@@ -93,7 +93,7 @@ const HomePage: React.FC = () => {
   return (
     <>
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 pt-8 pb-16 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-purple-900 via-blue-900 to-cyan-900 pt-8 pb-16 overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img 
@@ -101,7 +101,7 @@ const HomePage: React.FC = () => {
             alt="Professional team collaboration" 
             className="w-full h-full object-cover opacity-20"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-blue-900/70 to-indigo-900/80"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-purple-900/85 via-blue-900/75 to-cyan-900/85"></div>
         </div>
         
         <div className="container mx-auto px-8">
@@ -110,7 +110,7 @@ const HomePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="text-4xl font-bold text-white mb-10 max-w-[700px] mx-auto leading-tight"
+              className="text-4xl font-bold bg-gradient-to-r from-white via-cyan-100 to-blue-100 bg-clip-text text-transparent mb-10 max-w-[700px] mx-auto leading-tight"
             >
               A marketplace for all your outsourcing needs.
             </motion.h1>
@@ -118,7 +118,7 @@ const HomePage: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="text-xl text-gray-200 mb-10 max-w-[700px] mx-auto"
+              className="text-xl text-cyan-100 mb-10 max-w-[700px] mx-auto"
             >
               Discover Projects, top companies, vetted freelancers, and global experts on a single platform
             </motion.p>
@@ -182,7 +182,7 @@ const HomePage: React.FC = () => {
                   </div>
                   <button
                     type="submit"
-                    className="px-8 py-4 bg-[#0070F3] text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 font-medium"
+                    className="px-8 py-4 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg hover:from-orange-600 hover:to-pink-600 transition-all duration-300 flex items-center justify-center gap-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     Search
                   </button>
@@ -197,34 +197,33 @@ const HomePage: React.FC = () => {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="text-center text-white"
             >
-              <p className="text-gray-300 text-lg mb-8">
+              <p className="text-cyan-200 text-lg mb-8">
                 Trusted by
               </p>
               <div className="overflow-hidden">
                 <div className="flex animate-marquee space-x-16 whitespace-nowrap">
-                  <div className="text-2xl font-bold text-blue-400">MRI</div>
-                  <div className="text-2xl font-bold text-emerald-400">Infosys</div>
-                  <div className="text-2xl font-bold text-purple-400">HiBob</div>
-                  <div className="text-2xl font-bold text-yellow-400">Atlassian</div>
-                  <div className="text-2xl font-bold text-red-400">Slack</div>
-                  <div className="text-2xl font-bold text-cyan-400">Zoom</div>
-                  <div className="text-2xl font-bold text-lime-400">Spotify</div>
-                  <div className="text-2xl font-bold text-orange-500">Shopify</div>
-                  <div className="text-2xl font-bold text-blue-500">Dropbox</div>
-                  <div className="text-2xl font-bold text-pink-400">Figma</div>
-                  <div className="text-2xl font-bold text-indigo-400">Notion</div>
+                  <div className="text-2xl font-bold text-cyan-300 hover:text-cyan-100 transition-colors">MRI</div>
+                  <div className="text-2xl font-bold text-emerald-300 hover:text-emerald-100 transition-colors">Infosys</div>
+                  <div className="text-2xl font-bold text-purple-300 hover:text-purple-100 transition-colors">HiBob</div>
+                  <div className="text-2xl font-bold text-yellow-300 hover:text-yellow-100 transition-colors">Atlassian</div>
+                  <div className="text-2xl font-bold text-red-300 hover:text-red-100 transition-colors">Slack</div>
+                  <div className="text-2xl font-bold text-blue-300 hover:text-blue-100 transition-colors">Zoom</div>
+                  <div className="text-2xl font-bold text-lime-300 hover:text-lime-100 transition-colors">Spotify</div>
+                  <div className="text-2xl font-bold text-orange-300 hover:text-orange-100 transition-colors">Shopify</div>
+                  <div className="text-2xl font-bold text-pink-300 hover:text-pink-100 transition-colors">Dropbox</div>
+                  <div className="text-2xl font-bold text-indigo-300 hover:text-indigo-100 transition-colors">Figma</div>
+                  <div className="text-2xl font-bold text-rose-300 hover:text-rose-100 transition-colors">Notion</div>
                   {/* Duplicate for seamless loop */}
-                  <div className="text-2xl font-bold text-blue-400">MRI</div>
-                  <div className="text-2xl font-bold text-emerald-400">Infosys</div>
-                  <div className="text-2xl font-bold text-purple-400">HiBob</div>
-                  <div className="text-2xl font-bold text-yellow-400">Atlassian</div>
-                  <div className="text-2xl font-bold text-red-400">Slack</div>
-                  <div className="text-2xl font-bold text-cyan-400">Zoom</div>
-                  <div className="text-2xl font-bold text-lime-400">Spotify</div>
-                  <div className="text-2xl font-bold text-orange-500">Shopify</div>
-                  <div className="text-2xl font-bold text-blue-500">Dropbox</div>
-                  <div className="text-2xl font-bold text-pink-400">Figma</div>
-                  <div className="text-2xl font-bold text-indigo-400">Notion</div>
+                  <div className="text-2xl font-bold text-cyan-300 hover:text-cyan-100 transition-colors">MRI</div>
+                  <div className="text-2xl font-bold text-emerald-300 hover:text-emerald-100 transition-colors">Infosys</div>
+                  <div className="text-2xl font-bold text-purple-300 hover:text-purple-100 transition-colors">HiBob</div>
+                  <div className="text-2xl font-bold text-yellow-300 hover:text-yellow-100 transition-colors">Atlassian</div>
+                  <div className="text-2xl font-bold text-red-300 hover:text-red-100 transition-colors">Slack</div>
+                  <div className="text-2xl font-bold text-blue-300 hover:text-blue-100 transition-colors">Zoom</div>
+                  <div className="text-2xl font-bold text-lime-300 hover:text-lime-100 transition-colors">Spotify</div>
+                  <div className="text-2xl font-bold text-orange-300 hover:text-orange-100 transition-colors">Shopify</div>
+                  <div className="text-2xl font-bold text-pink-300 hover:text-pink-100 transition-colors">Dropbox</div>
+                  <div className="text-2xl font-bold text-indigo-300 hover:text-indigo-100 transition-colors">Figma</div>
                 </div>
               </div>
             </motion.div>
@@ -287,49 +286,49 @@ const HomePage: React.FC = () => {
                   </li>
                 ))}
               </ul>
-              <button className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700 transition-colors group">
+              <button className="inline-flex items-center bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all group">
                 <span>View All Categories</span>
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
             
-            <div className="group bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="group bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-emerald-200/50 hover:shadow-2xl hover:border-green-300/50 transition-all duration-300 hover:-translate-y-2">
               <div className="flex items-center mb-6">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center mr-4">
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center mr-4">
                   <Database className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-[#0B2D59]">Technical Skillsets</h3>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-800 to-teal-700 bg-clip-text text-transparent">Technical Skillsets</h3>
               </div>
               <ul className="space-y-4 mb-6">
                 {skillsets.slice(0, 4).map((skill, index) => (
                   <li key={index} className="flex items-center group-hover:translate-x-1 transition-transform duration-200" style={{ transitionDelay: `${index * 50}ms` }}>
-                    <div className="h-2 w-2 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 mr-4"></div>
-                    <span className="text-[#0B2D59] font-semibold text-lg">{skill}</span>
+                    <div className="h-2 w-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 mr-4"></div>
+                    <span className="text-slate-800 font-semibold text-lg">{skill}</span>
                   </li>
                 ))}
               </ul>
-              <button className="inline-flex items-center text-emerald-600 font-semibold hover:text-emerald-700 transition-colors group">
+              <button className="inline-flex items-center bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all group">
                 <span>View All Skills</span>
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
             
-            <div className="group bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-white/50 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+            <div className="group bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-amber-200/50 hover:shadow-2xl hover:border-orange-300/50 transition-all duration-300 hover:-translate-y-2">
               <div className="flex items-center mb-6">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center mr-4">
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center mr-4">
                   <Users className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-[#0B2D59]">Professional Roles</h3>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-amber-800 to-orange-700 bg-clip-text text-transparent">Professional Roles</h3>
               </div>
               <ul className="space-y-4 mb-6">
                 {jobTitles.slice(0, 4).map((title, index) => (
                   <li key={index} className="flex items-center group-hover:translate-x-1 transition-transform duration-200" style={{ transitionDelay: `${index * 50}ms` }}>
-                    <div className="h-2 w-2 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 mr-4"></div>
-                    <span className="text-[#0B2D59] font-semibold text-lg">{title}</span>
+                    <div className="h-2 w-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 mr-4"></div>
+                    <span className="text-slate-800 font-semibold text-lg">{title}</span>
                   </li>
                 ))}
               </ul>
-              <button className="inline-flex items-center text-purple-600 font-semibold hover:text-purple-700 transition-colors group">
+              <button className="inline-flex items-center bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent font-semibold hover:from-amber-700 hover:to-orange-700 transition-all group">
                 <span>View All Roles</span>
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </button>
@@ -339,13 +338,13 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* How Collabov Works */}
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-gradient-to-b from-white to-slate-50">
         <div className="container mx-auto px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-[#0B2D59] mb-6">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-900 to-indigo-800 bg-clip-text text-transparent mb-6">
               Comprehensive Outsourcing Solutions
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-xl text-slate-600 max-w-3xl mx-auto">
               Our platform provides end-to-end outsourcing capabilities designed to meet diverse business requirements
             </p>
           </div>
@@ -353,60 +352,60 @@ const HomePage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             {/* Dedicated Teams */}
             <div className="relative">
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8 shadow-xl border border-blue-100">
-                <div className="h-16 w-16 rounded-full bg-[#0070F3] flex items-center justify-center mx-auto mb-6">
+              <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 rounded-2xl p-8 shadow-xl border border-indigo-200/50 hover:shadow-2xl transition-all duration-300">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
                   <Users className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-[#0B2D59] mb-4 text-center">Dedicated Team Solutions</h3>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-900 to-blue-800 bg-clip-text text-transparent mb-4 text-center">Dedicated Team Solutions</h3>
                 <div className="space-y-3 mb-6">
-                  <p className="text-[#0B2D59] font-semibold">Cost reduction up to 60%</p>
-                  <p className="text-gray-600">Timezone-aligned professional teams</p>
-                  <p className="text-gray-600">Verified workforce from trusted vendors</p>
-                  <p className="text-gray-600">Seamless integration with existing operations</p>
+                  <p className="text-indigo-900 font-semibold">Cost reduction up to 60%</p>
+                  <p className="text-slate-600">Timezone-aligned professional teams</p>
+                  <p className="text-slate-600">Verified workforce from trusted vendors</p>
+                  <p className="text-slate-600">Seamless integration with existing operations</p>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm p-4 rounded-lg border">
-                  <p className="font-semibold text-[#0B2D59] mb-2">Process:</p>
-                  <p className="text-sm text-gray-700">Search → Evaluate → Connect → Deploy</p>
+                <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-indigo-200/50">
+                  <p className="font-semibold text-indigo-900 mb-2">Process:</p>
+                  <p className="text-sm text-slate-700">Search → Evaluate → Connect → Deploy</p>
                 </div>
               </div>
             </div>
             
             {/* Freelance Professionals */}
             <div className="relative">
-              <div className="bg-gradient-to-br from-emerald-50 to-teal-100 rounded-2xl p-8 shadow-xl border border-emerald-100">
-                <div className="h-16 w-16 rounded-full bg-emerald-600 flex items-center justify-center mx-auto mb-6">
+              <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 rounded-2xl p-8 shadow-xl border border-emerald-200/50 hover:shadow-2xl transition-all duration-300">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
                   <Briefcase className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-[#0B2D59] mb-4 text-center">Freelance Professionals</h3>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-900 to-teal-800 bg-clip-text text-transparent mb-4 text-center">Freelance Professionals</h3>
                 <div className="space-y-3 mb-6">
-                  <p className="text-[#0B2D59] font-semibold">Pre-vetted, immediately available</p>
-                  <p className="text-gray-600">Flexible hourly or project-based pricing</p>
-                  <p className="text-gray-600">AI-powered matching technology</p>
-                  <p className="text-gray-600">Global talent pool access</p>
+                  <p className="text-emerald-900 font-semibold">Pre-vetted, immediately available</p>
+                  <p className="text-slate-600">Flexible hourly or project-based pricing</p>
+                  <p className="text-slate-600">AI-powered matching technology</p>
+                  <p className="text-slate-600">Global talent pool access</p>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm p-4 rounded-lg border">
-                  <p className="font-semibold text-[#0B2D59] mb-2">Process:</p>
-                  <p className="text-sm text-gray-700">Browse → Assess → Engage → Collaborate</p>
+                <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-emerald-200/50">
+                  <p className="font-semibold text-emerald-900 mb-2">Process:</p>
+                  <p className="text-sm text-slate-700">Browse → Assess → Engage → Collaborate</p>
                 </div>
               </div>
             </div>
             
             {/* Project Posting */}
             <div className="relative">
-              <div className="bg-gradient-to-br from-purple-50 to-pink-100 rounded-2xl p-8 shadow-xl border border-purple-100">
-                <div className="h-16 w-16 rounded-full bg-purple-600 flex items-center justify-center mx-auto mb-6">
+              <div className="bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-100 rounded-2xl p-8 shadow-xl border border-purple-200/50 hover:shadow-2xl transition-all duration-300">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-purple-600 to-fuchsia-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
                   <Megaphone className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-[#0B2D59] mb-4 text-center">Project Posting Platform</h3>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-900 to-fuchsia-800 bg-clip-text text-transparent mb-4 text-center">Project Posting Platform</h3>
                 <div className="space-y-3 mb-6">
-                  <p className="text-[#0B2D59] font-semibold">No-cost project posting</p>
-                  <p className="text-gray-600">Competitive proposal evaluation</p>
-                  <p className="text-gray-600">Expertise and pricing comparison</p>
-                  <p className="text-gray-600">Comprehensive vendor selection</p>
+                  <p className="text-purple-900 font-semibold">No-cost project posting</p>
+                  <p className="text-slate-600">Competitive proposal evaluation</p>
+                  <p className="text-slate-600">Expertise and pricing comparison</p>
+                  <p className="text-slate-600">Comprehensive vendor selection</p>
                 </div>
-                <div className="bg-white/70 backdrop-blur-sm p-4 rounded-lg border">
-                  <p className="font-semibold text-[#0B2D59] mb-2">Process:</p>
-                  <p className="text-sm text-gray-700">Post → Review → Select → Monitor</p>
+                <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-purple-200/50">
+                  <p className="font-semibold text-purple-900 mb-2">Process:</p>
+                  <p className="text-sm text-slate-700">Post → Review → Select → Monitor</p>
                 </div>
               </div>
             </div>
@@ -415,7 +414,7 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* AI Outsourcing Calculator Section */}
-      <section className="py-16 bg-gradient-to-r from-slate-100 to-gray-100">
+      <section className="py-16 bg-gradient-to-r from-slate-100 via-blue-50 to-indigo-100">
         <div className="container mx-auto px-8 text-center">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Image Section */}
@@ -425,21 +424,23 @@ const HomePage: React.FC = () => {
                 alt="AI-powered analytics dashboard" 
                 className="rounded-2xl shadow-2xl w-full h-80 object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0070F3]/30 to-transparent rounded-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-indigo-600/40 to-purple-600/20 rounded-2xl"></div>
               <div className="absolute top-6 left-6">
-                <Calculator className="h-12 w-12 text-white drop-shadow-lg" />
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <Calculator className="h-8 w-8 text-white drop-shadow-lg" />
+                </div>
               </div>
             </div>
             
             {/* Content Section */}
             <div className="text-center lg:text-left">
-              <h2 className="text-4xl font-bold text-[#0B2D59] mb-6">AI-Powered Outsourcing Calculator</h2>
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-indigo-800 to-purple-800 bg-clip-text text-transparent mb-6">AI-Powered Outsourcing Calculator</h2>
+              <p className="text-xl text-slate-600 mb-8 leading-relaxed">
                 Leverage our advanced AI calculator to identify optimal outsourcing opportunities. 64% of our clients have successfully utilized this tool to streamline their operations.
               </p>
               <Link
                 to="/ai-calculator"
-                className="inline-flex items-center px-8 py-4 bg-[#0070F3] text-white rounded-xl hover:bg-blue-600 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 Access Calculator
                 <ArrowRight className="ml-3 h-5 w-5" />
@@ -450,15 +451,15 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* Try AI Services Section */}
-      <section className="py-16 bg-gradient-to-br from-indigo-50 via-white to-cyan-50">
+      <section className="py-16 bg-gradient-to-br from-violet-50 via-indigo-50 to-cyan-50">
         <div className="container mx-auto px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Content Section */}
             <div>
-              <h2 className="text-4xl font-bold text-[#0B2D59] mb-6">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-purple-800 to-indigo-800 bg-clip-text text-transparent mb-6">
                 Comprehensive AI-Powered Solutions
               </h2>
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              <p className="text-xl text-slate-600 mb-8 leading-relaxed">
                 Access our curated collection of AI-powered tools designed to enhance productivity across presentations, development, design, content creation, marketing, and business operations.
               </p>
               
@@ -466,7 +467,7 @@ const HomePage: React.FC = () => {
                 {aiCategories.map((category, index) => (
                   <button
                     key={index}
-                    className="px-4 py-3 bg-white text-[#0B2D59] rounded-xl hover:bg-[#0070F3] hover:text-white transition-all duration-300 font-medium border border-gray-200 shadow-sm hover:shadow-md text-sm"
+                    className="px-4 py-3 bg-white/80 backdrop-blur-sm text-slate-800 rounded-xl hover:bg-gradient-to-r hover:from-purple-600 hover:to-indigo-600 hover:text-white transition-all duration-300 font-medium border border-purple-200/50 shadow-sm hover:shadow-lg text-sm transform hover:-translate-y-0.5"
                   >
                     {category}
                   </button>
@@ -475,7 +476,7 @@ const HomePage: React.FC = () => {
               
               <Link
                 to="/ai-services"
-                className="inline-flex items-center px-8 py-4 bg-[#0070F3] text-white rounded-xl hover:bg-blue-600 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 Explore AI Solutions
                 <ArrowRight className="ml-3 h-5 w-5" />
@@ -489,9 +490,11 @@ const HomePage: React.FC = () => {
                 alt="AI technology and automation" 
                 className="rounded-2xl shadow-2xl w-full h-80 object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-indigo-600/30 to-transparent rounded-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-purple-600/40 to-indigo-600/20 rounded-2xl"></div>
               <div className="absolute top-6 right-6">
-                <Brain className="h-12 w-12 text-white drop-shadow-lg" />
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <Brain className="h-8 w-8 text-white drop-shadow-lg" />
+                </div>
               </div>
             </div>
           </div>
@@ -499,9 +502,14 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* Vendor & Freelancer Invitation */}
-      <section className="py-16 bg-[#0070F3] text-white">
+      <section className="py-16 bg-gradient-to-r from-indigo-900 via-purple-800 to-blue-900 text-white relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/50 via-purple-900/30 to-blue-900/50"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+        
         <div className="container mx-auto px-8">
-          <div className="max-w-4xl mx-auto text-center">
+          <div className="max-w-4xl mx-auto text-center relative z-10">
             <h2 className="text-3xl font-bold mb-8">
               Grow Your Business Globally with Collabov
             </h2>
@@ -536,19 +544,19 @@ const HomePage: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/vendor/signup"
-                className="px-8 py-4 bg-white text-[#0070F3] rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                className="px-8 py-4 bg-white text-indigo-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 Sign Up as Vendor
               </Link>
               <Link
                 to="/vendor/signup"
-                className="px-8 py-4 bg-white text-[#0070F3] rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                className="px-8 py-4 bg-white text-emerald-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 Join as Freelancer
               </Link>
               <Link
                 to="/vendor/signup"
-                className="px-8 py-4 bg-white text-[#0070F3] rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                className="px-8 py-4 bg-white text-purple-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 Become an Expert
               </Link>
@@ -558,7 +566,7 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* Explore Packages & Bundles Section */}
-      <section className="py-16 bg-gradient-to-br from-amber-50 to-orange-50">
+      <section className="py-16 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
         <div className="container mx-auto px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Image Section */}
@@ -568,21 +576,23 @@ const HomePage: React.FC = () => {
                 alt="Business packages and solutions" 
                 className="rounded-2xl shadow-2xl w-full h-80 object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-amber-600/30 to-transparent rounded-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-orange-600/40 to-amber-600/20 rounded-2xl"></div>
               <div className="absolute top-6 left-6">
-                <PackageIcon className="h-12 w-12 text-white drop-shadow-lg" />
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <PackageIcon className="h-8 w-8 text-white drop-shadow-lg" />
+                </div>
               </div>
             </div>
             
             {/* Content Section */}
             <div>
-              <h2 className="text-4xl font-bold text-[#0B2D59] mb-6">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-900 via-orange-800 to-amber-800 bg-clip-text text-transparent mb-6">
                 Explore Packages & Bundles
               </h2>
-              <p className="text-xl text-gray-600 mb-4 leading-relaxed">
+              <p className="text-xl text-slate-600 mb-4 leading-relaxed">
                 Simplify outsourcing with curated fixed-price packages
               </p>
-              <p className="text-lg text-gray-600 mb-8">
+              <p className="text-lg text-slate-600 mb-8">
                 Clear pricing, faster onboarding, tailored solutions from trusted vendors
               </p>
               
@@ -590,7 +600,7 @@ const HomePage: React.FC = () => {
                 {packages.map((pkg, index) => (
                   <div
                     key={index}
-                    className="px-6 py-4 bg-white text-[#0B2D59] rounded-xl border border-gray-200 hover:border-amber-400 transition-all duration-300 shadow-sm hover:shadow-md font-medium"
+                    className="px-6 py-4 bg-white/90 backdrop-blur-sm text-slate-800 rounded-xl border border-orange-200/50 hover:border-amber-400 hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 transition-all duration-300 shadow-sm hover:shadow-lg font-medium transform hover:-translate-y-0.5"
                   >
                     {pkg}
                   </div>
@@ -599,7 +609,7 @@ const HomePage: React.FC = () => {
               
               <Link
                 to="/packages"
-                className="inline-flex items-center px-8 py-4 bg-[#0070F3] text-white rounded-xl hover:bg-blue-600 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl hover:from-orange-700 hover:to-amber-700 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 View All Packages
                 <ArrowRight className="ml-3 h-5 w-5" />
