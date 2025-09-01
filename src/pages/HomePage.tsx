@@ -236,10 +236,10 @@ const HomePage: React.FC = () => {
         <div className="container mx-auto px-8">
           <div className="max-w-4xl mx-auto text-center bg-white border border-gray-200 rounded-xl shadow-lg p-10">
             <h2 className="text-3xl font-bold text-[#0B2D59] mb-6">
-              Tell us what you need — let AI do the matching.
+              Describe Your Project — Let AI Find Perfect Matches
             </h2>
             <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-              Skip the guesswork. Just describe your project and our AI will instantly connect you with top freelancers, agencies, or expert teams that fit your exact needs. Fast. Accurate. Effortless.
+              Skip the guesswork. Just describe your project and our AI will instantly connect you with top independent professionals, agencies, or expert teams that fit your exact needs. Fast. Accurate. Effortless.
             </p>
             <Link
               to="/ai-services"
@@ -511,7 +511,7 @@ const HomePage: React.FC = () => {
         <div className="container mx-auto px-8">
           <div className="max-w-4xl mx-auto text-center relative z-10">
             <h2 className="text-3xl font-bold mb-8">
-              Grow Your Business Globally with Collabov
+              Join Our Global Professional Network
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
@@ -546,19 +546,19 @@ const HomePage: React.FC = () => {
                 to="/vendor/signup"
                 className="px-8 py-4 bg-white text-indigo-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                Sign Up as Vendor
+                Join as Service Provider
               </Link>
               <Link
                 to="/vendor/signup"
                 className="px-8 py-4 bg-white text-emerald-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                Join as Independent Professional
+                Sign Up as Independent Professional
               </Link>
               <Link
                 to="/vendor/signup"
                 className="px-8 py-4 bg-white text-purple-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                Become an Expert
+                Join as Domain Expert
               </Link>
             </div>
           </div>
