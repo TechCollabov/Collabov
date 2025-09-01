@@ -26,9 +26,9 @@ import AdminBlog from './pages/admin/AdminBlog';
 import AdminSettings from './pages/admin/AdminSettings';
 import VendorSignup from './pages/vendor/VendorSignup';
 import ServiceProviderSelection from './pages/vendor/ServiceProviderSelection';
-import FreelancerSignup from './pages/vendor/FreelancerSignup';
-import FreelancerDashboard from './pages/freelancer/FreelancerDashboard';
-import FreelancerProfileSetup from './pages/freelancer/FreelancerProfileSetup';
+import IndependentSignup from './pages/vendor/IndependentSignup';
+import ContractorDashboard from './pages/contractor/ContractorDashboard';
+import ContractorProfileSetup from './pages/contractor/ContractorProfileSetup';
 import VendorLogin from './pages/vendor/VendorLogin';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import SignInPage from './pages/SignInPage';
@@ -49,7 +49,7 @@ function App() {
        !location.pathname.startsWith('/vendor/dashboard') && 
        !location.pathname.startsWith('/vendor/login') && 
        !location.pathname.startsWith('/vendor/signup') && 
-       !location.pathname.startsWith('/freelancer/dashboard') && 
+       !location.pathname.startsWith('/contractor/dashboard') && 
        !location.pathname.startsWith('/customer/dashboard') && 
        <Navbar />}
       <main className="flex-grow">
@@ -64,10 +64,10 @@ function App() {
           <Route path="/search" element={<SearchResults />} />
           <Route path="/vendor/signup" element={<VendorSignup />} />
           <Route path="/vendor/role-selection" element={<ServiceProviderSelection />} />
-          <Route path="/freelancer/signup" element={<FreelancerSignup />} />
-          <Route path="/freelancer/dashboard" element={<FreelancerDashboard />} />
-          <Route path="/freelancer/profile-setup" element={<FreelancerProfileSetup />} />
-          <Route path="/freelancer/login" element={<VendorLogin />} />
+          <Route path="/independent/signup" element={<IndependentSignup />} />
+          <Route path="/contractor/dashboard" element={<ContractorDashboard />} />
+          <Route path="/contractor/profile-setup" element={<ContractorProfileSetup />} />
+          <Route path="/contractor/login" element={<VendorLogin />} />
           <Route path="/vendor/login" element={<VendorLogin />} />
           <Route path="/vendor/dashboard/*" element={<VendorDashboard />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
@@ -101,7 +101,7 @@ function App() {
        !location.pathname.startsWith('/vendor/dashboard') && 
        !location.pathname.startsWith('/vendor/login') && 
        !location.pathname.startsWith('/vendor/signup') && 
-       !location.pathname.startsWith('/freelancer/dashboard') && 
+       !location.pathname.startsWith('/contractor/dashboard') && 
        !location.pathname.startsWith('/customer/dashboard') && 
        <Footer />}
     </div>

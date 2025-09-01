@@ -517,7 +517,7 @@ const PostJobPage: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-blue-900 mb-1">What happens next?</h4>
                   <ul className="text-sm text-blue-800 space-y-1">
-                    <li>• Your job will be visible to relevant freelancers and vendors</li>
+                    <li>• Your job will be visible to relevant contractors and vendors</li>
                     <li>• You'll start receiving proposals within 24 hours</li>
                     <li>• Review proposals and interview candidates</li>
                     <li>• Award the project to your preferred candidate</li>

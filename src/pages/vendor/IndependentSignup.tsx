@@ -1,26 +1,4 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { motion } from 'framer-motion';
-import { Mail, Lock, User, Phone, Globe, ArrowLeft, Shield, FileText } from 'lucide-react';
-
-const signupSchema = z.object({
-  firstName: z.string().min(2, 'First name is required'),
-  lastName: z.string().min(2, 'Last name is required'),
-  contactNumber: z.string().min(10, 'Valid contact number is required'),
-  email: z.string().email('Valid email is required'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-type SignupFormData = z.infer<typeof signupSchema>;
-
-const FreelancerSignup: React.FC = () => {
+const IndependentSignup: React.FC = () => {
   const navigate = useNavigate();
   const [showOTP, setShowOTP] = useState(false);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -33,7 +11,7 @@ const FreelancerSignup: React.FC = () => {
   });
 
   const onSubmit = async (data: SignupFormData) => {
-    console.log('Freelancer signup:', data);
+    console.log('Independent professional signup:', data);
     setFormData(data);
     setShowOTP(true);
     // Here you would send OTP to the phone number
@@ -71,7 +49,7 @@ const FreelancerSignup: React.FC = () => {
           email: formData.email,
           firstName: formData.firstName,
           lastName: formData.lastName,
-          role: 'freelancer',
+          role: 'contractor',
           signupMethod: 'email'
         }));
       }
@@ -79,7 +57,7 @@ const FreelancerSignup: React.FC = () => {
       // Simulate OTP verification
       setTimeout(() => {
         setIsVerifying(false);
-        navigate('/freelancer/dashboard');
+        navigate('/contractor/dashboard');
       }, 2000);
     }
   };
@@ -97,14 +75,14 @@ const FreelancerSignup: React.FC = () => {
     localStorage.setItem('userSignupData', JSON.stringify({
       email: account.email,
       fullName: account.name,
-      role: 'freelancer',
+      role: 'contractor',
       signupMethod: 'google',
       googleId: account.id
     }));
     
     // Simulate successful OAuth and redirect to profile setup
     setTimeout(() => {
-      navigate('/freelancer/profile-setup', {
+      navigate('/contractor/profile-setup', {
         state: {
           googleData: {
             fullName: account.name,
@@ -131,10 +109,10 @@ const FreelancerSignup: React.FC = () => {
             <span className="text-xl font-bold text-[#0B2D59]">Collabov</span>
           </Link>
           <h2 className="text-center text-3xl font-bold text-[#0B2D59] mb-2">
-            Verify Your Phone Number
+           Join as an Independent Professional
           </h2>
           <p className="text-center text-gray-600 mb-8">
-            We've sent a 6-digit code to {formData?.contactNumber}
+           Connect with clients worldwide and grow your professional business
           </p>
         </div>
 
@@ -531,5 +509,3 @@ const FreelancerSignup: React.FC = () => {
     </>
   );
 };
-
-export default FreelancerSignup;

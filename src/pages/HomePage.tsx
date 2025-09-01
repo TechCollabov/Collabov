@@ -526,7 +526,7 @@ const HomePage: React.FC = () => {
                 </li>
                 <li className="flex items-start">
                   <CheckCircle className="h-6 w-6 mr-3 mt-1 flex-shrink-0" />
-                  <span>Manage teams, freelancers & packages from your dashboard</span>
+                  <span>Manage teams, contractors & packages from your dashboard</span>
                 </li>
               </ul>
               <ul className="space-y-4 text-left">
@@ -552,7 +552,7 @@ const HomePage: React.FC = () => {
                 to="/vendor/signup"
                 className="px-8 py-4 bg-white text-emerald-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
-                Join as Freelancer
+                Join as Independent Professional
               </Link>
               <Link
                 to="/vendor/signup"

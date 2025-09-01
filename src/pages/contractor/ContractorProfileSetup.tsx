@@ -41,7 +41,7 @@ interface ProfileData {
   certifications: string[];
 }
 
-const FreelancerProfileSetup: React.FC = () => {
+const ContractorProfileSetup: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const googleData = location.state?.googleData as GoogleData;
@@ -672,7 +672,7 @@ const FreelancerProfileSetup: React.FC = () => {
             <span className="text-xl font-bold text-[#0B2D59]">Collabov</span>
           </Link>
           <h1 className="text-3xl font-bold text-[#0B2D59] mb-2">
-            Complete Your Freelancer Profile
+            Complete Your Professional Profile
           </h1>
           <p className="text-gray-600">
             Step {currentStep} of {totalSteps} - Let's make you stand out to potential clients
@@ -739,5 +739,3 @@ const FreelancerProfileSetup: React.FC = () => {
     </div>
   );
 };
-
-export default FreelancerProfileSetup;

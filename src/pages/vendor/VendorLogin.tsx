@@ -38,8 +38,8 @@ const VendorLogin: React.FC = () => {
         case 'vendor':
           navigate('/vendor/dashboard');
           break;
-        case 'expert':
-          navigate('/expert/dashboard');
+        case 'contractor':
+          navigate('/contractor/dashboard');
           break;
         case 'customer':
           navigate('/dashboard');
@@ -52,7 +52,7 @@ const VendorLogin: React.FC = () => {
 
   const userTypeOptions = [
     { value: 'vendor', label: 'Vendor', icon: Building2, description: 'Sign in as a service provider company' },
-    { value: 'expert', label: 'Expert', icon: Briefcase, description: 'Sign in as an individual professional' },
+    { value: 'contractor', label: 'Independent Professional', icon: Briefcase, description: 'Sign in as an individual professional' },
     { value: 'customer', label: 'Customer', icon: User, description: 'Sign in as a business looking for services' }
   ];
 

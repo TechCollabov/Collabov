@@ -34,13 +34,13 @@ const SignInPage: React.FC = () => {
   // Mock user database for role-based routing
   const mockUsers: UserRole[] = [
     { email: 'studio@vendor.com', role: 'vendor', dashboard: '/vendor/dashboard' },
-    { email: 'jane@freelancer.com', role: 'freelancer', dashboard: '/freelancer/dashboard' },
+    { email: 'jane@contractor.com', role: 'contractor', dashboard: '/contractor/dashboard' },
     { email: 'client@company.com', role: 'customer', dashboard: '/customer/dashboard' },
     { email: 'expert@domain.com', role: 'expert', dashboard: '/expert/dashboard' },
     { email: 'admin@collabov.com', role: 'vendor', dashboard: '/vendor/dashboard' },
-    // Add any email that goes through freelancer signup
-    { email: 'john.doe@gmail.com', role: 'freelancer', dashboard: '/freelancer/dashboard' },
-    { email: 'john.doe@company.com', role: 'freelancer', dashboard: '/freelancer/dashboard' }
+    // Add any email that goes through independent professional signup
+    { email: 'john.doe@gmail.com', role: 'contractor', dashboard: '/contractor/dashboard' },
+    { email: 'john.doe@company.com', role: 'contractor', dashboard: '/contractor/dashboard' }
   ];
 
   const getUserRole = (email: string): UserRole | null => {
@@ -68,18 +68,18 @@ const SignInPage: React.FC = () => {
       }
     }
     
-    // Default routing for common freelancer patterns
-    if (email.toLowerCase().includes('freelancer') || 
+    // Default routing for common contractor patterns
+    if (email.toLowerCase().includes('contractor') || 
         email.toLowerCase().includes('john.doe') ||
         email.toLowerCase().includes('jane.doe') ||
         email.toLowerCase().endsWith('@gmail.com') ||
         email.toLowerCase().endsWith('@yahoo.com') ||
         email.toLowerCase().endsWith('@hotmail.com')) {
-      console.log('Detected freelancer email pattern:', email);
+      console.log('Detected contractor email pattern:', email);
       return {
         email: email,
-        role: 'freelancer',
-        dashboard: '/freelancer/dashboard'
+        role: 'contractor',
+        dashboard: '/contractor/dashboard'
       };
     }
     
@@ -338,7 +338,7 @@ const SignInPage: React.FC = () => {
               <h4 className="text-sm font-medium text-blue-800 mb-2">Demo Accounts:</h4>
               <div className="text-xs text-blue-700 space-y-1">
                 <p><strong>Vendor:</strong> studio@vendor.com</p>
-                <p><strong>Freelancer:</strong> jane@freelancer.com</p>
+                <p><strong>Contractor:</strong> jane@contractor.com</p>
                 <p><strong>Customer:</strong> client@company.com</p>
                 <p><strong>Expert:</strong> expert@domain.com</p>
                 <p className="text-blue-600 mt-2">Password: any password</p>
@@ -386,8 +386,8 @@ const SignInPage: React.FC = () => {
               {[
                 {
                   id: '1',
-                  name: 'Jane Freelancer',
-                  email: 'jane@freelancer.com',
+                  name: 'Jane Contractor',
+                  email: 'jane@contractor.com',
                   picture: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2'
                 },
                 {

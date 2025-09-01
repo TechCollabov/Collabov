@@ -333,7 +333,7 @@ const CustomerDashboard: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <h3 className="font-medium text-gray-900">Post a Job</h3>
-                    <p className="text-sm text-gray-600">Find freelancers for your project</p>
+                    <p className="text-sm text-gray-600">Find contractors for your project</p>
                   </div>
                 </button>
 

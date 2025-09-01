@@ -65,11 +65,11 @@ const Navbar: React.FC = () => {
                       <h3 className="text-xs font-bold text-[#0070F3] uppercase tracking-wider mb-4 border-b border-blue-100 pb-2">Short Term</h3>
                       <div className="space-y-3">
                         <Link 
-                          to="/freelancers" 
+                          to="/contractors" 
                           className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
                           onClick={() => setIsOutsourceOpen(false)}
                         >
-                          Freelancers
+                          Independent Professionals
                         </Link>
                         <Link 
                           to="/experts" 
@@ -122,7 +122,7 @@ const Navbar: React.FC = () => {
                   <div className="px-8">
                     <div className="space-y-3">
                       <Link 
-                        to="/tenders" 
+                        to="/contractors" 
                         className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
                         onClick={() => setIsProjectsOpen(false)}
                       >
@@ -243,7 +243,7 @@ const Navbar: React.FC = () => {
                         className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
                         onClick={closeMenu}
                       >
-                        Freelancers
+                        Independent Professionals
                       </Link>
                       <Link
                         to="/experts"

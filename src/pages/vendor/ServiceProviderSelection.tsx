@@ -30,7 +30,7 @@ const ServiceProviderSelection: React.FC = () => {
     },
     {
       id: 'freelancer',
-      title: 'Freelancer',
+      title: 'Independent Professional',
       description: 'An individual professional offering services independently.',
       icon: User,
       features: [
@@ -57,8 +57,8 @@ const ServiceProviderSelection: React.FC = () => {
   const handleContinue = () => {
     if (selectedRole) {
       // Navigate to appropriate signup page based on role
-      if (selectedRole === 'freelancer') {
-        navigate('/freelancer/signup');
+      if (selectedRole === 'independent') {
+        navigate('/independent/signup');
       } else {
         navigate(`/vendor/signup?role=${selectedRole}`);
       }

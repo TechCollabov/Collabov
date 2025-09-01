@@ -26,7 +26,7 @@ const Footer: React.FC = () => {
               <li><Link to="/services" className="hover:text-gray-300 transition-colors">Outsource Projects</Link></li>
               <li><Link to="/ai-services" className="hover:text-gray-300 transition-colors">AI Services</Link></li>
               <li><Link to="/packages" className="hover:text-gray-300 transition-colors">Packages & Bundles</Link></li>
-              <li><Link to="/freelancers" className="hover:text-gray-300 transition-colors">Freelancers</Link></li>
+              <li><Link to="/contractors" className="hover:text-gray-300 transition-colors">Independent Professionals</Link></li>
               <li><Link to="/teams" className="hover:text-gray-300 transition-colors">Dedicated Teams</Link></li>
             </ul>
           </div>

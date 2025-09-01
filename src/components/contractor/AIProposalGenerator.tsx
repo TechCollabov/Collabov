@@ -192,7 +192,7 @@ Looking forward to collaborating with you!
 
 Best regards,
 John Doe
-Full Stack Developer`;
+Independent Professional`;
 
       setGeneratedProposal(proposal);
       setProposalScore(Math.floor(Math.random() * 15) + 85); // Random score between 85-100
@@ -234,10 +234,10 @@ Full Stack Developer`;
       clientNotifications.push({
         id: Date.now().toString(),
         type: 'new_proposal',
-        message: `You've received a new proposal from John Doe for "${jobContext.jobTitle}"`,
+        message: `You've received a new proposal from an independent professional for "${jobContext.jobTitle}"`,
         jobId: jobContext.jobId,
-        freelancerId: 'user_567',
-        timestamp: new Date().toISOString(),
+        contractorId: 'user_567',
+        contractorId: 'user_567', // This would come from auth context
         read: false
       });
       localStorage.setItem(`client_notifications_${jobContext.clientId}`, JSON.stringify(clientNotifications));
@@ -246,7 +246,7 @@ Full Stack Developer`;
       onClose();
       
       // Redirect to proposals page with success message
-      navigate('/freelancer/dashboard?tab=proposals&success=true&job=' + encodeURIComponent(jobContext.jobTitle));
+      navigate('/contractor/dashboard?tab=proposals&success=true&job=' + encodeURIComponent(jobContext.jobTitle));
     }, 2000);
   };
 

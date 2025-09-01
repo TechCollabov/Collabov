@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import AIProposalGenerator from '../../components/freelancer/AIProposalGenerator';
+import AIProposalGenerator from '../../components/contractor/AIProposalGenerator';
 import { 
   Search, Filter, Star, DollarSign, MessageSquare, 
   Briefcase, User, Settings, LogOut, Bell, 
@@ -11,7 +11,7 @@ import {
   BookOpen, HelpCircle, Camera, MapPin
 } from 'lucide-react';
 
-const FreelancerDashboard: React.FC = () => {
+const ContractorDashboard: React.FC = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAvailable, setIsAvailable] = useState(true);
@@ -616,13 +616,13 @@ const FreelancerDashboard: React.FC = () => {
               </div>
 
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <h4 className="font-semibold text-purple-900 mb-2">🤖 AI Proposal Generator</h4>
+                <h4 className="font-semibold text-purple-900 mb-2">🤖 Smart Proposal Assistant</h4>
                 <p className="text-sm text-purple-700 mb-3">Smart writing assistant for proposals</p>
                 <button 
                   className="text-purple-600 text-sm font-medium hover:text-purple-700"
                   onClick={() => setShowAIProposal(true)}
                 >
-                  Try AI Assistant →
+                  Try Smart Assistant →
                 </button>
               </div>
             </motion.div>
@@ -630,7 +630,7 @@ const FreelancerDashboard: React.FC = () => {
         </div>
       </main>
 
-      {/* AI Proposal Generator Modal */}
+      {/* Smart Proposal Generator Modal */}
       <AIProposalGenerator 
         isOpen={showAIProposal}
         onClose={() => setShowAIProposal(false)}
@@ -638,5 +638,3 @@ const FreelancerDashboard: React.FC = () => {
     </div>
   );
 };
-
-export default FreelancerDashboard;
