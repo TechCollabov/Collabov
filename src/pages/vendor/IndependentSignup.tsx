@@ -509,3 +509,6 @@ const IndependentSignup: React.FC = () => {
     </>
   );
 };
+
+
+export default IndependentSignup
