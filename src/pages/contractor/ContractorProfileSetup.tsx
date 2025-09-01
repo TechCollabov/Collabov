@@ -739,3 +739,6 @@ const ContractorProfileSetup: React.FC = () => {
     </div>
   );
 };
+
+
+export default ContractorProfileSetup
