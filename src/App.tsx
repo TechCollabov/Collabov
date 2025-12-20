@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { CustomerRoute, ContractorRoute, VendorRoute, AdminRoute } from './components/auth/ProtectedRoute';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import HomePage from './pages/HomePage';
@@ -36,7 +38,7 @@ import SignInPage from './pages/SignInPage';
 // Lazy load the PostJobPage to avoid any import issues
 const PostJobPage = React.lazy(() => import('./pages/customer/PostJobPage'));
 
-function App() {
+function AppContent() {
   const location = useLocation();
 
   useEffect(() => {
@@ -45,12 +47,12 @@ function App() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {!location.pathname.startsWith('/admin') && 
-       !location.pathname.startsWith('/vendor/dashboard') && 
-       !location.pathname.startsWith('/vendor/login') && 
-       !location.pathname.startsWith('/vendor/signup') && 
-       !location.pathname.startsWith('/contractor/dashboard') && 
-       !location.pathname.startsWith('/customer/dashboard') && 
+      {!location.pathname.startsWith('/admin') &&
+       !location.pathname.startsWith('/vendor/dashboard') &&
+       !location.pathname.startsWith('/vendor/login') &&
+       !location.pathname.startsWith('/vendor/signup') &&
+       !location.pathname.startsWith('/contractor/dashboard') &&
+       !location.pathname.startsWith('/customer/dashboard') &&
        <Navbar />}
       <main className="flex-grow">
         <Routes>
@@ -65,30 +67,31 @@ function App() {
           <Route path="/vendor/signup" element={<VendorSignup />} />
           <Route path="/vendor/role-selection" element={<ServiceProviderSelection />} />
           <Route path="/independent/signup" element={<IndependentSignup />} />
-          <Route path="/contractor/dashboard" element={<ContractorDashboard />} />
-          <Route path="/contractor/profile-setup" element={<ContractorProfileSetup />} />
+          <Route path="/contractor/profile-setup" element={<ContractorRoute><ContractorProfileSetup /></ContractorRoute>} />
+          <Route path="/contractor/dashboard" element={<ContractorRoute><ContractorDashboard /></ContractorRoute>} />
           <Route path="/contractor/login" element={<VendorLogin />} />
           <Route path="/vendor/login" element={<VendorLogin />} />
-          <Route path="/vendor/dashboard/*" element={<VendorDashboard />} />
+          <Route path="/vendor/dashboard/*" element={<VendorRoute><VendorDashboard /></VendorRoute>} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/user-type" element={<UserTypeSelection />} />
           <Route path="/customer/signup" element={<CustomerSignup />} />
           <Route path="/signin" element={<SignInPage />} />
-          <Route path="/customer/dashboard" element={<CustomerDashboard />} />
-          <Route path="/customer/compare" element={<VendorComparison />} />
+          <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
+          <Route path="/customer/compare" element={<CustomerRoute><VendorComparison /></CustomerRoute>} />
           <Route path="/customer/post-job" element={
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-            </div>}>
-              <PostJobPage />
-            </React.Suspense>
+            <CustomerRoute>
+              <React.Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+              </div>}>
+                <PostJobPage />
+              </React.Suspense>
+            </CustomerRoute>
           } />
-          
-          {/* Admin Routes */}
+
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="teams" element={<AdminTeams />} />
@@ -97,14 +100,22 @@ function App() {
           </Route>
         </Routes>
       </main>
-      {!location.pathname.startsWith('/admin') && 
-       !location.pathname.startsWith('/vendor/dashboard') && 
-       !location.pathname.startsWith('/vendor/login') && 
-       !location.pathname.startsWith('/vendor/signup') && 
-       !location.pathname.startsWith('/contractor/dashboard') && 
-       !location.pathname.startsWith('/customer/dashboard') && 
+      {!location.pathname.startsWith('/admin') &&
+       !location.pathname.startsWith('/vendor/dashboard') &&
+       !location.pathname.startsWith('/vendor/login') &&
+       !location.pathname.startsWith('/vendor/signup') &&
+       !location.pathname.startsWith('/contractor/dashboard') &&
+       !location.pathname.startsWith('/customer/dashboard') &&
        <Footer />}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

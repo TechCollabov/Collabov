@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, Phone, Building2, Globe, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const signupSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
@@ -23,6 +24,9 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 const CustomerSignup: React.FC = () => {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -32,24 +36,29 @@ const CustomerSignup: React.FC = () => {
   });
 
   const onSubmit = async (data: SignupFormData) => {
-    console.log('Customer signup:', data);
-    
-    // Store customer signup data for future sign-ins
-    localStorage.setItem('userSignupData', JSON.stringify({
-      email: data.workEmail,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      companyName: data.companyName,
-      role: 'customer',
-      signupMethod: 'email'
-    }));
-    
-    setIsEmailSent(true);
-    
-    // Simulate email verification for demo
-    setTimeout(() => {
-      navigate('/customer/dashboard');
-    }, 2000);
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      await signUp(data.workEmail, data.password, {
+        fullName: `${data.firstName} ${data.lastName}`,
+        userType: 'customer',
+        additionalData: {
+          companyName: data.companyName,
+          phone: data.phoneNumber,
+        },
+      });
+
+      setIsEmailSent(true);
+      setTimeout(() => {
+        navigate('/customer/dashboard');
+      }, 2000);
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred during signup');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignup = () => {
@@ -166,6 +175,12 @@ const CustomerSignup: React.FC = () => {
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
@@ -353,9 +368,17 @@ const CustomerSignup: React.FC = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#0070F3] hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0070F3] transition-all duration-200 transform hover:scale-105"
+                disabled={isLoading}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#0070F3] hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0070F3] transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                Create Account
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                    Creating Account...
+                  </div>
+                ) : (
+                  'Create Account'
+                )}
               </button>
             </div>
           </form>

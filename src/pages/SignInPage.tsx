@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Globe, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const signInSchema = z.object({
   email: z.string().email('Valid email is required'),
@@ -22,6 +23,8 @@ interface UserRole {
 
 const SignInPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn, profile } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -31,65 +34,19 @@ const SignInPage: React.FC = () => {
     resolver: zodResolver(signInSchema)
   });
 
-  // Mock user database for role-based routing
-  const mockUsers: UserRole[] = [
-    { email: 'studio@vendor.com', role: 'vendor', dashboard: '/vendor/dashboard' },
-    { email: 'jane@contractor.com', role: 'contractor', dashboard: '/contractor/dashboard' },
-    { email: 'client@company.com', role: 'customer', dashboard: '/customer/dashboard' },
-    { email: 'expert@domain.com', role: 'expert', dashboard: '/expert/dashboard' },
-    { email: 'admin@collabov.com', role: 'vendor', dashboard: '/vendor/dashboard' },
-    // Add any email that goes through independent professional signup
-    { email: 'john.doe@gmail.com', role: 'contractor', dashboard: '/contractor/dashboard' },
-    { email: 'john.doe@company.com', role: 'contractor', dashboard: '/contractor/dashboard' }
-  ];
-
-  const getUserRole = (email: string): UserRole | null => {
-    // First check if user exists in our mock database
-    const existingUser = mockUsers.find(user => user.email.toLowerCase() === email.toLowerCase());
-    if (existingUser) {
-      console.log('Found existing user:', existingUser);
-      return existingUser;
+  const getDashboardPath = (userType: string): string => {
+    switch (userType) {
+      case 'customer':
+        return '/customer/dashboard';
+      case 'contractor':
+        return '/contractor/dashboard';
+      case 'vendor':
+        return '/vendor/dashboard';
+      case 'admin':
+        return '/admin';
+      default:
+        return '/';
     }
-    
-    // Check if user signed up through our flows (stored in localStorage)
-    const signupData = localStorage.getItem('userSignupData');
-    if (signupData) {
-      const userData = JSON.parse(signupData);
-      if (userData.email?.toLowerCase() === email.toLowerCase()) {
-        console.log('Found signup data:', userData);
-        return {
-          email: userData.email,
-          role: userData.role || 'freelancer',
-          dashboard: userData.role === 'vendor' ? '/vendor/dashboard' : 
-                    userData.role === 'customer' ? '/customer/dashboard' :
-                    userData.role === 'expert' ? '/expert/dashboard' : 
-                    '/freelancer/dashboard'
-        };
-      }
-    }
-    
-    // Default routing for common contractor patterns
-    if (email.toLowerCase().includes('contractor') || 
-        email.toLowerCase().includes('john.doe') ||
-        email.toLowerCase().includes('jane.doe') ||
-        email.toLowerCase().endsWith('@gmail.com') ||
-        email.toLowerCase().endsWith('@yahoo.com') ||
-        email.toLowerCase().endsWith('@hotmail.com')) {
-      console.log('Detected contractor email pattern:', email);
-      return {
-        email: email,
-        role: 'contractor',
-        dashboard: '/contractor/dashboard'
-      };
-    }
-    
-    // Default to customer for business emails
-    console.log('Defaulting to customer for:', email);
-    return {
-      email: email,
-      role: 'customer', 
-      dashboard: '/customer/dashboard'
-    };
   };
 
   const onSubmit = async (data: SignInFormData) => {
@@ -97,31 +54,21 @@ const SignInPage: React.FC = () => {
     setError('');
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await signIn(data.email, data.password);
 
-      const user = getUserRole(data.email);
-      
-      // Since we now always return a user, no need for null check
-      // Just validate password (for demo, any password works)
-      if (!data.password) {
-        setError('Password is required');
-        setIsLoading(false);
-        return;
+      const from = (location.state as any)?.from?.pathname || null;
+
+      if (from) {
+        navigate(from);
+      } else if (profile) {
+        navigate(getDashboardPath(profile.user_type));
+      } else {
+        navigate('/');
       }
-
-      // Simulate successful login
-      localStorage.setItem('userAuth', JSON.stringify({
-        email: user!.email,
-        role: user!.role,
-        rememberMe: data.rememberMe
-      }));
-
-      console.log('Redirecting to:', user!.dashboard);
-      // Redirect based on user role
-      navigate(user!.dashboard);
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      console.error('Sign in error:', err);
+      setError(err instanceof Error ? err.message : 'Invalid email or password');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -333,16 +280,13 @@ const SignInPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Demo Accounts */}
-            <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">Demo Accounts:</h4>
-              <div className="text-xs text-blue-700 space-y-1">
-                <p><strong>Vendor:</strong> studio@vendor.com</p>
-                <p><strong>Contractor:</strong> jane@contractor.com</p>
-                <p><strong>Customer:</strong> client@company.com</p>
-                <p><strong>Expert:</strong> expert@domain.com</p>
-                <p className="text-blue-600 mt-2">Password: any password</p>
-              </div>
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <Link to="/user-type" className="font-medium text-[#0070F3] hover:text-blue-600">
+                  Sign up
+                </Link>
+              </p>
             </div>
           </motion.div>
         </div>
