@@ -237,7 +237,6 @@ Independent Professional`;
         message: `You've received a new proposal from an independent professional for "${jobContext.jobTitle}"`,
         jobId: jobContext.jobId,
         contractorId: 'user_567',
-        contractorId: 'user_567', // This would come from auth context
         read: false
       });
       localStorage.setItem(`client_notifications_${jobContext.clientId}`, JSON.stringify(clientNotifications));

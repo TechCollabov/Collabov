@@ -12,6 +12,7 @@
   "dependencies": {
     "@headlessui/react": "^1.7.18",
     "@hookform/resolvers": "^3.3.4",
+    "@supabase/supabase-js": "^2.89.0",
     "cities.json": "^1.1.34",
     "framer-motion": "^11.2.0",
     "lucide-react": "^0.344.0",
