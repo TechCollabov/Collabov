@@ -25,7 +25,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 const VendorSignup: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp, profile, user } = useAuth();
+  const { signUp, profile, user, loading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
@@ -33,11 +33,11 @@ const VendorSignup: React.FC = () => {
   });
 
   useEffect(() => {
-    if (user && profile && !error) {
+    if (!loading && user && profile && !error && !isSubmitting) {
       const redirectPath = getRedirectPath(profile.user_type);
-      navigate(redirectPath);
+      navigate(redirectPath, { replace: true });
     }
-  }, [user, profile, navigate, error]);
+  }, [user, profile, navigate, error, isSubmitting, loading]);
 
   const onSubmit = async (data: SignupFormData) => {
     setIsSubmitting(true);
@@ -57,6 +57,14 @@ const VendorSignup: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
