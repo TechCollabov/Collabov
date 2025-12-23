@@ -548,18 +548,6 @@ const HomePage: React.FC = () => {
               >
                 Join as Service Provider
               </Link>
-              <Link
-                to="/vendor/signup"
-                className="px-8 py-4 bg-white text-emerald-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-              >
-                Sign Up as Independent Professional
-              </Link>
-              <Link
-                to="/vendor/signup"
-                className="px-8 py-4 bg-white text-purple-600 rounded-xl hover:bg-gray-100 transition-all duration-300 font-medium shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-              >
-                Join as Domain Expert
-              </Link>
             </div>
           </div>
         </div>
