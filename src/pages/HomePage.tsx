@@ -349,7 +349,7 @@ const HomePage: React.FC = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Dedicated Teams */}
             <div className="relative">
               <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 rounded-2xl p-8 shadow-xl border border-indigo-200/50 hover:shadow-2xl transition-all duration-300">
@@ -369,27 +369,7 @@ const HomePage: React.FC = () => {
                 </div>
               </div>
             </div>
-            
-            {/* Freelance Professionals */}
-            <div className="relative">
-              <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 rounded-2xl p-8 shadow-xl border border-emerald-200/50 hover:shadow-2xl transition-all duration-300">
-                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <Briefcase className="h-8 w-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-900 to-teal-800 bg-clip-text text-transparent mb-4 text-center">Freelance Professionals</h3>
-                <div className="space-y-3 mb-6">
-                  <p className="text-emerald-900 font-semibold">Pre-vetted, immediately available</p>
-                  <p className="text-slate-600">Flexible hourly or project-based pricing</p>
-                  <p className="text-slate-600">AI-powered matching technology</p>
-                  <p className="text-slate-600">Global talent pool access</p>
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm p-4 rounded-lg border border-emerald-200/50">
-                  <p className="font-semibold text-emerald-900 mb-2">Process:</p>
-                  <p className="text-sm text-slate-700">Browse → Assess → Engage → Collaborate</p>
-                </div>
-              </div>
-            </div>
-            
+
             {/* Project Posting */}
             <div className="relative">
               <div className="bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-100 rounded-2xl p-8 shadow-xl border border-purple-200/50 hover:shadow-2xl transition-all duration-300">
