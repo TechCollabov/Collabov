@@ -25,7 +25,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 const CustomerSignup: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp, profile, user } = useAuth();
+  const { signUp, profile, user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -36,11 +36,11 @@ const CustomerSignup: React.FC = () => {
   });
 
   useEffect(() => {
-    if (user && profile && !error) {
+    if (!loading && user && profile && !error && !isLoading) {
       const redirectPath = getRedirectPath(profile.user_type);
-      navigate(redirectPath);
+      navigate(redirectPath, { replace: true });
     }
-  }, [user, profile, navigate, error]);
+  }, [user, profile, navigate, error, loading, isLoading]);
 
   const onSubmit = async (data: SignupFormData) => {
     try {
@@ -90,6 +90,14 @@ const CustomerSignup: React.FC = () => {
       navigate('/customer/dashboard');
     }, 1000);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0070F3]"></div>
+      </div>
+    );
+  }
 
   return (
     <>
