@@ -40,65 +40,22 @@ const Navbar: React.FC = () => {
               
               {isOutsourceOpen && (
                 <div className="absolute top-full left-0 mt-1 w-auto bg-white rounded-xl shadow-2xl border border-gray-100 py-6 z-50 backdrop-blur-sm bg-white/95">
-                  <div className="flex space-x-12 px-8">
-                    <div>
-                      <h3 className="text-xs font-bold text-[#0070F3] uppercase tracking-wider mb-4 border-b border-blue-100 pb-2">Long Term</h3>
-                      <div className="space-y-3">
-                        <Link 
-                          to="/services" 
-                          className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
-                          onClick={() => setIsOutsourceOpen(false)}
-                        >
-                          Dedicated Teams
-                        </Link>
-                        <Link 
-                          to="/vendors" 
-                          className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
-                          onClick={() => setIsOutsourceOpen(false)}
-                        >
-                          Companies
-                        </Link>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-xs font-bold text-[#0070F3] uppercase tracking-wider mb-4 border-b border-blue-100 pb-2">Short Term</h3>
-                      <div className="space-y-3">
-                        <Link 
-                          to="/contractors" 
-                          className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
-                          onClick={() => setIsOutsourceOpen(false)}
-                        >
-                          Independent Professionals
-                        </Link>
-                        <Link 
-                          to="/experts" 
-                          className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
-                          onClick={() => setIsOutsourceOpen(false)}
-                        >
-                          Experts
-                        </Link>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-xs font-bold text-[#0070F3] uppercase tracking-wider mb-4 border-b border-blue-100 pb-2">Other</h3>
-                      <div className="space-y-3">
-                        <Link 
-                          to="/peo" 
-                          className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
-                          onClick={() => setIsOutsourceOpen(false)}
-                        >
-                          PEO
-                        </Link>
-                        <Link 
-                          to="/eor" 
-                          className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
-                          onClick={() => setIsOutsourceOpen(false)}
-                        >
-                          EOR
-                        </Link>
-                      </div>
+                  <div className="px-8">
+                    <div className="space-y-3">
+                      <Link
+                        to="/services"
+                        className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
+                        onClick={() => setIsOutsourceOpen(false)}
+                      >
+                        Dedicated Teams
+                      </Link>
+                      <Link
+                        to="/vendors"
+                        className="block px-4 py-2 text-[#0B2D59] hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 whitespace-nowrap font-medium hover:shadow-sm"
+                        onClick={() => setIsOutsourceOpen(false)}
+                      >
+                        Companies
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -214,66 +171,21 @@ const Navbar: React.FC = () => {
               {/* Mobile Outsource Section */}
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-[#0B2D59] mb-4">Outsource</h3>
-                <div className="ml-4 space-y-4">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Long Term</h4>
-                    <div className="ml-2 space-y-2">
-                      <Link
-                        to="/services"
-                        className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
-                        onClick={closeMenu}
-                      >
-                        Dedicated Teams
-                      </Link>
-                      <Link
-                        to="/vendors"
-                        className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
-                        onClick={closeMenu}
-                      >
-                        Companies
-                      </Link>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Short Term</h4>
-                    <div className="ml-2 space-y-2">
-                      <Link
-                        to="/freelancers"
-                        className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
-                        onClick={closeMenu}
-                      >
-                        Independent Professionals
-                      </Link>
-                      <Link
-                        to="/experts"
-                        className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
-                        onClick={closeMenu}
-                      >
-                        Experts
-                      </Link>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Other</h4>
-                    <div className="ml-2 space-y-2">
-                      <Link
-                        to="/peo"
-                        className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
-                        onClick={closeMenu}
-                      >
-                        PEO
-                      </Link>
-                      <Link
-                        to="/eor"
-                        className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
-                        onClick={closeMenu}
-                      >
-                        EOR
-                      </Link>
-                    </div>
-                  </div>
+                <div className="ml-4 space-y-2">
+                  <Link
+                    to="/services"
+                    className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
+                    onClick={closeMenu}
+                  >
+                    Dedicated Teams
+                  </Link>
+                  <Link
+                    to="/vendors"
+                    className="block text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200"
+                    onClick={closeMenu}
+                  >
+                    Companies
+                  </Link>
                 </div>
               </div>
 

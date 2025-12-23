@@ -27,30 +27,6 @@ const ServiceProviderSelection: React.FC = () => {
         'Enterprise-level contracts',
         'Dedicated account manager'
       ]
-    },
-    {
-      id: 'freelancer',
-      title: 'Independent Professional',
-      description: 'An individual professional offering services independently.',
-      icon: User,
-      features: [
-        'Personal brand building',
-        'Flexible project selection',
-        'Direct client communication',
-        'Individual portfolio showcase'
-      ]
-    },
-    {
-      id: 'expert',
-      title: 'Expert',
-      description: 'A master-level specialist or advisor in a specific domain.',
-      icon: Award,
-      features: [
-        'Premium consulting rates',
-        'Thought leadership platform',
-        'Exclusive project access',
-        'Industry recognition'
-      ]
     }
   ];
 
@@ -107,7 +83,8 @@ const ServiceProviderSelection: React.FC = () => {
         </div>
 
         {/* Role Selection Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div className="flex justify-center mb-12">
+          <div className="w-full max-w-md">
           {roleOptions.map((role, index) => {
             const Icon = role.icon;
             const isSelected = selectedRole === role.id;
@@ -194,6 +171,7 @@ const ServiceProviderSelection: React.FC = () => {
               </motion.div>
             );
           })}
+          </div>
         </div>
 
         {/* Continue Button */}
