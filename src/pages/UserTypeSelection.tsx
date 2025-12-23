@@ -29,7 +29,7 @@ const UserTypeSelection: React.FC = () => {
             className="group"
           >
             <Link
-              to="/vendor/role-selection"
+              to="/vendor/signup"
               className="block bg-white rounded-2xl shadow-lg border border-gray-100 p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#0070F3]/30"
             >
               <div className="text-center">
