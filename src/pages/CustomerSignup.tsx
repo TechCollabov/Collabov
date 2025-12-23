@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, Phone, Building2, Globe, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getRedirectPath } from '../utils/authRedirect';
 
 const signupSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
@@ -24,16 +25,22 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 const CustomerSignup: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  const { signUp, profile, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isEmailSent, setIsEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema)
   });
+
+  useEffect(() => {
+    if (user && profile && !error) {
+      const redirectPath = getRedirectPath(profile.user_type);
+      navigate(redirectPath);
+    }
+  }, [user, profile, navigate, error]);
 
   const onSubmit = async (data: SignupFormData) => {
     try {
@@ -48,15 +55,9 @@ const CustomerSignup: React.FC = () => {
           phone: data.phoneNumber,
         },
       });
-
-      setIsEmailSent(true);
-      setTimeout(() => {
-        navigate('/customer/dashboard');
-      }, 2000);
     } catch (err) {
       console.error('Signup error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred during signup');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -89,29 +90,6 @@ const CustomerSignup: React.FC = () => {
       navigate('/customer/dashboard');
     }, 1000);
   };
-
-  if (isEmailSent) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <motion.div 
-            className="bg-white py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 text-center border border-gray-100"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Verification Email Sent
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Please check your email to verify your account. You will be redirected to your dashboard shortly.
-            </p>
-            <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

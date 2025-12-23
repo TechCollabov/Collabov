@@ -77,6 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, userData: SignUpData) => {
+    const { data: emailExists } = await supabase.rpc('check_email_exists', {
+      email_to_check: email
+    });
+
+    if (emailExists) {
+      throw new Error('This email is already registered. Please sign in or use a different email.');
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,

@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Phone } from 'lucide-react';
+import { Mail, Lock, User, Phone, Building2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { getRedirectPath } from '../../utils/authRedirect';
 
 const signupSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
   lastName: z.string().min(2, 'Last name is required'),
+  companyName: z.string().min(2, 'Company name is required'),
   mobileNumber: z.string().min(10, 'Valid mobile number is required'),
   workEmail: z.string().email('Valid work email is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -22,54 +25,38 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 const VendorSignup: React.FC = () => {
   const navigate = useNavigate();
-  const [isEmailSent, setIsEmailSent] = useState(false);
+  const { signUp, profile, user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema)
   });
 
-  const onSubmit = async (data: SignupFormData) => {
-    // Here we would handle the signup process
-    console.log('Form submitted:', data);
-    
-    // Store vendor signup data for future sign-ins
-    localStorage.setItem('userSignupData', JSON.stringify({
-      email: data.workEmail,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      role: 'vendor',
-      signupMethod: 'email'
-    }));
-    
-    setIsEmailSent(true);
-    
-    // Simulate email verification for demo
-    setTimeout(() => {
-      navigate('/vendor/dashboard');
-    }, 2000);
-  };
+  useEffect(() => {
+    if (user && profile && !error) {
+      const redirectPath = getRedirectPath(profile.user_type);
+      navigate(redirectPath);
+    }
+  }, [user, profile, navigate, error]);
 
-  if (isEmailSent) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <motion.div 
-            className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 text-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Verification Email Sent
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Please check your email to verify your account. You will be redirected to your dashboard shortly.
-            </p>
-            <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
+  const onSubmit = async (data: SignupFormData) => {
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      await signUp(data.workEmail, data.password, {
+        fullName: `${data.firstName} ${data.lastName}`,
+        userType: 'vendor',
+        additionalData: {
+          companyName: data.companyName,
+          phone: data.mobileNumber,
+        }
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during signup');
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -89,6 +76,12 @@ const VendorSignup: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
+
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -128,6 +121,25 @@ const VendorSignup: React.FC = () => {
                   <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
+                Company Name
+              </label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Building2 className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  {...register('companyName')}
+                  type="text"
+                  className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
+                />
+              </div>
+              {errors.companyName && (
+                <p className="mt-1 text-sm text-red-600">{errors.companyName.message}</p>
+              )}
             </div>
 
             <div>
@@ -209,9 +221,10 @@ const VendorSignup: React.FC = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                disabled={isSubmitting}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign Up
+                {isSubmitting ? 'Creating Account...' : 'Sign Up'}
               </button>
             </div>
           </form>
