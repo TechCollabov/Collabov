@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  LayoutDashboard, Plus, FileText, Bot, Bookmark, 
-  FolderOpen, FileCheck, CreditCard, MessageSquare, 
+import {
+  LayoutDashboard, Plus, FileText, Bot, Bookmark,
+  FolderOpen, FileCheck, CreditCard, MessageSquare,
   AlertTriangle, HelpCircle, Search, Filter, Calendar,
   Clock, DollarSign, Users, Star, TrendingUp, Bell,
   Settings, LogOut, ChevronDown, User, Globe, Eye,
@@ -11,9 +11,11 @@ import {
   AlertCircle, Target, Briefcase, Building2, Zap,
   BarChart3, PieChart, Activity, ArrowRight, Send
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CustomerDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -145,6 +147,15 @@ const CustomerDashboard: React.FC = () => {
     }
   ];
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation Bar */}
@@ -244,7 +255,10 @@ const CustomerDashboard: React.FC = () => {
                       <span>Support</span>
                     </button>
                     <hr className="my-2" />
-                    <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                    >
                       <LogOut className="h-4 w-4" />
                       <span>Logout</span>
                     </button>
