@@ -2,20 +2,21 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building2, User, ArrowRight, Globe } from 'lucide-react';
+import { UI_VENDOR_LABEL, UI_CUSTOMER_LABEL } from '../constants/roles';
 
 const UserTypeSelection: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link to="/" className="flex items-center justify-center space-x-2 mb-8">
           <Globe className="h-10 w-10 text-[#0070F3]" />
           <span className="text-2xl font-bold text-[#0B2D59]">Collabov</span>
         </Link>
         <h2 className="text-center text-3xl font-bold text-[#0B2D59] mb-2">
-          Welcome to Collabov
+          Join Collabov
         </h2>
         <p className="text-center text-lg text-gray-600 mb-8">
-          Choose your account type to sign up
+          Choose your account type to get started
         </p>
       </div>
 
@@ -29,7 +30,7 @@ const UserTypeSelection: React.FC = () => {
             className="group"
           >
             <Link
-              to="/vendor/signup"
+              to="/sign-up/vendor"
               className="block bg-white rounded-2xl shadow-lg border border-gray-100 p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#0070F3]/30"
             >
               <div className="text-center">
@@ -37,7 +38,7 @@ const UserTypeSelection: React.FC = () => {
                   <Building2 className="h-10 w-10 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-[#0B2D59] mb-4">
-                  Service Provider
+                  {UI_VENDOR_LABEL}
                 </h3>
                 <p className="text-gray-600 mb-6 leading-relaxed">
                   Are you a company, agency, or freelancer looking to offer your services to global clients?
@@ -72,7 +73,7 @@ const UserTypeSelection: React.FC = () => {
             className="group"
           >
             <Link
-              to="/customer/signup"
+              to="/sign-up/customer"
               className="block bg-white rounded-2xl shadow-lg border border-gray-100 p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 hover:border-emerald-500/30"
             >
               <div className="text-center">
@@ -80,7 +81,7 @@ const UserTypeSelection: React.FC = () => {
                   <User className="h-10 w-10 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-[#0B2D59] mb-4">
-                  Customer
+                  {UI_CUSTOMER_LABEL}
                 </h3>
                 <p className="text-gray-600 mb-6 leading-relaxed">
                   Are you a business looking to outsource projects or hire dedicated teams?
@@ -123,7 +124,7 @@ const UserTypeSelection: React.FC = () => {
               Sign in to access your dashboard and continue where you left off
             </p>
             <Link
-              to="/vendor/login"
+              to="/sign-in"
               className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-[#0070F3] to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               Sign In

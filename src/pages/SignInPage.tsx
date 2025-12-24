@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Globe, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { ROLE_TO_DASHBOARD } from '../constants/roles';
 
 const signInSchema = z.object({
   email: z.string().email('Valid email is required'),
@@ -29,18 +30,7 @@ const SignInPage: React.FC = () => {
   });
 
   const getDashboardPath = (userType: string): string => {
-    switch (userType) {
-      case 'customer':
-        return '/customer/dashboard';
-      case 'contractor':
-        return '/contractor/dashboard';
-      case 'vendor':
-        return '/vendor/dashboard';
-      case 'admin':
-        return '/admin';
-      default:
-        return '/';
-    }
+    return ROLE_TO_DASHBOARD[userType] || '/';
   };
 
   useEffect(() => {
@@ -255,7 +245,7 @@ const SignInPage: React.FC = () => {
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 Don't have an account?{' '}
-                <Link to="/user-type" className="font-medium text-[#0070F3] hover:text-blue-600">
+                <Link to="/sign-up" className="font-medium text-[#0070F3] hover:text-blue-600">
                   Sign up
                 </Link>
               </p>

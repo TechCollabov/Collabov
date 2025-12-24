@@ -51,8 +51,8 @@ const ServiceProviderSelection: React.FC = () => {
               <Globe className="h-8 w-8 text-[#0070F3]" />
               <span className="text-xl font-bold text-[#0B2D59]">Collabov</span>
             </Link>
-            <Link 
-              to="/vendor/login" 
+            <Link
+              to="/sign-in"
               className="text-gray-600 hover:text-[#0070F3] font-medium transition-colors"
             >
               Already have an account? Sign in

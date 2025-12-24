@@ -75,10 +75,10 @@ const VendorSignup: React.FC = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          Create your vendor account
+          Create your service provider account
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Join our network of verified vendors and grow your business globally
+          Join our network of verified service providers and grow your business globally
         </p>
       </div>
 
@@ -245,7 +245,7 @@ const VendorSignup: React.FC = () => {
           <div className="mt-6">
             <p className="text-center text-sm text-gray-600">
               Already have an account?{' '}
-              <a href="/vendor/login" className="font-medium text-primary-600 hover:text-primary-500">
+              <a href="/sign-in" className="font-medium text-primary-600 hover:text-primary-500">
                 Sign in
               </a>
             </p>

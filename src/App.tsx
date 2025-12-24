@@ -49,8 +49,8 @@ function AppContent() {
     <div className="flex flex-col min-h-screen">
       {!location.pathname.startsWith('/admin') &&
        !location.pathname.startsWith('/vendor/dashboard') &&
-       !location.pathname.startsWith('/vendor/login') &&
-       !location.pathname.startsWith('/vendor/signup') &&
+       !location.pathname.startsWith('/sign-in') &&
+       !location.pathname.startsWith('/sign-up') &&
        !location.pathname.startsWith('/contractor/dashboard') &&
        !location.pathname.startsWith('/customer/dashboard') &&
        <Navbar />}
@@ -64,20 +64,18 @@ function AppContent() {
           <Route path="/industries" element={<IndustriesPage />} />
           <Route path="/vendors" element={<VendorsPage />} />
           <Route path="/search" element={<SearchResults />} />
-          <Route path="/vendor/signup" element={<VendorSignup />} />
+          <Route path="/sign-up" element={<UserTypeSelection />} />
+          <Route path="/sign-up/vendor" element={<VendorSignup />} />
+          <Route path="/sign-up/customer" element={<CustomerSignup />} />
+          <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/vendor/role-selection" element={<ServiceProviderSelection />} />
           <Route path="/independent/signup" element={<IndependentSignup />} />
           <Route path="/contractor/profile-setup" element={<ContractorRoute><ContractorProfileSetup /></ContractorRoute>} />
           <Route path="/contractor/dashboard" element={<ContractorRoute><ContractorDashboard /></ContractorRoute>} />
-          <Route path="/contractor/login" element={<VendorLogin />} />
-          <Route path="/vendor/login" element={<VendorLogin />} />
           <Route path="/vendor/dashboard/*" element={<VendorRoute><VendorDashboard /></VendorRoute>} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/user-type" element={<UserTypeSelection />} />
-          <Route path="/customer/signup" element={<CustomerSignup />} />
-          <Route path="/signin" element={<SignInPage />} />
           <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
           <Route path="/customer/compare" element={<CustomerRoute><VendorComparison /></CustomerRoute>} />
           <Route path="/customer/post-job" element={
@@ -102,8 +100,8 @@ function AppContent() {
       </main>
       {!location.pathname.startsWith('/admin') &&
        !location.pathname.startsWith('/vendor/dashboard') &&
-       !location.pathname.startsWith('/vendor/login') &&
-       !location.pathname.startsWith('/vendor/signup') &&
+       !location.pathname.startsWith('/sign-in') &&
+       !location.pathname.startsWith('/sign-up') &&
        !location.pathname.startsWith('/contractor/dashboard') &&
        !location.pathname.startsWith('/customer/dashboard') &&
        <Footer />}

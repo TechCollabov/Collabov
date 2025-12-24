@@ -400,7 +400,7 @@ const IndependentSignup: React.FC = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
-              <Link to="/vendor/login" className="font-medium text-[#0070F3] hover:text-blue-600">
+              <Link to="/sign-in" className="font-medium text-[#0070F3] hover:text-blue-600">
                 Sign in
               </Link>
             </p>
