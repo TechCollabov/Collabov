@@ -15,16 +15,10 @@ const signInSchema = z.object({
 
 type SignInFormData = z.infer<typeof signInSchema>;
 
-interface UserRole {
-  email: string;
-  role: 'vendor' | 'customer' | 'freelancer' | 'expert';
-  dashboard: string;
-}
-
 const SignInPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, profile } = useAuth();
+  const { signIn, profile, user, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
@@ -49,71 +43,49 @@ const SignInPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!loading && !isLoading && user && profile) {
+      const from = (location.state as any)?.from?.pathname || null;
+      if (from) {
+        navigate(from, { replace: true });
+      } else {
+        navigate(getDashboardPath(profile.user_type), { replace: true });
+      }
+    }
+  }, [user, profile, loading, isLoading, navigate, location]);
+
   const onSubmit = async (data: SignInFormData) => {
     setIsLoading(true);
     setError('');
 
     try {
       await signIn(data.email, data.password);
-
-      const from = (location.state as any)?.from?.pathname || null;
-
-      if (from) {
-        navigate(from);
-      } else if (profile) {
-        navigate(getDashboardPath(profile.user_type));
-      } else {
-        navigate('/');
-      }
     } catch (err) {
       console.error('Sign in error:', err);
       setError(err instanceof Error ? err.message : 'Invalid email or password');
-    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleSignIn = () => {
-    setShowGoogleModal(true);
+  const handleGoogleSignIn = async () => {
+    setError('Google Sign In is not yet implemented. Please use email/password.');
   };
 
   const handleGoogleAccountSelect = (account: any) => {
     setShowGoogleModal(false);
-    setIsLoading(true);
-
-    // Simulate Google OAuth and role detection
-    setTimeout(() => {
-      const user = getUserRole(account.email);
-      
-      if (user) {
-        localStorage.setItem('userAuth', JSON.stringify({
-          email: user.email,
-          role: user.role,
-          provider: 'google'
-        }));
-        navigate(user.dashboard);
-      } else {
-        // New user - redirect to role selection
-        navigate('/user-type', { 
-          state: { 
-            googleData: account,
-            isSignIn: true 
-          }
-        });
-      }
-      setIsLoading(false);
-    }, 1500);
   };
 
-  const handleAppleSignIn = () => {
-    // Simulate Apple Sign In
-    setIsLoading(true);
-    setTimeout(() => {
-      // For demo, redirect to freelancer dashboard
-      navigate('/freelancer/dashboard');
-      setIsLoading(false);
-    }, 1500);
+  const handleAppleSignIn = async () => {
+    setError('Apple Sign In is not yet implemented. Please use email/password.');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0070F3]"></div>
+      </div>
+    );
+  }
 
   return (
     <>

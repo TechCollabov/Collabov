@@ -53,7 +53,12 @@ const VendorSignup: React.FC = () => {
         }
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during signup');
+      if (err instanceof Error && err.message === 'VERIFICATION_REQUIRED') {
+        setError('Please check your email to verify your account before signing in.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred during signup');
+      }
+
       setIsSubmitting(false);
     }
   };

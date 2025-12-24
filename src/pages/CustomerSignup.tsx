@@ -57,7 +57,13 @@ const CustomerSignup: React.FC = () => {
       });
     } catch (err) {
       console.error('Signup error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred during signup');
+
+      if (err instanceof Error && err.message === 'VERIFICATION_REQUIRED') {
+        setError('Please check your email to verify your account before signing in.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred during signup');
+      }
+
       setIsLoading(false);
     }
   };

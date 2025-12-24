@@ -99,6 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     if (!data.user) throw new Error('User creation failed');
 
+    if (data.user && !data.session) {
+      throw new Error('VERIFICATION_REQUIRED');
+    }
+
     const { error: profileError } = await supabase.from('profiles').insert({
       id: data.user.id,
       email: email,
