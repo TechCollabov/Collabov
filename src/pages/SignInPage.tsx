@@ -34,24 +34,40 @@ const SignInPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!loading && !isLoading && user && profile) {
+    console.log('[SignIn] useEffect - Auth state:', {
+      loading,
+      isLoading,
+      hasUser: !!user,
+      hasProfile: !!profile,
+      userType: profile?.user_type
+    });
+
+    // Only redirect if auth is loaded, we have user and profile, and we're not currently processing a sign in
+    if (!loading && user && profile) {
+      console.log('[SignIn] All conditions met, preparing redirect...');
       const from = (location.state as any)?.from?.pathname || null;
-      if (from) {
-        navigate(from, { replace: true });
-      } else {
-        navigate(getDashboardPath(profile.user_type), { replace: true });
-      }
+      const redirectPath = from || getDashboardPath(profile.user_type);
+      console.log('[SignIn] Redirecting to:', redirectPath);
+
+      // Reset loading state before redirect
+      setIsLoading(false);
+      navigate(redirectPath, { replace: true });
     }
-  }, [user, profile, loading, isLoading, navigate, location]);
+  }, [user, profile, loading, navigate, location]);
 
   const onSubmit = async (data: SignInFormData) => {
+    console.log('[SignIn] Starting sign in process for:', data.email);
     setIsLoading(true);
     setError('');
 
     try {
+      console.log('[SignIn] Calling signIn method...');
       await signIn(data.email, data.password);
+      console.log('[SignIn] signIn method completed successfully');
+      // Note: Don't set isLoading to false here - let the useEffect handle redirect
+      // The auth state change will trigger profile load, which will then trigger redirect
     } catch (err) {
-      console.error('Sign in error:', err);
+      console.error('[SignIn] Sign in error:', err);
       setError(err instanceof Error ? err.message : 'Invalid email or password');
       setIsLoading(false);
     }

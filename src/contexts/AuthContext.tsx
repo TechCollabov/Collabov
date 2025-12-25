@@ -32,7 +32,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[AuthContext] Initializing auth state...');
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[AuthContext] Initial session check:', { hasSession: !!session, userId: session?.user?.id });
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -43,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthContext] Auth state changed:', { event, hasSession: !!session, userId: session?.user?.id });
+
       (async () => {
         setSession(session);
         setUser(session?.user ?? null);
@@ -60,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadUserProfile = async (userId: string) => {
+    console.log('[AuthContext] Loading user profile for:', userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -67,24 +73,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AuthContext] Error loading profile:', error);
+        throw error;
+      }
+
+      console.log('[AuthContext] Profile loaded successfully:', {
+        userType: data?.user_type,
+        email: data?.email,
+        profileCompleted: data?.profile_completed
+      });
       setProfile(data);
     } catch (error) {
-      console.error('Error loading profile:', error);
+      console.error('[AuthContext] Failed to load profile:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, userData: SignUpData) => {
+    console.log('[AuthContext] signUp started for:', { email, userType: userData.userType });
+
+    // Check if email already exists
     const { data: emailExists } = await supabase.rpc('check_email_exists', {
       email_to_check: email
     });
 
     if (emailExists) {
+      console.log('[AuthContext] Email already exists:', email);
       throw new Error('This email is already registered. Please sign in or use a different email.');
     }
 
+    // Sign up with Supabase Auth
+    console.log('[AuthContext] Creating auth user...');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -96,13 +117,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
 
-    if (error) throw error;
-    if (!data.user) throw new Error('User creation failed');
+    if (error) {
+      console.error('[AuthContext] signUp auth error:', error);
+      throw error;
+    }
 
+    if (!data.user) {
+      console.error('[AuthContext] No user returned from signUp');
+      throw new Error('User creation failed');
+    }
+
+    console.log('[AuthContext] Auth user created:', {
+      userId: data.user.id,
+      hasSession: !!data.session,
+      emailConfirmed: data.user.email_confirmed_at
+    });
+
+    // If email confirmation is required (no session), we need to stop here
+    // The user will need to verify their email before we can create profile records
     if (data.user && !data.session) {
+      console.log('[AuthContext] Email verification required - user must verify email before continuing');
       throw new Error('VERIFICATION_REQUIRED');
     }
 
+    // Create profile record
+    console.log('[AuthContext] Creating profile record...');
     const { error: profileError } = await supabase.from('profiles').insert({
       id: data.user.id,
       email: email,
@@ -112,25 +151,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onboarding_step: 0,
     });
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error('[AuthContext] Profile creation error:', profileError);
+      throw profileError;
+    }
 
+    console.log('[AuthContext] Profile created successfully');
+
+    // Create role-specific record
     if (userData.userType === 'customer' && userData.additionalData?.companyName) {
+      console.log('[AuthContext] Creating customer record...');
       const { error: customerError } = await supabase.from('customers').insert({
         id: data.user.id,
         company_name: userData.additionalData.companyName as string,
       });
-      if (customerError) throw customerError;
+      if (customerError) {
+        console.error('[AuthContext] Customer creation error:', customerError);
+        throw customerError;
+      }
     }
 
     if (userData.userType === 'contractor') {
+      console.log('[AuthContext] Creating contractor record...');
       const { error: contractorError } = await supabase.from('contractors').insert({
         id: data.user.id,
         title: userData.additionalData?.title as string || 'Freelancer',
       });
-      if (contractorError) throw contractorError;
+      if (contractorError) {
+        console.error('[AuthContext] Contractor creation error:', contractorError);
+        throw contractorError;
+      }
     }
 
     if (userData.userType === 'vendor' && userData.additionalData?.companyName) {
+      console.log('[AuthContext] Creating vendor record...');
       const { error: vendorError } = await supabase.from('vendors').insert({
         id: data.user.id,
         company_name: userData.additionalData.companyName as string,
@@ -138,17 +192,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         contact_email: email,
         contact_phone: userData.additionalData.phone as string || '',
       });
-      if (vendorError) throw vendorError;
+      if (vendorError) {
+        console.error('[AuthContext] Vendor creation error:', vendorError);
+        throw vendorError;
+      }
     }
+
+    console.log('[AuthContext] signUp completed successfully');
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log('[AuthContext] signIn called for:', email);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[AuthContext] signIn error:', error);
+
+      // Check if error is due to unverified email
+      if (error.message.includes('Email not confirmed')) {
+        throw new Error('Please verify your email address before signing in. Check your inbox for the verification link.');
+      }
+
+      throw error;
+    }
+
+    if (!data.user) {
+      console.error('[AuthContext] No user returned after sign in');
+      throw new Error('Sign in failed - no user returned');
+    }
+
+    // Check if email is confirmed
+    if (!data.user.email_confirmed_at) {
+      console.log('[AuthContext] Email not confirmed for user');
+      throw new Error('Please verify your email address before signing in. Check your inbox for the verification link.');
+    }
+
+    console.log('[AuthContext] signIn successful:', {
+      userId: data.user.id,
+      email: data.user.email,
+      emailConfirmed: data.user.email_confirmed_at
+    });
+
+    // onAuthStateChange will fire automatically and load the profile
   };
 
   const signOut = async () => {

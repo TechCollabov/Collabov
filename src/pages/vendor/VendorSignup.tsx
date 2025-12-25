@@ -40,6 +40,7 @@ const VendorSignup: React.FC = () => {
   }, [user, profile, navigate, error, isSubmitting, loading]);
 
   const onSubmit = async (data: SignupFormData) => {
+    console.log('[VendorSignup] Starting signup for:', data.workEmail);
     setIsSubmitting(true);
     setError('');
 
@@ -52,9 +53,13 @@ const VendorSignup: React.FC = () => {
           phone: data.mobileNumber,
         }
       });
+
+      console.log('[VendorSignup] Signup completed successfully');
     } catch (err) {
+      console.error('[VendorSignup] Signup error:', err);
+
       if (err instanceof Error && err.message === 'VERIFICATION_REQUIRED') {
-        setError('Please check your email to verify your account before signing in.');
+        setError('Account created! Please check your email and click the verification link to activate your account. After verification, you can sign in.');
       } else {
         setError(err instanceof Error ? err.message : 'An error occurred during signup');
       }

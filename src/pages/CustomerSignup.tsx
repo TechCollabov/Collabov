@@ -43,6 +43,7 @@ const CustomerSignup: React.FC = () => {
   }, [user, profile, navigate, error, loading, isLoading]);
 
   const onSubmit = async (data: SignupFormData) => {
+    console.log('[CustomerSignup] Starting signup for:', data.workEmail);
     try {
       setIsLoading(true);
       setError(null);
@@ -55,11 +56,13 @@ const CustomerSignup: React.FC = () => {
           phone: data.phoneNumber,
         },
       });
+
+      console.log('[CustomerSignup] Signup completed successfully');
     } catch (err) {
-      console.error('Signup error:', err);
+      console.error('[CustomerSignup] Signup error:', err);
 
       if (err instanceof Error && err.message === 'VERIFICATION_REQUIRED') {
-        setError('Please check your email to verify your account before signing in.');
+        setError('Account created! Please check your email and click the verification link to activate your account. After verification, you can sign in.');
       } else {
         setError(err instanceof Error ? err.message : 'An error occurred during signup');
       }
