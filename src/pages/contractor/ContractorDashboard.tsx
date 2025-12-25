@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AIProposalGenerator from '../../components/contractor/AIProposalGenerator';
-import { useAuth } from '../../contexts/AuthContext';
-import {
-  Search, Filter, Star, DollarSign, MessageSquare,
-  Briefcase, User, Settings, LogOut, Bell,
+import { 
+  Search, Filter, Star, DollarSign, MessageSquare, 
+  Briefcase, User, Settings, LogOut, Bell, 
   CheckCircle, AlertCircle, Upload, Edit, Eye,
   TrendingUp, Award, Globe, Clock, ChevronDown,
   Plus, Download, CreditCard, Target, Zap,
@@ -14,8 +13,6 @@ import {
 
 const ContractorDashboard: React.FC = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAvailable, setIsAvailable] = useState(true);
   const [profileCompletion, setProfileCompletion] = useState(65);
@@ -118,15 +115,6 @@ const ContractorDashboard: React.FC = () => {
     { id: 'help', label: 'Help', icon: HelpCircle }
   ];
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate('/');
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dashboard Navigation Bar */}
@@ -198,10 +186,7 @@ const ContractorDashboard: React.FC = () => {
                       <span>Support</span>
                     </button>
                     <hr className="my-2" />
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                    >
+                    <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2">
                       <LogOut className="h-4 w-4" />
                       <span>Logout</span>
                     </button>

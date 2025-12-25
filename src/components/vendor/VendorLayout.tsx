@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, FileText, Package, MessageSquare, Bell, Users, Settings, Menu, X, LogOut, Globe, Contact as FileContract, Mail } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 
 const VendorLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { signOut } = useAuth();
 
   const navigation = [
     { name: 'Dashboard', href: '/vendor/dashboard', icon: LayoutDashboard },
@@ -21,15 +18,6 @@ const VendorLayout: React.FC = () => {
     { name: 'Manage Employee', href: '/vendor/dashboard/employees', icon: Users },
     { name: 'Account Settings', href: '/vendor/dashboard/settings', icon: Settings },
   ];
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate('/');
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -69,13 +57,13 @@ const VendorLayout: React.FC = () => {
           })}
         </nav>
         <div className="absolute bottom-0 w-full p-4 border-t">
-          <button
-            onClick={handleLogout}
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+          <Link
+            to="/vendor/login"
+            className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
           >
             <LogOut className="h-5 w-5 mr-3" />
             Sign Out
-          </button>
+          </Link>
         </div>
       </div>
 
