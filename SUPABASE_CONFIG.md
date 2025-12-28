@@ -8,16 +8,13 @@ To ensure the authentication system works correctly in production, you must conf
 
 **Location:** Supabase Dashboard > Authentication > Settings > Email Auth
 
-**Configuration:**
-- **Enable email confirmations:** Can be enabled or disabled
-  - If **ENABLED**: Users must verify their email before they can sign in
-  - If **DISABLED**: Users can sign in immediately after signup
+**Current Configuration:**
+- **Enable email confirmations:** DISABLED
+  - Users can sign in immediately after signup
+  - No email verification required
+  - Profiles are created automatically during signup
 
-**Current Implementation:** The app supports both modes. When email verification is enabled:
-- Users receive a verification email after signup
-- Profile records are created automatically via database trigger
-- Users must verify their email before signing in
-- Clear error messages guide users through the process
+**Note:** If you want to enable email verification in the future, additional code changes will be required to support the email confirmation flow.
 
 ### 2. Redirect URL Configuration
 
@@ -53,61 +50,33 @@ http://localhost:5173/vendor/dashboard
 http://localhost:5173/contractor/dashboard
 ```
 
-### 3. Email Templates
-
-**Location:** Supabase Dashboard > Authentication > Email Templates
-
-**Verify Email Template:**
-
-Ensure the confirmation link in your email template uses the correct redirect URL:
-
-```html
-<h2>Confirm your email</h2>
-<p>Click the link below to verify your email address:</p>
-<p><a href="{{ .SiteURL }}/auth/v1/verify?token={{ .Token }}&type=signup&redirect_to={{ .RedirectTo }}">Verify Email</a></p>
-```
-
-The `redirect_to` parameter should point to your sign-in page or dashboard.
 
 ## Testing Authentication Flow
 
-### With Email Verification Enabled
+### Current Flow (Email Verification Disabled)
 
 1. User signs up with email and password
-2. User receives verification email
-3. User clicks verification link in email
-4. Database trigger creates profile and role-specific records
-5. User is redirected to sign-in page
-6. User signs in with their credentials
-7. User is redirected to role-based dashboard
-
-### With Email Verification Disabled
-
-1. User signs up with email and password
-2. Profile records are created immediately
+2. Profile and role-specific records are created immediately
 3. User receives session immediately
-4. User is redirected to role-based dashboard
+4. User is automatically redirected to their role-based dashboard
+5. No email verification required
 
 ## Troubleshooting
 
-### Issue: Verification emails redirect to localhost
-
-**Solution:** Update the Site URL in Supabase dashboard to your production domain.
-
-### Issue: "Email not confirmed" error when signing in
-
-**Solution:** User needs to verify their email. Check that:
-1. Email verification is enabled in Supabase
-2. Verification email was sent
-3. User clicked the verification link
-4. Verification link hasn't expired
-
-### Issue: Profile not created after email verification
+### Issue: User can't sign in after signup
 
 **Solution:** Check that:
-1. The `handle_new_user()` trigger is installed (see migration: `add_auth_user_trigger`)
-2. User metadata contains `user_type` and `full_name`
-3. Database logs for any errors
+1. Profile records were created successfully
+2. User is using the correct email and password
+3. No errors occurred during signup process
+4. Check browser console for detailed error logs
+
+### Issue: Profile not created during signup
+
+**Solution:** Check that:
+1. User metadata contains `user_type` and `full_name`
+2. Database RLS policies allow insert operations
+3. Check browser console and Supabase logs for errors
 
 ## Security Notes
 

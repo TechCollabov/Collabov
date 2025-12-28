@@ -58,15 +58,11 @@ const CustomerSignup: React.FC = () => {
       });
 
       console.log('[CustomerSignup] Signup completed successfully');
+      // Note: Don't set isLoading to false here - let useEffect handle redirect
+      // The auth state change will trigger profile load and redirect
     } catch (err) {
       console.error('[CustomerSignup] Signup error:', err);
-
-      if (err instanceof Error && err.message === 'VERIFICATION_REQUIRED') {
-        setError('Account created! Please check your email and click the verification link to activate your account. After verification, you can sign in.');
-      } else {
-        setError(err instanceof Error ? err.message : 'An error occurred during signup');
-      }
-
+      setError(err instanceof Error ? err.message : 'An error occurred during signup');
       setIsLoading(false);
     }
   };

@@ -133,13 +133,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emailConfirmed: data.user.email_confirmed_at
     });
 
-    // If email confirmation is required (no session), we need to stop here
-    // The user will need to verify their email before we can create profile records
-    if (data.user && !data.session) {
-      console.log('[AuthContext] Email verification required - user must verify email before continuing');
-      throw new Error('VERIFICATION_REQUIRED');
-    }
-
     // Create profile record
     console.log('[AuthContext] Creating profile record...');
     const { error: profileError } = await supabase.from('profiles').insert({
@@ -211,24 +204,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) {
       console.error('[AuthContext] signIn error:', error);
-
-      // Check if error is due to unverified email
-      if (error.message.includes('Email not confirmed')) {
-        throw new Error('Please verify your email address before signing in. Check your inbox for the verification link.');
-      }
-
       throw error;
     }
 
     if (!data.user) {
       console.error('[AuthContext] No user returned after sign in');
       throw new Error('Sign in failed - no user returned');
-    }
-
-    // Check if email is confirmed
-    if (!data.user.email_confirmed_at) {
-      console.log('[AuthContext] Email not confirmed for user');
-      throw new Error('Please verify your email address before signing in. Check your inbox for the verification link.');
     }
 
     console.log('[AuthContext] signIn successful:', {
