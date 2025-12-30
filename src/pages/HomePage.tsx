@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import cities from 'cities.json';
 import { 
@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 const HomePage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [location, setLocation] = useState('');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
@@ -17,7 +18,18 @@ const HomePage: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle search logic
+
+    // Build search query parameters
+    const params = new URLSearchParams();
+    if (searchQuery) {
+      params.set('q', searchQuery);
+    }
+    if (location) {
+      params.set('location', location);
+    }
+
+    // Navigate to search results page
+    navigate(`/search?${params.toString()}`);
   };
 
   const handleLocationChange = (value: string) => {
