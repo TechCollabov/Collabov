@@ -110,14 +110,14 @@ const DashboardHome: React.FC = () => {
       {/* Key Metrics */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         {[
-          { title: 'Total Views', value: '1,234', icon: BarChart2, trend: '+12%' },
-          { title: 'Pending Payments', value: '$5,400', icon: DollarSign, trend: 'Due in 7 days' },
-          { title: 'Customer Inquiries', value: '28', icon: MessageSquare, trend: '+24%' },
-          { title: 'Assigned Resources', value: '12', icon: Users, trend: '3 Projects', onClick: () => setShowResourceModal(true) },
-          { title: 'Confirmed Contracts', value: '8', icon: FileCheck, trend: '2 Pending' },
-          { title: 'Average Rating', value: '4.8', icon: Star, trend: '96 Reviews' },
-          { title: 'Work Progress', value: '75%', icon: TrendingUp, trend: 'On Track' },
-          { title: 'Upcoming Meetings', value: '3', icon: Calendar, trend: 'This Week' }
+          { title: 'Active Engagements', value: '3', icon: FileCheck, trend: '2 On Track' },
+          { title: 'Bench Capacity', value: '4 people', icon: Users, trend: 'Available now', onClick: () => setShowResourceModal(true) },
+          { title: 'Profile Views (30d)', value: '87', icon: BarChart2, trend: '+18%' },
+          { title: 'Enquiries This Month', value: '6', icon: MessageSquare, trend: '+2 this week' },
+          { title: 'Gross Revenue MTD', value: '£14,700', icon: DollarSign, trend: '+12% MoM' },
+          { title: 'Pending Payouts', value: '£10,700', icon: DollarSign, trend: 'In escrow' },
+          { title: 'Average Rating', value: '4.8', icon: Star, trend: '47 Reviews' },
+          { title: 'Open Proposals', value: '5', icon: TrendingUp, trend: '2 shortlisted' }
         ].map((metric, index) => (
           <motion.div
             key={metric.title}

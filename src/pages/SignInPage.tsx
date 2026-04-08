@@ -258,11 +258,16 @@ const SignInPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
               <p className="text-sm text-gray-600">
                 Don't have an account?{' '}
-                <Link to="/sign-up" className="font-medium text-[#0070F3] hover:text-blue-600">
+                <Link to="/user-type" className="font-medium text-[#0070F3] hover:text-blue-600">
                   Sign up
+                </Link>
+              </p>
+              <p className="text-xs text-gray-400">
+                <Link to="/admin/login" className="hover:text-gray-600 transition-colors">
+                  Sign in as Admin
                 </Link>
               </p>
             </div>

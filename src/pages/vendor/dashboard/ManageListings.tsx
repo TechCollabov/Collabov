@@ -42,13 +42,9 @@ interface FormData {
 
   // Documents
   documents: {
-    incorporation: File | null;
-    pan: File | null;
-    gst: File | null;
-    msme: File | null;
-    aoa: File | null;
-    moa: File | null;
-    directorDetails: File | null;
+    companiesHouse: File | null;
+    vatCert: File | null;
+    addressProof: File | null;
   };
 
   // Payment Details
@@ -89,13 +85,9 @@ const ManageListings: React.FC = () => {
     notableProjects: '',
     clientReferences: '',
     documents: {
-      incorporation: null,
-      pan: null,
-      gst: null,
-      msme: null,
-      aoa: null,
-      moa: null,
-      directorDetails: null
+      companiesHouse: null,
+      vatCert: null,
+      addressProof: null,
     },
     registeredName: '',
     accountNumber: '',
@@ -591,90 +583,82 @@ const ManageListings: React.FC = () => {
       case 5:
         return (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold">Client and Project Information</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Types of Clients Served
-              </label>
-              <textarea
-                name="clientTypes"
-                value={formData.clientTypes}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="e.g., SMBs, Enterprises, Startups..."
-                required
-              />
-            </div>
+            <h2 className="text-xl font-semibold">Portfolio & Case Studies</h2>
+            <p className="text-sm text-gray-500">Add up to 3 case studies that showcase your work. These appear on your public vendor profile.</p>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notable Projects
-              </label>
-              <textarea
-                name="notableProjects"
-                value={formData.notableProjects}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Describe your most significant projects..."
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Client References
-              </label>
-              <textarea
-                name="clientReferences"
-                value={formData.clientReferences}
-                onChange={handleInputChange}
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Provide details of 2 client references..."
-                required
-              />
-            </div>
+            {[1, 2, 3].map(n => (
+              <div key={n} className="border border-gray-200 rounded-xl p-5 space-y-4">
+                <div className="text-sm font-semibold text-gray-700">Case Study {n} {n === 1 && <span className="text-red-500">*</span>}</div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Title</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                    placeholder="e.g., Cloud Migration for NHS Trust"
+                    required={n === 1}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Client Industry</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                    placeholder="e.g., Healthcare, Financial Services, Retail"
+                    required={n === 1}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Summary</label>
+                  <textarea
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                    placeholder="Describe the challenge, your approach, and the outcome..."
+                    required={n === 1}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Key Result</label>
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                    placeholder="e.g., Reduced infrastructure costs by 35%"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         );
 
       case 6:
         return (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold">Documents</h2>
+            <h2 className="text-xl font-semibold">Verification Documents</h2>
+            <p className="text-sm text-gray-500">Upload your UK company documents. These are reviewed by the Collabov team and are not shown publicly.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[
-                { key: 'incorporation', label: 'Company Incorporation Certificate' },
-                { key: 'pan', label: 'Copy of PAN' },
-                { key: 'gst', label: 'Copy of GST Certificate' },
-                { key: 'msme', label: 'Copy of MSME (if available)', required: false },
-                { key: 'aoa', label: 'Article of Association' },
-                { key: 'moa', label: 'Memorandum of Association' },
-                { key: 'directorDetails', label: 'Director Details (PAN & Aadhar)' }
+                { key: 'companiesHouse', label: 'Companies House Registration Certificate', required: true, hint: 'Certificate of Incorporation from Companies House' },
+                { key: 'vatCert', label: 'VAT Registration Certificate', required: false, hint: 'HMRC VAT certificate (if VAT registered)' },
+                { key: 'addressProof', label: 'Proof of Business Address', required: false, hint: 'e.g. utility bill or bank statement (within 3 months)' },
               ].map(doc => (
-                <div key={doc.key} className="border rounded-lg p-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div key={doc.key} className="border border-gray-200 rounded-xl p-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     {doc.label}
-                    {doc.required !== false && <span className="text-red-500">*</span>}
+                    {doc.required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
-                  <div className="mt-2">
-                    <label className="btn-secondary cursor-pointer inline-flex items-center">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload File
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={handleFileChange(doc.key)}
-                        required={doc.required !== false}
-                      />
-                    </label>
-                    {formData.documents[doc.key as keyof typeof formData.documents] && (
-                      <p className="text-sm text-green-600 mt-2">
-                        ✓ File uploaded
-                      </p>
-                    )}
-                  </div>
+                  <p className="text-xs text-gray-400 mb-3">{doc.hint}</p>
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                    <Upload className="h-4 w-4" />
+                    Upload File
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileChange(doc.key)}
+                      required={doc.required}
+                    />
+                  </label>
+                  {formData.documents[doc.key as keyof typeof formData.documents] && (
+                    <p className="text-sm text-green-600 mt-2">✓ File uploaded</p>
+                  )}
                 </div>
               ))}
             </div>
