@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Package, MessageSquare, Bell, Users, Settings,
-  Menu, X, LogOut, Globe, FileContract as FileContract2, Mail, Briefcase,
+  Menu, X, LogOut, Globe, ClipboardList, Mail, Briefcase,
   CreditCard, BarChart2
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,7 +18,7 @@ const VendorLayout: React.FC = () => {
     { name: 'Team Members', href: '/vendor/dashboard/employees', icon: Users },
     { name: 'Services & Packages', href: '/vendor/dashboard/packages', icon: Package },
     { name: 'Enquiries', href: '/vendor/dashboard/enquiries', icon: MessageSquare },
-    { name: 'Active Contracts', href: '/vendor/dashboard/contracts', icon: FileContract2 },
+    { name: 'Active Contracts', href: '/vendor/dashboard/contracts', icon: ClipboardList },
     { name: 'Job Board', href: '/vendor/dashboard/jobs', icon: Briefcase },
     { name: 'Inbox', href: '/vendor/dashboard/inbox', icon: Mail },
     { name: 'Payments', href: '/vendor/dashboard/payments', icon: CreditCard },
