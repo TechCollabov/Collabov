@@ -1,128 +1,160 @@
-import React from 'react';
-import { Save } from 'lucide-react';
+import React, { useState } from 'react';
+import { Save, AlertTriangle } from 'lucide-react';
 
 const AdminSettings: React.FC = () => {
+  const [settings, setSettings] = useState({
+    platformFeePercent: '5',
+    autoReleaseDays: '7',
+    minProjectValue: '500',
+    invitationExpiryDays: '14',
+    adminEmail: 'admin@collabov.com',
+    maintenanceMode: false,
+    vendorVerificationSla: '3',
+  });
+
+  const update = (key: string, value: string | boolean) => setSettings(s => ({ ...s, [key]: value }));
+
+  const [saved, setSaved] = useState(false);
+  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Platform Settings</h1>
 
-      <div className="mt-6 bg-white shadow rounded-lg divide-y divide-gray-200">
-        {/* General Settings */}
-        <div className="p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">General Settings</h2>
-          <div className="space-y-6">
+      <div className="space-y-5 max-w-2xl">
+
+        {/* Payments */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-4">Payments & Fees</h2>
+          <div className="space-y-4">
             <div>
-              <label htmlFor="siteName" className="block text-sm font-medium text-gray-700">
-                Site Name
-              </label>
-              <input
-                type="text"
-                id="siteName"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                defaultValue="Collabov"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Platform Fee (%)</label>
+              <p className="text-xs text-gray-400 mb-2">Percentage deducted from each milestone payment before vendor payout.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  value={settings.platformFeePercent}
+                  onChange={e => update('platformFeePercent', e.target.value)}
+                  className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
             </div>
             <div>
-              <label htmlFor="siteDescription" className="block text-sm font-medium text-gray-700">
-                Site Description
-              </label>
-              <textarea
-                id="siteDescription"
-                rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                defaultValue="Revolutionizing B2B Outsourcing with Verified Global Talent"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Auto-Release Days</label>
+              <p className="text-xs text-gray-400 mb-2">Number of days after milestone delivery approval before funds are automatically released to vendor.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={settings.autoReleaseDays}
+                  onChange={e => update('autoReleaseDays', e.target.value)}
+                  className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+                <span className="text-sm text-gray-500">days</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Project Value (£)</label>
+              <p className="text-xs text-gray-400 mb-2">Minimum total contract value allowed on the platform.</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">£</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={settings.minProjectValue}
+                  onChange={e => update('minProjectValue', e.target.value)}
+                  className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Contact Information */}
-        <div className="p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Contact Information</h2>
-          <div className="space-y-6">
+        {/* Vendor Verification */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-4">Vendor Verification</h2>
+          <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Verification SLA (working days)</label>
+              <p className="text-xs text-gray-400 mb-2">Target number of working days to review and respond to a vendor verification application.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="14"
+                  value={settings.vendorVerificationSla}
+                  onChange={e => update('vendorVerificationSla', e.target.value)}
+                  className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+                <span className="text-sm text-gray-500">working days</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* User & Platform */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-4">Users & Platform</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Invitation Expiry (days)</label>
+              <p className="text-xs text-gray-400 mb-2">How long a vendor or buyer invitation link remains active.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="90"
+                  value={settings.invitationExpiryDays}
+                  onChange={e => update('invitationExpiryDays', e.target.value)}
+                  className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+                <span className="text-sm text-gray-500">days</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Notification Email</label>
+              <p className="text-xs text-gray-400 mb-2">Receives platform alerts, new verifications, and dispute notifications.</p>
               <input
                 type="email"
-                id="email"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                defaultValue="hello@collabov.com"
-              />
-            </div>
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                id="phone"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                defaultValue="+44 (0) 123 456 7890"
-              />
-            </div>
-            <div>
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                Address
-              </label>
-              <textarea
-                id="address"
-                rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                defaultValue="123 Tech Hub Street&#10;London, EC2A 4NS&#10;United Kingdom"
+                value={settings.adminEmail}
+                onChange={e => update('adminEmail', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
               />
             </div>
           </div>
         </div>
 
-        {/* Social Media Links */}
-        <div className="p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Social Media Links</h2>
-          <div className="space-y-6">
+        {/* Maintenance Mode */}
+        <div className={`rounded-xl border shadow-sm p-6 ${settings.maintenanceMode ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <label htmlFor="linkedin" className="block text-sm font-medium text-gray-700">
-                LinkedIn
-              </label>
-              <input
-                type="url"
-                id="linkedin"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                placeholder="https://linkedin.com/company/collabov"
-              />
+              <div className="flex items-center gap-2">
+                <AlertTriangle className={`h-4 w-4 ${settings.maintenanceMode ? 'text-red-500' : 'text-gray-400'}`} />
+                <h2 className="text-base font-semibold text-gray-800">Maintenance Mode</h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">When enabled, the public-facing site shows a maintenance page. Admin panel remains accessible.</p>
             </div>
-            <div>
-              <label htmlFor="twitter" className="block text-sm font-medium text-gray-700">
-                Twitter
-              </label>
-              <input
-                type="url"
-                id="twitter"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                placeholder="https://twitter.com/collabov"
-              />
-            </div>
-            <div>
-              <label htmlFor="facebook" className="block text-sm font-medium text-gray-700">
-                Facebook
-              </label>
-              <input
-                type="url"
-                id="facebook"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                placeholder="https://facebook.com/collabov"
-              />
-            </div>
+            <button
+              onClick={() => update('maintenanceMode', !settings.maintenanceMode)}
+              className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${settings.maintenanceMode ? 'bg-red-500' : 'bg-gray-200'}`}
+            >
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings.maintenanceMode ? 'translate-x-7' : 'translate-x-1'}`} />
+            </button>
           </div>
         </div>
 
-        {/* Save Button */}
-        <div className="p-6">
-          <button className="btn-primary flex items-center">
-            <Save className="h-5 w-5 mr-2" />
-            Save Settings
-          </button>
-        </div>
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          className={`flex items-center gap-2 py-2.5 px-5 text-sm font-semibold rounded-xl transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-[#0070F3] text-white hover:bg-blue-700'}`}
+        >
+          <Save className="h-4 w-4" />
+          {saved ? 'Settings Saved!' : 'Save Settings'}
+        </button>
       </div>
     </div>
   );

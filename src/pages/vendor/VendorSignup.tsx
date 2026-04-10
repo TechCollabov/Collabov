@@ -1,257 +1,366 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { motion } from 'framer-motion';
-import { Mail, Lock, User, Phone, Building2 } from 'lucide-react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { Globe, Eye, EyeOff, CheckCircle, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/authRedirect';
 
-const signupSchema = z.object({
-  firstName: z.string().min(2, 'First name is required'),
-  lastName: z.string().min(2, 'Last name is required'),
-  companyName: z.string().min(2, 'Company name is required'),
-  mobileNumber: z.string().min(10, 'Valid mobile number is required'),
-  workEmail: z.string().email('Valid work email is required'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const BUSINESS_TYPES = [
+  { value: 'msp', label: 'MSP (Managed Service Provider)' },
+  { value: 'agency', label: 'IT Agency' },
+  { value: 'staffaug', label: 'Staff Augmentation Firm' },
+];
 
-type SignupFormData = z.infer<typeof signupSchema>;
+const SERVICE_CATEGORIES = [
+  'Software Development', 'Managed IT', 'Staff Augmentation', 'Cybersecurity',
+  'Cloud & Infrastructure', 'QA & Testing', 'DevOps', 'Data & Analytics',
+  'UI/UX Design', 'AI & Machine Learning',
+];
+
+const TECH_TAGS = [
+  'React', 'Node.js', 'Python', '.NET', 'Java', 'AWS', 'Azure', 'GCP',
+  'Docker', 'Kubernetes', 'TypeScript', 'PHP', 'Ruby', 'Go', 'Terraform',
+];
+
+const COUNTRIES = [
+  'United Kingdom', 'Ireland', 'Poland', 'Romania', 'Ukraine', 'India',
+  'Portugal', 'Germany', 'Netherlands', 'United States', 'Other',
+];
 
 const VendorSignup: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signUp, profile, user, loading } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const { register, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema)
-  });
+  const [step, setStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Step 1
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [businessType, setBusinessType] = useState(searchParams.get('type') || '');
+
+  // Step 2
+  const [companyName, setCompanyName] = useState('');
+  const [country, setCountry] = useState('United Kingdom');
+  const [website, setWebsite] = useState('');
+  const [description, setDescription] = useState('');
+
+  // Step 3
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedTech, setSelectedTech] = useState<string[]>([]);
+  const [techInput, setTechInput] = useState('');
+
+  // Step 4
+  const [companyRegFile, setCompanyRegFile] = useState<File | null>(null);
+  const [vatFile, setVatFile] = useState<File | null>(null);
+  const [addressFile, setAddressFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (!loading && user && profile && !error && !isSubmitting) {
-      const redirectPath = getRedirectPath(profile.user_type);
-      navigate(redirectPath, { replace: true });
+    if (!loading && user && profile && step < 5) {
+      navigate(getRedirectPath(profile.user_type), { replace: true });
     }
-  }, [user, profile, navigate, error, isSubmitting, loading]);
+  }, [user, profile, loading, step, navigate]);
 
-  const onSubmit = async (data: SignupFormData) => {
-    console.log('[VendorSignup] Starting signup for:', data.workEmail);
-    setIsSubmitting(true);
-    setError('');
+  const validatePassword = (pw: string) => {
+    if (pw.length < 10) return 'Password must be at least 10 characters';
+    if (!/[A-Z]/.test(pw)) return 'Must include an uppercase letter';
+    if (!/[0-9]/.test(pw)) return 'Must include a number';
+    if (!/[^A-Za-z0-9]/.test(pw)) return 'Must include a symbol';
+    return null;
+  };
 
+  const handleStep1 = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!businessType) { setError('Please select your business type'); return; }
+    const pwErr = validatePassword(password);
+    if (pwErr) { setError(pwErr); return; }
+    setStep(2);
+  };
+
+  const handleStep2 = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!companyName.trim()) { setError('Company name is required'); return; }
+    setStep(3);
+  };
+
+  const handleStep3 = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (selectedServices.length === 0) { setError('Select at least one service category'); return; }
+    setStep(4);
+  };
+
+  const handleStep4 = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!companyRegFile) { setError('Company registration certificate is required'); return; }
+    setStep(5);
+  };
+
+  const handleFinalSubmit = async () => {
+    setError(null);
+    setIsLoading(true);
     try {
-      await signUp(data.workEmail, data.password, {
-        fullName: `${data.firstName} ${data.lastName}`,
+      await signUp(email, password, {
+        fullName: companyName,
         userType: 'vendor',
         additionalData: {
-          companyName: data.companyName,
-          phone: data.mobileNumber,
-        }
+          companyName,
+          businessType,
+          country,
+          website,
+          description,
+          services: selectedServices,
+          techStack: selectedTech,
+        },
       });
-
-      console.log('[VendorSignup] Signup completed successfully');
-      // Note: Don't set isSubmitting to false here - let useEffect handle redirect
-      // The auth state change will trigger profile load and redirect
-    } catch (err) {
-      console.error('[VendorSignup] Signup error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred during signup');
-      setIsSubmitting(false);
+    } catch (err: any) {
+      setError(err.message || 'Sign up failed. Please try again.');
+      setStep(1);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
+  const toggleService = (s: string) =>
+    setSelectedServices(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+
+  const toggleTech = (t: string) =>
+    setSelectedTech(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+
+  const addTechFromInput = () => {
+    const val = techInput.trim();
+    if (val && !selectedTech.includes(val)) setSelectedTech(prev => [...prev, val]);
+    setTechInput('');
+  };
+
+  const TOTAL_STEPS = 5;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          Create your service provider account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Join our network of verified service providers and grow your business globally
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
+      <Link to="/" className="flex items-center gap-2 mb-8">
+        <Globe className="h-8 w-8 text-[#0070F3]" />
+        <span className="text-2xl font-bold text-[#0B2D59]">Collabov</span>
+      </Link>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <motion.div 
-          className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
-              {error}
-            </div>
-          )}
-
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                  First Name
-                </label>
-                <div className="mt-1 relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    {...register('firstName')}
-                    type="text"
-                    className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
-                  />
+      <div className="max-w-lg w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        {step < TOTAL_STEPS && (
+          <div className="flex items-center gap-1 mb-8">
+            {[1, 2, 3, 4].map((s) => (
+              <React.Fragment key={s}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${step > s ? 'bg-[#0070F3] text-white' : step === s ? 'bg-[#0070F3] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                  {step > s ? <CheckCircle className="h-3 w-3" /> : s}
                 </div>
-                {errors.firstName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                  Last Name
-                </label>
-                <div className="mt-1 relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    {...register('lastName')}
-                    type="text"
-                    className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
-                  />
-                </div>
-                {errors.lastName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
-                Company Name
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building2 className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('companyName')}
-                  type="text"
-                  className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
-                />
-              </div>
-              {errors.companyName && (
-                <p className="mt-1 text-sm text-red-600">{errors.companyName.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="mobileNumber" className="block text-sm font-medium text-gray-700">
-                Mobile Number
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('mobileNumber')}
-                  type="tel"
-                  className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
-                />
-              </div>
-              {errors.mobileNumber && (
-                <p className="mt-1 text-sm text-red-600">{errors.mobileNumber.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="workEmail" className="block text-sm font-medium text-gray-700">
-                Work Email
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('workEmail')}
-                  type="email"
-                  className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
-                />
-              </div>
-              {errors.workEmail && (
-                <p className="mt-1 text-sm text-red-600">{errors.workEmail.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Create Password
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('password')}
-                  type="password"
-                  className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
-                />
-              </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password
-              </label>
-              <div className="mt-1 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  {...register('confirmPassword')}
-                  type="password"
-                  className="pl-10 block w-full shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm border-gray-300 rounded-md"
-                />
-              </div>
-              {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
-              )}
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? 'Creating Account...' : 'Sign Up'}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6">
-            <p className="text-center text-sm text-gray-600">
-              Already have an account?{' '}
-              <a href="/sign-in" className="font-medium text-primary-600 hover:text-primary-500">
-                Sign in
-              </a>
-            </p>
+                {s < 4 && <div className={`flex-1 h-1 rounded ${step > s ? 'bg-[#0070F3]' : 'bg-gray-100'}`} />}
+              </React.Fragment>
+            ))}
+            <span className="ml-2 text-xs text-gray-400 flex-shrink-0">Step {step} of 4</span>
           </div>
-        </motion.div>
+        )}
+
+        {error && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>}
+
+        {/* Step 1 — Email + Password + Business Type */}
+        {step === 1 && (
+          <>
+            <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Create your provider account</h1>
+            <p className="text-gray-500 text-sm mb-6">Join our network of verified IT service providers</p>
+            <form onSubmit={handleStep1} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Business Type <span className="text-red-500">*</span></label>
+                <div className="space-y-2">
+                  {BUSINESS_TYPES.map(bt => (
+                    <label key={bt.value} className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-colors ${businessType === bt.value ? 'border-[#0070F3] bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                      <input type="radio" name="businessType" value={bt.value} checked={businessType === bt.value}
+                        onChange={() => setBusinessType(bt.value)} className="sr-only" />
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${businessType === bt.value ? 'border-[#0070F3] bg-[#0070F3]' : 'border-gray-300'}`} />
+                      <span className="text-sm font-medium text-gray-700">{bt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Work Email <span className="text-red-500">*</span></label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                  placeholder="you@company.com"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
+                    placeholder="Min 10 chars, uppercase, number, symbol"
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <button type="submit" className="w-full py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                Continue
+              </button>
+            </form>
+            <p className="text-center text-sm text-gray-400 mt-6">
+              Already have an account?{' '}
+              <Link to="/signin" className="text-[#0070F3] font-medium hover:underline">Sign in</Link>
+            </p>
+          </>
+        )}
+
+        {/* Step 2 — Company Basics */}
+        {step === 2 && (
+          <>
+            <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Company basics</h1>
+            <p className="text-gray-500 text-sm mb-6">Tell us about your organisation</p>
+            <form onSubmit={handleStep2} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name <span className="text-red-500">*</span></label>
+                <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} required
+                  placeholder="e.g. TechPro Solutions Ltd"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                <select value={country} onChange={e => setCountry(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]">
+                  {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                <input type="url" value={website} onChange={e => setWebsite(e.target.value)}
+                  placeholder="https://yourcompany.com"
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Brief Description</label>
+                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                  placeholder="A short overview of what your company does and who you serve..."
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none" />
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setStep(1)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
+                <button type="submit" className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Continue</button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {/* Step 3 — Services & Tech Stack */}
+        {step === 3 && (
+          <>
+            <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Services & tech stack</h1>
+            <p className="text-gray-500 text-sm mb-6">What do you offer? This helps buyers find you.</p>
+            <form onSubmit={handleStep3} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Service Categories <span className="text-red-500">*</span></label>
+                <div className="flex flex-wrap gap-2">
+                  {SERVICE_CATEGORIES.map(s => (
+                    <button key={s} type="button" onClick={() => toggleService(s)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selectedServices.includes(s) ? 'bg-[#0070F3] text-white border-[#0070F3]' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tech Stack</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {TECH_TAGS.map(t => (
+                    <button key={t} type="button" onClick={() => toggleTech(t)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selectedTech.includes(t) ? 'bg-[#0070F3] text-white border-[#0070F3]' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input type="text" value={techInput} onChange={e => setTechInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTechFromInput(); } }}
+                    placeholder="Add custom technology..."
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+                  <button type="button" onClick={addTechFromInput} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200">Add</button>
+                </div>
+                {selectedTech.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedTech.map(t => (
+                      <span key={t} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-[#0070F3] text-xs rounded-full">
+                        {t}
+                        <button type="button" onClick={() => toggleTech(t)}><X className="h-3 w-3" /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setStep(2)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
+                <button type="submit" className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Continue</button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {/* Step 4 — Documents */}
+        {step === 4 && (
+          <>
+            <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Verification documents</h1>
+            <p className="text-gray-500 text-sm mb-2">We review all applications within 2 business days. Documents are kept confidential.</p>
+            <p className="text-xs text-gray-400 mb-6">PDF or image, max 10MB each</p>
+            <form onSubmit={handleStep4} className="space-y-4">
+              {[
+                { label: 'Company Registration Certificate (Companies House)', required: true, file: companyRegFile, setFile: setCompanyRegFile },
+                { label: 'VAT Registration Certificate (if applicable)', required: false, file: vatFile, setFile: setVatFile },
+                { label: 'Address Proof (utility bill or bank statement dated within 3 months)', required: false, file: addressFile, setFile: setAddressFile },
+              ].map(({ label, required, file, setFile }) => (
+                <div key={label}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label} {required && <span className="text-red-500">*</span>}
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-[#0070F3] transition-colors">
+                    <Upload className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-500 flex-1">{file ? file.name : 'Click to upload'}</span>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only"
+                      onChange={e => setFile(e.target.files?.[0] || null)} />
+                    {file && <button type="button" onClick={e => { e.preventDefault(); setFile(null); }}><X className="h-4 w-4 text-gray-400" /></button>}
+                  </label>
+                </div>
+              ))}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setStep(3)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
+                <button type="submit" className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Submit Application</button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {/* Step 5 — Confirmation */}
+        {step === 5 && (
+          <div className="text-center py-4">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="h-8 w-8 text-[#0070F3]" />
+            </div>
+            <h1 className="text-2xl font-bold text-[#0B2D59] mb-3">Application submitted!</h1>
+            <p className="text-gray-600 mb-2">
+              <span className="font-semibold">{companyName}</span> — {BUSINESS_TYPES.find(b => b.value === businessType)?.label}
+            </p>
+            <p className="text-gray-500 text-sm mb-8">
+              We review all applications within 2 business days. You will receive an email when your profile is approved.
+            </p>
+            {error && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>}
+            <button
+              onClick={handleFinalSubmit}
+              disabled={isLoading}
+              className="w-full py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {isLoading ? <><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> Creating account...</> : 'Create Account & Submit'}
+            </button>
+            <Link to="/vendor/dashboard" className="block mt-4 text-sm text-gray-400 hover:text-gray-600">
+              Go to vendor dashboard (limited view until approved)
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
