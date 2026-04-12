@@ -75,7 +75,7 @@
 */
 
 -- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 
 -- =====================================================
 -- ENUMS
@@ -196,21 +196,21 @@ CREATE TABLE IF NOT EXISTS vendors (
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS skills (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text UNIQUE NOT NULL,
   category text,
   created_at timestamptz DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS industries (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text UNIQUE NOT NULL,
   description text,
   created_at timestamptz DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS service_categories (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text UNIQUE NOT NULL,
   description text,
   parent_id uuid REFERENCES service_categories(id),
@@ -223,7 +223,7 @@ CREATE TABLE IF NOT EXISTS service_categories (
 
 -- Contractor skills (many-to-many)
 CREATE TABLE IF NOT EXISTS contractor_skills (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contractor_id uuid NOT NULL REFERENCES contractors(id) ON DELETE CASCADE,
   skill_id uuid NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
   created_at timestamptz DEFAULT now(),
@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS contractor_skills (
 
 -- Portfolio items
 CREATE TABLE IF NOT EXISTS portfolio_items (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contractor_id uuid NOT NULL REFERENCES contractors(id) ON DELETE CASCADE,
   title text NOT NULL,
   description text,
@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS portfolio_items (
 
 -- Certifications
 CREATE TABLE IF NOT EXISTS certifications (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contractor_id uuid NOT NULL REFERENCES contractors(id) ON DELETE CASCADE,
   name text NOT NULL,
   issuing_organization text,
@@ -262,7 +262,7 @@ CREATE TABLE IF NOT EXISTS certifications (
 
 -- Vendor industries (many-to-many)
 CREATE TABLE IF NOT EXISTS vendor_industries (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   industry_id uuid NOT NULL REFERENCES industries(id) ON DELETE CASCADE,
   created_at timestamptz DEFAULT now(),
@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS vendor_industries (
 
 -- Vendor services
 CREATE TABLE IF NOT EXISTS vendor_services (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   service_category_id uuid REFERENCES service_categories(id),
   name text NOT NULL,
@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS vendor_services (
 
 -- Vendor documents
 CREATE TABLE IF NOT EXISTS vendor_documents (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   document_type document_type NOT NULL,
   document_url text NOT NULL,
@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS vendor_documents (
 
 -- Vendor employees/resources
 CREATE TABLE IF NOT EXISTS vendor_employees (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   name text NOT NULL,
   role text,
@@ -313,7 +313,7 @@ CREATE TABLE IF NOT EXISTS vendor_employees (
 
 -- Vendor packages/subscriptions
 CREATE TABLE IF NOT EXISTS vendor_packages (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   name text NOT NULL,
   description text,
@@ -330,7 +330,7 @@ CREATE TABLE IF NOT EXISTS vendor_packages (
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS jobs (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   title text NOT NULL,
   description text NOT NULL,
@@ -353,7 +353,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 -- Job skills (many-to-many)
 CREATE TABLE IF NOT EXISTS job_skills (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id uuid NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   skill_id uuid NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
   created_at timestamptz DEFAULT now(),
@@ -362,7 +362,7 @@ CREATE TABLE IF NOT EXISTS job_skills (
 
 -- Job attachments
 CREATE TABLE IF NOT EXISTS job_attachments (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id uuid NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   file_name text NOT NULL,
   file_url text NOT NULL,
@@ -373,7 +373,7 @@ CREATE TABLE IF NOT EXISTS job_attachments (
 
 -- Proposals
 CREATE TABLE IF NOT EXISTS proposals (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id uuid NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   contractor_id uuid NOT NULL REFERENCES contractors(id) ON DELETE CASCADE,
   proposal_content text NOT NULL,
@@ -393,7 +393,7 @@ CREATE TABLE IF NOT EXISTS proposals (
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS projects (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   contractor_id uuid REFERENCES contractors(id) ON DELETE SET NULL,
   vendor_id uuid REFERENCES vendors(id) ON DELETE SET NULL,
@@ -416,7 +416,7 @@ CREATE TABLE IF NOT EXISTS projects (
 
 -- Project milestones
 CREATE TABLE IF NOT EXISTS project_milestones (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   title text NOT NULL,
   description text,
@@ -431,7 +431,7 @@ CREATE TABLE IF NOT EXISTS project_milestones (
 
 -- Contracts
 CREATE TABLE IF NOT EXISTS contracts (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contract_number text UNIQUE NOT NULL,
   project_id uuid REFERENCES projects(id) ON DELETE SET NULL,
   customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -459,7 +459,7 @@ CREATE TABLE IF NOT EXISTS contracts (
 
 -- Contract services
 CREATE TABLE IF NOT EXISTS contract_services (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contract_id uuid NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
   service_name text NOT NULL,
   description text,
@@ -471,7 +471,7 @@ CREATE TABLE IF NOT EXISTS contract_services (
 
 -- Contract deliverables
 CREATE TABLE IF NOT EXISTS contract_deliverables (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contract_id uuid NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
   title text NOT NULL,
   description text,
@@ -487,7 +487,7 @@ CREATE TABLE IF NOT EXISTS contract_deliverables (
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS messages (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   recipient_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   subject text,
@@ -500,7 +500,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE TABLE IF NOT EXISTS message_attachments (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   message_id uuid NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
   file_name text NOT NULL,
   file_url text NOT NULL,
@@ -510,7 +510,7 @@ CREATE TABLE IF NOT EXISTS message_attachments (
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   type notification_type NOT NULL,
   title text NOT NULL,
@@ -529,7 +529,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS reviews (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   contractor_id uuid REFERENCES contractors(id) ON DELETE CASCADE,
   vendor_id uuid REFERENCES vendors(id) ON DELETE CASCADE,
@@ -551,7 +551,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 -- Saved vendors (customer wishlist)
 CREATE TABLE IF NOT EXISTS saved_vendors (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   vendor_id uuid REFERENCES vendors(id) ON DELETE CASCADE,
   contractor_id uuid REFERENCES contractors(id) ON DELETE CASCADE,
@@ -566,7 +566,7 @@ CREATE TABLE IF NOT EXISTS saved_vendors (
 
 -- Enquiries (customer to vendor)
 CREATE TABLE IF NOT EXISTS enquiries (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   subject text NOT NULL,
