@@ -133,60 +133,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emailConfirmed: data.user.email_confirmed_at
     });
 
-    // Create profile record
-    console.log('[AuthContext] Creating profile record...');
-    const { error: profileError } = await supabase.from('profiles').insert({
+    // Upsert profile record (trigger may have already created it)
+    console.log('[AuthContext] Upserting profile record...');
+    const { error: profileError } = await supabase.from('profiles').upsert({
       id: data.user.id,
       email: email,
       full_name: userData.fullName,
       user_type: userData.userType,
       profile_completed: false,
       onboarding_step: 0,
-    });
+    }, { onConflict: 'id' });
 
     if (profileError) {
-      console.error('[AuthContext] Profile creation error:', profileError);
+      console.error('[AuthContext] Profile upsert error:', profileError);
       throw profileError;
     }
 
     console.log('[AuthContext] Profile created successfully');
 
-    // Create role-specific record
+    // Upsert role-specific record (trigger may have already created a placeholder)
     if (userData.userType === 'customer' && userData.additionalData?.companyName) {
-      console.log('[AuthContext] Creating customer record...');
-      const { error: customerError } = await supabase.from('customers').insert({
+      console.log('[AuthContext] Upserting customer record...');
+      const { error: customerError } = await supabase.from('customers').upsert({
         id: data.user.id,
         company_name: userData.additionalData.companyName as string,
-      });
+      }, { onConflict: 'id' });
       if (customerError) {
-        console.error('[AuthContext] Customer creation error:', customerError);
+        console.error('[AuthContext] Customer upsert error:', customerError);
         throw customerError;
       }
     }
 
     if (userData.userType === 'contractor') {
-      console.log('[AuthContext] Creating contractor record...');
-      const { error: contractorError } = await supabase.from('contractors').insert({
+      console.log('[AuthContext] Upserting contractor record...');
+      const { error: contractorError } = await supabase.from('contractors').upsert({
         id: data.user.id,
         title: userData.additionalData?.title as string || 'Freelancer',
-      });
+      }, { onConflict: 'id' });
       if (contractorError) {
-        console.error('[AuthContext] Contractor creation error:', contractorError);
+        console.error('[AuthContext] Contractor upsert error:', contractorError);
         throw contractorError;
       }
     }
 
     if (userData.userType === 'vendor' && userData.additionalData?.companyName) {
-      console.log('[AuthContext] Creating vendor record...');
-      const { error: vendorError } = await supabase.from('vendors').insert({
+      console.log('[AuthContext] Upserting vendor record...');
+      const { error: vendorError } = await supabase.from('vendors').upsert({
         id: data.user.id,
         company_name: userData.additionalData.companyName as string,
         contact_name: userData.fullName,
         contact_email: email,
         contact_phone: userData.additionalData.phone as string || '',
-      });
+      }, { onConflict: 'id' });
       if (vendorError) {
-        console.error('[AuthContext] Vendor creation error:', vendorError);
+        console.error('[AuthContext] Vendor upsert error:', vendorError);
         throw vendorError;
       }
     }
