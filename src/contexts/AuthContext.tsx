@@ -104,7 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('This email is already registered. Please sign in or use a different email.');
     }
 
-    // Sign up with Supabase Auth
+    // Sign up — pass all data in metadata so the SECURITY DEFINER trigger
+    // creates profile + role records server-side, bypassing RLS entirely.
+    // No client-side inserts needed.
     console.log('[AuthContext] Creating auth user...');
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -113,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           full_name: userData.fullName,
           user_type: userData.userType,
+          company_name: userData.additionalData?.companyName ?? '',
         },
       },
     });
@@ -127,69 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('User creation failed');
     }
 
-    console.log('[AuthContext] Auth user created:', {
+    console.log('[AuthContext] Auth user created — trigger handles profile creation:', {
       userId: data.user.id,
       hasSession: !!data.session,
-      emailConfirmed: data.user.email_confirmed_at
+      emailConfirmed: data.user.email_confirmed_at,
     });
-
-    // Upsert profile record (trigger may have already created it)
-    console.log('[AuthContext] Upserting profile record...');
-    const { error: profileError } = await supabase.from('profiles').upsert({
-      id: data.user.id,
-      email: email,
-      full_name: userData.fullName,
-      user_type: userData.userType,
-      profile_completed: false,
-      onboarding_step: 0,
-    }, { onConflict: 'id' });
-
-    if (profileError) {
-      console.error('[AuthContext] Profile upsert error:', profileError);
-      throw profileError;
-    }
-
-    console.log('[AuthContext] Profile created successfully');
-
-    // Upsert role-specific record (trigger may have already created a placeholder)
-    if (userData.userType === 'customer' && userData.additionalData?.companyName) {
-      console.log('[AuthContext] Upserting customer record...');
-      const { error: customerError } = await supabase.from('customers').upsert({
-        id: data.user.id,
-        company_name: userData.additionalData.companyName as string,
-      }, { onConflict: 'id' });
-      if (customerError) {
-        console.error('[AuthContext] Customer upsert error:', customerError);
-        throw customerError;
-      }
-    }
-
-    if (userData.userType === 'contractor') {
-      console.log('[AuthContext] Upserting contractor record...');
-      const { error: contractorError } = await supabase.from('contractors').upsert({
-        id: data.user.id,
-        title: userData.additionalData?.title as string || 'Freelancer',
-      }, { onConflict: 'id' });
-      if (contractorError) {
-        console.error('[AuthContext] Contractor upsert error:', contractorError);
-        throw contractorError;
-      }
-    }
-
-    if (userData.userType === 'vendor' && userData.additionalData?.companyName) {
-      console.log('[AuthContext] Upserting vendor record...');
-      const { error: vendorError } = await supabase.from('vendors').upsert({
-        id: data.user.id,
-        company_name: userData.additionalData.companyName as string,
-        contact_name: userData.fullName,
-        contact_email: email,
-        contact_phone: userData.additionalData.phone as string || '',
-      }, { onConflict: 'id' });
-      if (vendorError) {
-        console.error('[AuthContext] Vendor upsert error:', vendorError);
-        throw vendorError;
-      }
-    }
 
     console.log('[AuthContext] signUp completed successfully');
   };
