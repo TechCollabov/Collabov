@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 /* ── Types ── */
-type VendorType = 'MSP' | 'Agency' | 'Dedicated Team' | 'Staff Aug';
+type VendorType = 'MSP' | 'Agency' | 'Staff Aug';
 type Availability = 'available' | 'limited' | 'booked';
 
 interface Vendor {
@@ -29,22 +29,12 @@ interface Vendor {
   ir35: boolean;
 }
 
-/* ── Mock data ── */
-const MOCK_VENDORS: Vendor[] = [
-  { id: '1', name: 'TechPro Solutions', city: 'Warsaw', country: 'Poland', type: 'Agency', verified: true, rating: 4.8, reviewCount: 47, engagements: 23, responseTime: '4 hrs', tagline: 'Full-stack React and Node.js agency specialising in fintech and SaaS platforms', techStack: ['React', 'Node.js', 'PostgreSQL', 'AWS', 'TypeScript'], monthlyRate: 3200, availability: 'available', ir35: true },
-  { id: '2', name: 'CloudBridge MSP', city: 'London', country: 'UK', type: 'MSP', verified: true, rating: 4.6, reviewCount: 31, engagements: 15, responseTime: '2 hrs', tagline: 'Enterprise-grade managed IT services for UK SMEs — 24/7 monitoring and support', techStack: ['Azure', 'Microsoft 365', 'Intune', 'Cisco', 'SentinelOne'], monthlyRate: 2800, availability: 'available', ir35: true },
-  { id: '3', name: 'DevForge Agency', city: 'Bucharest', country: 'Romania', type: 'Agency', verified: true, rating: 4.9, reviewCount: 62, engagements: 38, responseTime: '6 hrs', tagline: 'Bespoke software development for e-commerce and marketplace platforms', techStack: ['Python', 'Django', 'React', 'AWS', 'Docker'], monthlyRate: 2400, availability: 'limited', availableFrom: 'May 2026', ir35: false },
-  { id: '4', name: 'ScaleTeam UK', city: 'Manchester', country: 'UK', type: 'Dedicated Team', verified: true, rating: 4.7, reviewCount: 19, engagements: 11, responseTime: '3 hrs', tagline: 'Dedicated developers and QA engineers available on a monthly basis for product teams', techStack: ['Java', 'Spring Boot', 'Kubernetes', 'GCP', 'Terraform'], monthlyRate: 4500, availability: 'available', ir35: true },
-  { id: '5', name: 'NexGen IT', city: 'Kraków', country: 'Poland', type: 'Staff Aug', verified: true, rating: 4.5, reviewCount: 28, engagements: 17, responseTime: '8 hrs', tagline: 'Staff augmentation for UK tech companies — vetted senior engineers on demand', techStack: ['.NET', 'Azure', 'TypeScript', 'Angular', 'SQL Server'], monthlyRate: 2600, availability: 'available', ir35: true },
-  { id: '6', name: 'CyberShield MSP', city: 'Edinburgh', country: 'UK', type: 'MSP', verified: true, rating: 4.4, reviewCount: 12, engagements: 8, responseTime: '1 hr', tagline: 'Cybersecurity-focused MSP for financial services and healthcare organisations', techStack: ['CrowdStrike', 'Splunk', 'AWS', 'Palo Alto', 'ISO 27001'], monthlyRate: 3800, availability: 'limited', availableFrom: 'June 2026', ir35: true },
-  { id: '7', name: 'FlowCode Labs', city: 'Kyiv', country: 'Ukraine', type: 'Agency', verified: false, rating: 0, reviewCount: 0, engagements: 0, responseTime: '12 hrs', tagline: 'Mobile-first development agency specialising in React Native and Flutter applications', techStack: ['React Native', 'Flutter', 'Firebase', 'Node.js', 'GraphQL'], monthlyRate: 1800, availability: 'available', ir35: false },
-  { id: '8', name: 'DataPulse Analytics', city: 'Birmingham', country: 'UK', type: 'Agency', verified: true, rating: 4.3, reviewCount: 9, engagements: 5, responseTime: '5 hrs', tagline: 'Data engineering and analytics agency — pipelines, dashboards, and BI for growth companies', techStack: ['Python', 'dbt', 'Snowflake', 'Tableau', 'AWS'], monthlyRate: 4200, availability: 'booked', ir35: true },
-];
+/* No hardcoded vendors — data will be loaded from the database */
+const MOCK_VENDORS: Vendor[] = [];
 
 const TYPE_COLOURS: Record<VendorType, string> = {
   'MSP': 'bg-blue-100 text-blue-700',
   'Agency': 'bg-green-100 text-green-700',
-  'Dedicated Team': 'bg-purple-100 text-purple-700',
   'Staff Aug': 'bg-amber-100 text-amber-700',
 };
 
@@ -96,7 +86,7 @@ const SERVICE_CATS = [
   'Cloud & Infrastructure', 'QA & Testing', 'DevOps', 'Data & Analytics', 'UI/UX Design', 'AI & Machine Learning',
 ];
 const TEAM_SIZES = ['1–10 people', '11–50 people', '51–200 people', '200+ people'];
-const VENDOR_TYPES: VendorType[] = ['MSP', 'Agency', 'Dedicated Team', 'Staff Aug'];
+const VENDOR_TYPES: VendorType[] = ['MSP', 'Agency', 'Staff Aug'];
 
 function AccordionGroup({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);

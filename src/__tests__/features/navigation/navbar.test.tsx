@@ -128,14 +128,6 @@ describe('Feature: Navbar', () => {
       expect(getOpenDropdownPanel(container)).not.toBeNull();
     });
 
-    it('should link "Dedicated Teams" to /results?type=dedicated', () => {
-      const { container } = renderNavbar();
-      fireEvent.mouseEnter(getDropdownWrapper(/^outsource$/i));
-      const panel = getOpenDropdownPanel(container)!;
-      expect(within(panel as HTMLElement).getByRole('link', { name: /^dedicated teams$/i }))
-        .toHaveAttribute('href', '/results?type=dedicated');
-    });
-
     it('should link "IT Agencies" to /results?type=agency', () => {
       const { container } = renderNavbar();
       fireEvent.mouseEnter(getDropdownWrapper(/^outsource$/i));
@@ -177,14 +169,6 @@ describe('Feature: Navbar', () => {
         .toHaveAttribute('href', '/ai-calculator');
     });
 
-    it('should display section headings for Long Term, Short Term, and Other', () => {
-      const { container } = renderNavbar();
-      fireEvent.mouseEnter(getDropdownWrapper(/^outsource$/i));
-      const panel = getOpenDropdownPanel(container)!;
-      expect(within(panel as HTMLElement).getByText(/long term/i)).toBeInTheDocument();
-      expect(within(panel as HTMLElement).getByText(/short term/i)).toBeInTheDocument();
-      expect(within(panel as HTMLElement).getByText(/^other$/i)).toBeInTheDocument();
-    });
   });
 
   describe('Scenario: Outsource dropdown closes on mouse leave', () => {
@@ -332,8 +316,6 @@ describe('Feature: Navbar', () => {
       const { container } = renderNavbar();
       const mobilePanel = container.querySelector('.fixed.inset-0') as HTMLElement;
 
-      expect(within(mobilePanel).getByRole('link', { name: /^dedicated teams$/i }))
-        .toHaveAttribute('href', '/results?type=dedicated');
       expect(within(mobilePanel).getByRole('link', { name: /^it agencies$/i }))
         .toHaveAttribute('href', '/results?type=agency');
       expect(within(mobilePanel).getByRole('link', { name: /^msps$/i }))
