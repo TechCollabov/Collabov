@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { AlertCircle, Check, X, MessageSquare, Clock } from 'lucide-react';
 
-const DISPUTES = [
-  { id: '1', buyer: 'FinEdge Capital', vendor: 'DevForge Agency', project: 'Cloud Migration Phase 1', amount: '£8,200', opened: '1 day ago', status: 'open', priority: 'high', reason: 'Buyer claims milestone was not delivered to spec. Vendor disputes and claims all deliverables were met.' },
-  { id: '2', buyer: 'GreenPath Logistics', vendor: 'TechPro Solutions', project: 'React Native App MVP', amount: '£6,500', opened: '4 days ago', status: 'under_review', priority: 'medium', reason: 'Delay in delivery — vendor requested additional time, buyer wants partial refund for missed deadline.' },
-  { id: '3', buyer: 'Brightstone Solicitors', vendor: 'CloudBridge MSP', project: 'M365 Migration', amount: '£2,800', opened: '2 weeks ago', status: 'resolved', priority: 'low', reason: 'Billing discrepancy resolved. Vendor issued partial refund of £400.' },
-];
+/* No hardcoded disputes — data will be loaded from the database */
+const DISPUTES: {
+  id: string; buyer: string; vendor: string; project: string; amount: string;
+  opened: string; status: string; priority: string; reason: string;
+}[] = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   open: { label: 'Open', color: 'bg-red-100 text-red-700' },
@@ -21,7 +21,7 @@ const PRIORITY_MAP: Record<string, string> = {
 
 const AdminDisputes: React.FC = () => {
   const [disputes, setDisputes] = useState(DISPUTES);
-  const [selected, setSelected] = useState<string | null>('1');
+  const [selected, setSelected] = useState<string | null>(null);
   const [resolution, setResolution] = useState('');
 
   const selectedDispute = disputes.find(d => d.id === selected);

@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { Check, Flag, X, Clock, DollarSign, Users } from 'lucide-react';
 
-const BRIEFS = [
-  { id: '1', title: 'Cloud Infrastructure Modernisation', company: 'FinEdge Capital', budget: '£40,000–£70,000', timeline: '4 months', proposals: 6, submitted: '2 days ago', status: 'pending', category: 'Cloud & Infrastructure', type: 'Tender' },
-  { id: '2', title: 'React Native Mobile App (iOS & Android)', company: 'GreenPath Logistics', budget: '£25,000–£45,000', timeline: '3 months', proposals: 11, submitted: '4 days ago', status: 'approved', category: 'Software Development', type: 'Tender' },
-  { id: '3', title: 'ISO 27001 Implementation', company: 'MedCore Health', budget: '£18,000–£30,000', timeline: '6 months', proposals: 4, submitted: '1 week ago', status: 'flagged', category: 'Cybersecurity', type: 'Tender', flagReason: 'Missing scope detail — not enough information for vendors to submit accurate proposals.' },
-  { id: '4', title: 'Senior Full-Stack Developer Contract', company: 'PayFlow Technologies', budget: '£550–£650/day', timeline: '6 months', proposals: 14, submitted: '1 day ago', status: 'pending', category: 'Software Development', type: 'Job' },
-  { id: '5', title: 'DevOps Team — Ongoing Retainer', company: 'TradePoint Exchange', budget: '£12,000/month', timeline: 'Ongoing', proposals: 3, submitted: '1 day ago', status: 'pending', category: 'DevOps', type: 'Tender' },
-];
+/* No hardcoded briefs — data will be loaded from the database */
+const BRIEFS: {
+  id: string; title: string; company: string; budget: string; timeline: string;
+  proposals: number; submitted: string; status: string; category: string; type: string; flagReason?: string;
+}[] = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700' },

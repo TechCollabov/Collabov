@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
 import { Bell, MessageSquare, FileText, CreditCard, Star, CheckCircle } from 'lucide-react';
 
-const NOTIFICATIONS = [
-  { id: '1', type: 'enquiry', title: 'New enquiry received', body: 'Sarah Mitchell from FinEdge Capital sent you an enquiry about Cloud Infrastructure Modernisation.', time: '2 hours ago', read: false },
-  { id: '2', type: 'message', title: 'New message', body: 'James Okafor replied to your proposal for the React Native App project.', time: '5 hours ago', read: false },
-  { id: '3', type: 'payment', title: 'Milestone payment released', body: '£5,500 for "Gap Analysis & ISMS Setup" has been released and is on its way to your account.', time: '1 day ago', read: false },
-  { id: '4', type: 'review', title: 'New review posted', body: 'MedCore Health left a 5-star review on your profile. "Excellent service and very professional team."', time: '2 days ago', read: true },
-  { id: '5', type: 'contract', title: 'Contract signed', body: 'GreenPath Logistics has signed the contract for the React Native App project. Work can begin.', time: '3 days ago', read: true },
-  { id: '6', type: 'enquiry', title: 'Enquiry status updated', body: 'Your proposal for "DevOps Team — Ongoing Retainer" has been marked as declined by the client.', time: '1 week ago', read: true },
-];
+/* No hardcoded notifications — data will be loaded from the database */
+const NOTIFICATIONS: { id: string; type: string; title: string; body: string; time: string; read: boolean }[] = [];
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   enquiry: <MessageSquare className="h-4 w-4" />,

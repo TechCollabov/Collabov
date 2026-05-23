@@ -1,88 +1,14 @@
 import React, { useState } from 'react';
 import { Search, MapPin, Clock, Briefcase, ChevronDown, Star, ArrowRight } from 'lucide-react';
 
-const JOBS = [
-  {
-    id: '1',
-    title: 'Senior Full-Stack Developer (React / Node.js)',
-    company: 'PayFlow Technologies',
-    companyType: 'Fintech',
-    location: 'Remote (UK)',
-    rate: '£550–£650/day',
-    duration: '6 months',
-    deadline: '25 Apr 2026',
-    category: 'Software Development',
-    description: 'Build new features for a payment processing platform. Agile environment, close work with product and design.',
-    skills: ['React', 'Node.js', 'TypeScript', 'PostgreSQL', 'AWS'],
-    applicants: 14,
-    matchScore: 94,
-    posted: '1 day ago',
-  },
-  {
-    id: '2',
-    title: 'Azure DevOps Engineer',
-    company: 'InfraCo UK',
-    companyType: 'IT Services',
-    location: 'Remote (UK)',
-    rate: '£500–£600/day',
-    duration: '4 months',
-    deadline: '5 May 2026',
-    category: 'DevOps',
-    description: 'Build and maintain CI/CD pipelines, IaC, and support cloud cost optimisation across Azure.',
-    skills: ['Azure DevOps', 'Terraform', 'Docker', 'Kubernetes'],
-    applicants: 5,
-    matchScore: 87,
-    posted: '3 days ago',
-  },
-  {
-    id: '3',
-    title: 'Cloud Architect (AWS)',
-    company: 'Retail Chain UK',
-    companyType: 'Retail & E-commerce',
-    location: 'Remote (UK)',
-    rate: '£700–£850/day',
-    duration: '5 months',
-    deadline: '12 May 2026',
-    category: 'Cloud & Infrastructure',
-    description: 'Design and oversee migration of on-premise retail systems to AWS. Lead a team of engineers.',
-    skills: ['AWS', 'Terraform', 'CloudFormation', 'Microservices'],
-    applicants: 6,
-    matchScore: 79,
-    posted: '5 days ago',
-  },
-  {
-    id: '4',
-    title: 'Cybersecurity Analyst (SOC)',
-    company: 'ShieldNet UK',
-    companyType: 'Managed Security',
-    location: 'London (Hybrid)',
-    rate: '£450–£550/day',
-    duration: '3 months',
-    deadline: '30 Apr 2026',
-    category: 'Cybersecurity',
-    description: 'Monitor SIEM alerts, triage incidents, perform threat hunting, produce post-incident reports.',
-    skills: ['SIEM', 'Splunk', 'ISO 27001', 'Incident Response'],
-    applicants: 8,
-    matchScore: 65,
-    posted: '2 days ago',
-  },
-  {
-    id: '5',
-    title: 'QA Automation Engineer (Playwright)',
-    company: 'DataSphere Analytics',
-    companyType: 'SaaS',
-    location: 'Remote (UK)',
-    rate: '£400–£500/day',
-    duration: '3 months',
-    deadline: '8 May 2026',
-    category: 'QA & Testing',
-    description: 'Build and maintain automated test suites using Playwright. Define test strategy and CI/CD integration.',
-    skills: ['Playwright', 'TypeScript', 'CI/CD', 'GitHub Actions'],
-    applicants: 9,
-    matchScore: 58,
-    posted: '1 week ago',
-  },
-];
+/* No hardcoded jobs — data will be loaded from the database */
+const JOBS: {
+  id: string; title: string; company: string; companyType: string;
+  location: string; rate: string; duration: string; deadline: string;
+  category: string; description: string; skills: string[];
+  applicants: number; matchScore: number; posted: string;
+}[] = [];
+
 
 const CATEGORIES = ['All', 'Software Development', 'Managed IT', 'Cybersecurity', 'Cloud & Infrastructure', 'DevOps', 'QA & Testing'];
 

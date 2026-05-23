@@ -1,14 +1,8 @@
 import React, { useState } from 'react';
 import { CreditCard, ArrowDownToLine, Clock, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 
-const MILESTONES = [
-  { id: '1', project: 'Cloud Migration — FinEdge Capital', milestone: 'Discovery & Architecture', amount: '£4,200', dueDate: '10 Apr 2026', status: 'pending', client: 'FinEdge Capital' },
-  { id: '2', project: 'React Native App — GreenPath', milestone: 'MVP Build (Sprint 1)', amount: '£6,500', dueDate: '18 Apr 2026', status: 'pending', client: 'GreenPath Logistics' },
-  { id: '3', project: 'Cloud Migration — FinEdge Capital', milestone: 'Phase 1 Migration', amount: '£8,000', dueDate: '5 May 2026', status: 'upcoming', client: 'FinEdge Capital' },
-  { id: '4', project: 'ISO 27001 — MedCore Health', milestone: 'Gap Analysis & ISMS Setup', amount: '£5,500', dueDate: '12 Mar 2026', status: 'released', client: 'MedCore Health' },
-  { id: '5', project: 'ISO 27001 — MedCore Health', milestone: 'Internal Audit', amount: '£4,800', dueDate: '28 Feb 2026', status: 'released', client: 'MedCore Health' },
-  { id: '6', project: 'M365 Migration — Brightstone', milestone: 'Migration Complete', amount: '£3,200', dueDate: '20 Jan 2026', status: 'released', client: 'Brightstone Solicitors' },
-];
+/* No hardcoded milestones — data will be loaded from the database */
+const MILESTONES: { id: string; project: string; milestone: string; amount: string; dueDate: string; status: string; client: string }[] = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   pending: { label: 'In Escrow', color: 'bg-amber-50 text-amber-700', icon: <Clock className="h-3.5 w-3.5" /> },

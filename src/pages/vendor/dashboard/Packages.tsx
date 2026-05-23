@@ -1,41 +1,12 @@
 import React, { useState } from 'react';
 import { Plus, Package, Pencil, Trash2, Clock, DollarSign, Check } from 'lucide-react';
 
-const MOCK_PACKAGES = [
-  {
-    id: '1',
-    title: 'Cloud Infrastructure Audit',
-    category: 'Cloud & Infrastructure',
-    price: '£2,800',
-    priceType: 'fixed',
-    duration: '1 week',
-    status: 'active',
-    included: ['Current state review', 'Architecture recommendations', 'Cost optimisation report', 'Security assessment'],
-    tags: ['AWS', 'Azure', 'Terraform'],
-  },
-  {
-    id: '2',
-    title: 'Managed IT Support — SME',
-    category: 'Managed IT',
-    price: '£950',
-    priceType: 'monthly',
-    duration: 'Monthly retainer',
-    status: 'active',
-    included: ['Helpdesk support (Mon–Fri)', 'Infrastructure monitoring', 'Security patching', 'Monthly report'],
-    tags: ['Microsoft 365', 'Azure AD', 'Windows'],
-  },
-  {
-    id: '3',
-    title: 'DevOps Setup Sprint',
-    category: 'DevOps',
-    price: '£4,500',
-    priceType: 'fixed',
-    duration: '2 weeks',
-    status: 'draft',
-    included: ['Docker containerisation', 'CI/CD pipeline (GitHub Actions)', 'Monitoring setup', 'Documentation'],
-    tags: ['Docker', 'Kubernetes', 'GitHub Actions'],
-  },
-];
+/* No hardcoded packages — data will be loaded from the database */
+const MOCK_PACKAGES: {
+  id: string; title: string; category: string; price: string;
+  priceType: string; duration: string; status: string;
+  included: string[]; tags: string[];
+}[] = [];
 
 const CATEGORIES = ['Cloud & Infrastructure', 'Managed IT', 'Software Development', 'Cybersecurity', 'DevOps', 'QA & Testing', 'Staff Augmentation'];
 

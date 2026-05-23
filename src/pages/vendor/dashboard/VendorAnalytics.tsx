@@ -2,39 +2,11 @@ import React from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Eye, MessageSquare, ArrowUpRight, Lightbulb } from 'lucide-react';
 
-const profileViewsData = [
-  { month: 'Oct', views: 42 },
-  { month: 'Nov', views: 61 },
-  { month: 'Dec', views: 55 },
-  { month: 'Jan', views: 78 },
-  { month: 'Feb', views: 93 },
-  { month: 'Mar', views: 110 },
-  { month: 'Apr', views: 87 },
-];
-
-const revenueData = [
-  { month: 'Oct', revenue: 8400 },
-  { month: 'Nov', revenue: 12200 },
-  { month: 'Dec', revenue: 9800 },
-  { month: 'Jan', revenue: 15600 },
-  { month: 'Feb', revenue: 18300 },
-  { month: 'Mar', revenue: 21000 },
-  { month: 'Apr', revenue: 14700 },
-];
-
-const funnelData = [
-  { stage: 'Profile Views', count: 110, pct: 100 },
-  { stage: 'Enquiries', count: 22, pct: 20 },
-  { stage: 'Proposals Sent', count: 11, pct: 10 },
-  { stage: 'Contracts Won', count: 3, pct: 2.7 },
-];
-
-const TIPS = [
-  'Add at least 2 case studies to increase enquiry rate by up to 40%',
-  'Vendors who respond within 2 hours receive 3× more proposals',
-  'Uploading your Companies House certificate increases trust score and search ranking',
-  'Profile completeness is currently 72% — complete your tech stack section for better matching',
-];
+/* No hardcoded analytics data — will be loaded from the database */
+const profileViewsData: { month: string; views: number }[] = [];
+const revenueData: { month: string; revenue: number }[] = [];
+const funnelData: { stage: string; count: number; pct: number }[] = [];
+const TIPS: string[] = [];
 
 const VendorAnalytics: React.FC = () => {
   return (
@@ -47,10 +19,10 @@ const VendorAnalytics: React.FC = () => {
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Profile Views (30d)', value: '87', change: '+18%', icon: <Eye className="h-5 w-5 text-[#0070F3]" /> },
-          { label: 'Enquiries (30d)', value: '6', change: '+2', icon: <MessageSquare className="h-5 w-5 text-[#0070F3]" /> },
-          { label: 'Conversion Rate', value: '2.7%', change: 'Proposals → Won', icon: <TrendingUp className="h-5 w-5 text-[#0070F3]" /> },
-          { label: 'Gross Revenue MTD', value: '£14,700', change: '+12% MoM', icon: <ArrowUpRight className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Profile Views (30d)', value: '—', change: '', icon: <Eye className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Enquiries (30d)', value: '—', change: '', icon: <MessageSquare className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Conversion Rate', value: '—', change: '', icon: <TrendingUp className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Gross Revenue MTD', value: '—', change: '', icon: <ArrowUpRight className="h-5 w-5 text-[#0070F3]" /> },
         ].map(kpi => (
           <div key={kpi.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center gap-2 mb-2">

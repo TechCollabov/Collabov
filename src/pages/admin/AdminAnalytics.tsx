@@ -2,48 +2,17 @@ import React from 'react';
 import { BarChart, Bar, AreaChart, Area, FunnelChart, Funnel, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import { TrendingUp, Users, Globe, DollarSign } from 'lucide-react';
 
-const revenueData = [
-  { month: 'Oct', gmv: 82000 },
-  { month: 'Nov', gmv: 97000 },
-  { month: 'Dec', gmv: 74000 },
-  { month: 'Jan', gmv: 115000 },
-  { month: 'Feb', gmv: 138000 },
-  { month: 'Mar', gmv: 162000 },
-  { month: 'Apr', gmv: 94000 },
-];
-
-const signupData = [
-  { month: 'Oct', buyers: 22, vendors: 8 },
-  { month: 'Nov', buyers: 31, vendors: 12 },
-  { month: 'Dec', buyers: 18, vendors: 6 },
-  { month: 'Jan', buyers: 44, vendors: 18 },
-  { month: 'Feb', buyers: 52, vendors: 21 },
-  { month: 'Mar', buyers: 67, vendors: 29 },
-  { month: 'Apr', buyers: 38, vendors: 14 },
-];
-
-const funnelData = [
-  { name: 'Site Visitors', value: 12500, fill: '#dbeafe' },
-  { name: 'Search / Browse', value: 4800, fill: '#bfdbfe' },
-  { name: 'Vendor Profile Views', value: 1900, fill: '#93c5fd' },
-  { name: 'RFP / Enquiry Sent', value: 310, fill: '#60a5fa' },
-  { name: 'Contracts Signed', value: 38, fill: '#0070F3' },
-];
-
-const geoData = [
-  { region: 'London', buyers: 98, vendors: 41 },
-  { region: 'Manchester', buyers: 44, vendors: 18 },
-  { region: 'Birmingham', buyers: 31, vendors: 12 },
-  { region: 'Leeds', buyers: 27, vendors: 9 },
-  { region: 'Edinburgh', buyers: 19, vendors: 7 },
-  { region: 'Other UK', buyers: 90, vendors: 37 },
-];
+/* No hardcoded analytics data — will be loaded from the database */
+const revenueData: { month: string; gmv: number }[] = [];
+const signupData: { month: string; buyers: number; vendors: number }[] = [];
+const funnelData: { name: string; value: number; fill: string }[] = [];
+const geoData: { region: string; buyers: number; vendors: number }[] = [];
 
 const KPIS = [
-  { label: 'Monthly Active Users', value: '4,820', change: '+14% MoM', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Avg. Time on Site', value: '4m 38s', change: '+22s vs last month', icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-  { label: 'Top Traffic Source', value: 'Organic', change: '52% of sessions', icon: Globe, color: 'text-purple-600', bg: 'bg-purple-50' },
-  { label: 'Platform Fee Revenue', value: '£4,710', change: '5% of GMV', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50' },
+  { label: 'Monthly Active Users', value: '—', change: '', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+  { label: 'Avg. Time on Site', value: '—', change: '', icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
+  { label: 'Top Traffic Source', value: '—', change: '', icon: Globe, color: 'text-purple-600', bg: 'bg-purple-50' },
+  { label: 'Platform Fee Revenue', value: '—', change: '', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50' },
 ];
 
 const AdminAnalytics: React.FC = () => {

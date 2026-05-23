@@ -1,56 +1,12 @@
 import React, { useState } from 'react';
 import { MessageSquare, Clock, Check, X, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 
-const ENQUIRIES = [
-  {
-    id: '1',
-    from: 'Sarah Mitchell',
-    company: 'FinEdge Capital',
-    companyType: 'Financial Services',
-    subject: 'Cloud Infrastructure Modernisation',
-    budget: '£40,000–£70,000',
-    timeline: '4 months',
-    received: '2 hours ago',
-    status: 'new',
-    message: 'Hi, we are looking for an experienced MSP or IT agency to migrate our on-premise infrastructure to AWS. The scope includes architecture, phased migration, DR setup, and documentation. Would love to understand your approach and availability.',
-  },
-  {
-    id: '2',
-    from: 'James Okafor',
-    company: 'GreenPath Logistics',
-    companyType: 'Logistics',
-    subject: 'React Native Mobile App',
-    budget: '£25,000–£45,000',
-    timeline: '3 months',
-    received: '1 day ago',
-    status: 'new',
-    message: 'We need a driver-facing mobile app built in React Native. Features include route optimisation, proof of delivery, and fleet integration. Are you available to start in May?',
-  },
-  {
-    id: '3',
-    from: 'Amanda Hughes',
-    company: 'MedCore Health',
-    companyType: 'Healthcare',
-    subject: 'ISO 27001 Certification Support',
-    budget: '£18,000–£30,000',
-    timeline: '6 months',
-    received: '3 days ago',
-    status: 'responded',
-    message: 'We require full ISO 27001 certification support including gap analysis, ISMS documentation, staff training, and pre-certification review.',
-  },
-  {
-    id: '4',
-    from: 'David Park',
-    company: 'TradePoint Exchange',
-    companyType: 'FinTech',
-    subject: 'DevOps Team — Ongoing Retainer',
-    budget: '£12,000/month',
-    timeline: 'Ongoing',
-    received: '1 week ago',
-    status: 'declined',
-    message: 'Looking for a dedicated DevOps team for Kubernetes management, CI/CD pipelines, and on-call rotation in a fintech environment.',
-  },
-];
+/* No hardcoded enquiries — data will be loaded from the database */
+const ENQUIRIES: {
+  id: string; from: string; company: string; companyType: string;
+  subject: string; budget: string; timeline: string; received: string;
+  status: string; message: string;
+}[] = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   new: { label: 'New', color: 'bg-blue-100 text-blue-700' },
@@ -67,7 +23,7 @@ Could you share more about your current infrastructure setup and the key pain po
 Looking forward to speaking with you.`;
 
 const Enquiries: React.FC = () => {
-  const [selected, setSelected] = useState<string | null>('1');
+  const [selected, setSelected] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [aiDrafted, setAiDrafted] = useState(false);
 

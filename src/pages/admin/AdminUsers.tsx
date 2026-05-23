@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
 import { Search, ShieldCheck, User, Building2, Ban, Mail } from 'lucide-react';
 
-const USERS = [
-  { id: '1', name: 'Sarah Mitchell', email: 'sarah@finedge.co.uk', role: 'buyer', company: 'FinEdge Capital', joined: '12 Jan 2026', status: 'active', projects: 3 },
-  { id: '2', name: 'James Okafor', email: 'james@greenpath.co.uk', role: 'buyer', company: 'GreenPath Logistics', joined: '5 Feb 2026', status: 'active', projects: 1 },
-  { id: '3', name: 'TechPro Solutions', email: 'admin@techpro.co.uk', role: 'vendor', company: 'TechPro Solutions', joined: '20 Oct 2025', status: 'active', projects: 23 },
-  { id: '4', name: 'CloudBridge MSP', email: 'ops@cloudbridge.co.uk', role: 'vendor', company: 'CloudBridge MSP', joined: '3 Nov 2025', status: 'active', projects: 15 },
-  { id: '5', name: 'Amanda Hughes', email: 'amanda@medcore.co.uk', role: 'buyer', company: 'MedCore Health', joined: '18 Mar 2026', status: 'active', projects: 2 },
-  { id: '6', name: 'DataFlow Labs', email: 'team@dataflowlabs.io', role: 'vendor', company: 'DataFlow Labs', joined: '1 Apr 2026', status: 'suspended', projects: 0 },
-  { id: '7', name: 'David Park', email: 'david@tradepoint.co.uk', role: 'buyer', company: 'TradePoint Exchange', joined: '28 Feb 2026', status: 'active', projects: 1 },
-  { id: '8', name: 'NexGen IT', email: 'hello@nexgenit.co.uk', role: 'vendor', company: 'NexGen IT', joined: '15 Mar 2026', status: 'pending', projects: 0 },
-];
+/* No hardcoded users — data will be loaded from the database */
+const USERS: {
+  id: string; name: string; email: string; role: string; company: string;
+  joined: string; status: string; projects: number;
+}[] = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   active: { label: 'Active', color: 'bg-green-100 text-green-700' },
