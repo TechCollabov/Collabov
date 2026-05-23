@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Clock, Check, X, MessageSquare, FileText, ExternalLink, ChevronRight } from 'lucide-react';
 
-const QUEUE = [
-  { id: '1', name: 'TechPro Solutions', type: 'IT Agency', country: 'Poland', submitted: '3 days ago', docs: { companiesHouse: true, vatCert: true, addressProof: false }, status: 'pending', email: 'admin@techpro.co.uk', website: 'techpro.co.uk' },
-  { id: '2', name: 'NexGen IT', type: 'IT Agency', country: 'UK', submitted: '5 days ago', docs: { companiesHouse: true, vatCert: false, addressProof: false }, status: 'pending', email: 'hello@nexgenit.co.uk', website: 'nexgenit.co.uk' },
-  { id: '3', name: 'CyberShield MSP', type: 'MSP', country: 'UK', submitted: '1 week ago', docs: { companiesHouse: true, vatCert: true, addressProof: true }, status: 'pending', email: 'ops@cybershield.co.uk', website: 'cybershield.co.uk' },
-  { id: '4', name: 'DataFlow Labs', type: 'IT Agency', country: 'Romania', submitted: '2 weeks ago', docs: { companiesHouse: false, vatCert: false, addressProof: false }, status: 'changes_requested', email: 'team@dataflowlabs.io', website: 'dataflowlabs.io' },
-];
+/* No hardcoded verification queue — data will be loaded from the database */
+const QUEUE: {
+  id: string; name: string; type: string; country: string; submitted: string;
+  docs: { companiesHouse: boolean; vatCert: boolean; addressProof: boolean };
+  status: string; email: string; website: string;
+}[] = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pending Review', color: 'bg-amber-100 text-amber-700' },
@@ -17,7 +17,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 
 const AdminVerification: React.FC = () => {
   const [vendors, setVendors] = useState(QUEUE);
-  const [selected, setSelected] = useState<string | null>('1');
+  const [selected, setSelected] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
   const selectedVendor = vendors.find(v => v.id === selected);

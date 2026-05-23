@@ -33,46 +33,9 @@ const Inbox: React.FC = () => {
   const [replyContent, setReplyContent] = useState('');
   const [showSendMessage, setShowSendMessage] = useState(false);
 
-  // Mock data
-  const messages: Message[] = [
-    {
-      id: '1',
-      username: 'john_doe',
-      subject: 'Project Discussion',
-      content: 'Hi, I would like to discuss the project requirements in detail.',
-      timestamp: '2024-03-15T10:30:00',
-      isRead: false,
-      attachments: [
-        { name: 'requirements.pdf', size: '2.5MB', type: 'application/pdf' }
-      ]
-    },
-    {
-      id: '2',
-      username: 'sarah_smith',
-      subject: 'Contract Review',
-      content: 'Please review the attached contract and let me know your thoughts.',
-      timestamp: '2024-03-14T15:45:00',
-      isRead: true,
-      attachments: [
-        { name: 'contract_v2.docx', size: '1.8MB', type: 'application/docx' }
-      ]
-    }
-  ];
-
-  const messageRequests: MessageRequest[] = [
-    {
-      id: '1',
-      username: 'tech_company',
-      subject: 'New Project Opportunity',
-      timestamp: '2024-03-15T09:00:00'
-    },
-    {
-      id: '2',
-      username: 'startup_founder',
-      subject: 'Collaboration Interest',
-      timestamp: '2024-03-14T16:20:00'
-    }
-  ];
+  /* No hardcoded messages — data will be loaded from the database */
+  const messages: Message[] = [];
+  const messageRequests: MessageRequest[] = [];
 
   const handleSendMessage = () => {
     // Handle sending message logic here

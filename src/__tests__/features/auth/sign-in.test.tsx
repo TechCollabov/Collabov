@@ -168,11 +168,10 @@ describe('Feature: User Sign In', () => {
   // ── Error handling ────────────────────────────────────────────────────────
 
   describe('Scenario: Sign-in fails due to wrong credentials', () => {
-    it('should display the error message returned by the auth service', async () => {
-      const errorMessage = 'Invalid login credentials';
+    it('should display a user-friendly error message on wrong credentials', async () => {
       vi.mocked(useAuth).mockReturnValue(
         createMockAuthValue({
-          signIn: vi.fn().mockRejectedValue(new Error(errorMessage)),
+          signIn: vi.fn().mockRejectedValue(new Error('Invalid login credentials')),
         }) as ReturnType<typeof useAuth>
       );
 
@@ -184,7 +183,7 @@ describe('Feature: User Sign In', () => {
       await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(errorMessage)).toBeInTheDocument();
+        expect(screen.getByText(/incorrect email or password/i)).toBeInTheDocument();
       });
     });
 

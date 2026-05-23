@@ -1,16 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Pencil, Trash2, Eye, Globe, FileText } from 'lucide-react';
 
-const CONTENT = [
-  { id: '1', title: 'Homepage Hero Copy', type: 'Page Content', status: 'published', lastEdited: '2 days ago', section: 'Homepage' },
-  { id: '2', title: 'How It Works Section', type: 'Page Content', status: 'published', lastEdited: '1 week ago', section: 'Homepage' },
-  { id: '3', title: 'Vendor Verification FAQ', type: 'FAQ', status: 'published', lastEdited: '3 days ago', section: 'Help Centre' },
-  { id: '4', title: 'IR35 Compliance Guide for Buyers', type: 'Resource', status: 'published', lastEdited: '2 weeks ago', section: 'Resources' },
-  { id: '5', title: 'Outsourcing to Eastern Europe — Market Report', type: 'Blog Post', status: 'draft', lastEdited: '1 day ago', section: 'Blog' },
-  { id: '6', title: 'Platform Terms of Service', type: 'Legal', status: 'published', lastEdited: '1 month ago', section: 'Legal' },
-  { id: '7', title: 'Privacy Policy', type: 'Legal', status: 'published', lastEdited: '1 month ago', section: 'Legal' },
-  { id: '8', title: '2026 UK IT Outsourcing Benchmark Report', type: 'Blog Post', status: 'draft', lastEdited: '3 days ago', section: 'Blog' },
-];
+/* No hardcoded content — data will be loaded from the database */
+const CONTENT: { id: string; title: string; type: string; status: string; lastEdited: string; section: string }[] = [];
 
 const TYPES = ['All', 'Page Content', 'FAQ', 'Resource', 'Blog Post', 'Legal'];
 

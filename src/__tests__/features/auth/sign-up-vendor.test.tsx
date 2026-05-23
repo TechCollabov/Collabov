@@ -1,7 +1,7 @@
 /**
- * Feature: Vendor Registration (5-step flow)
+ * Feature: Vendor Registration (4-step flow)
  *
- * Step 1 — Business type + Email + Password
+ * Step 1 — Email + Password
  * Step 2 — Company basics
  * Step 3 — Services & tech stack
  * Step 4 — Verification documents (UK docs)
@@ -38,14 +38,12 @@ function fakeFile(name = 'cert.pdf', type = 'application/pdf') {
   return new File(['(binary content)'], name, { type });
 }
 
-/** Fill Step 1 with valid data (business type + email + password) and advance. */
+/** Fill Step 1 with valid email + password and advance. */
 async function completeStep1(
   user: ReturnType<typeof userEvent.setup>,
   email = 'vendor@msp.com',
   password = 'ValidPass1!'
 ) {
-  // Select MSP business type — the radio is inside a <label> that wraps it
-  await user.click(screen.getByLabelText(/msp \(managed service provider\)/i));
   await user.type(screen.getByPlaceholderText(/you@company\.com/i), email);
   await user.type(screen.getByPlaceholderText(/min 10 chars/i), password);
   await user.click(screen.getByRole('button', { name: /^continue$/i }));
@@ -65,8 +63,6 @@ async function completeStep3(user: ReturnType<typeof userEvent.setup>) {
 
 /** Upload the required company registration document in Step 4 and advance. */
 async function completeStep4(user: ReturnType<typeof userEvent.setup>) {
-  // File inputs are rendered via a .map() with className="sr-only" — no data-testid.
-  // The first file input corresponds to the required "Company Registration Certificate".
   const fileInputs = document.querySelectorAll(
     'input[type="file"]'
   ) as NodeListOf<HTMLInputElement>;
@@ -87,19 +83,12 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
 
   // ── Step 1: Rendering ─────────────────────────────────────────────────────
 
-  describe('Scenario: Step 1 renders business type and credentials', () => {
+  describe('Scenario: Step 1 renders credentials fields', () => {
     it('should display the "Create your provider account" heading', () => {
       renderVendorSignup();
       expect(
         screen.getByRole('heading', { name: /create your provider account/i })
       ).toBeInTheDocument();
-    });
-
-    it('should display business type options (MSP, IT Agency, Staff Augmentation)', () => {
-      renderVendorSignup();
-      expect(screen.getByLabelText(/msp \(managed service provider\)/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/it agency/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/staff augmentation firm/i)).toBeInTheDocument();
     });
 
     it('should display email and password fields', () => {
@@ -116,25 +105,11 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
 
   // ── Step 1: Validation ────────────────────────────────────────────────────
 
-  describe('Scenario: Step 1 requires a business type selection', () => {
-    it('should show an error if no business type is selected', async () => {
-      const user = userEvent.setup();
-      renderVendorSignup();
-
-      await user.type(screen.getByPlaceholderText(/you@company\.com/i), 'v@msp.com');
-      await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'ValidPass1!');
-      await user.click(screen.getByRole('button', { name: /^continue$/i }));
-
-      expect(await screen.findByText(/please select your business type/i)).toBeInTheDocument();
-    });
-  });
-
   describe('Scenario: Password must meet security requirements on Step 1', () => {
     it('should reject a password shorter than 10 characters', async () => {
       const user = userEvent.setup();
       renderVendorSignup();
 
-      await user.click(screen.getByLabelText(/msp \(managed service provider\)/i));
       await user.type(screen.getByPlaceholderText(/you@company\.com/i), 'v@msp.com');
       await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'Short1!');
       await user.click(screen.getByRole('button', { name: /^continue$/i }));
@@ -146,7 +121,6 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
       const user = userEvent.setup();
       renderVendorSignup();
 
-      await user.click(screen.getByLabelText(/msp \(managed service provider\)/i));
       await user.type(screen.getByPlaceholderText(/you@company\.com/i), 'v@msp.com');
       await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'nouppercase1!');
       await user.click(screen.getByRole('button', { name: /^continue$/i }));
@@ -158,7 +132,6 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
       const user = userEvent.setup();
       renderVendorSignup();
 
-      await user.click(screen.getByLabelText(/msp \(managed service provider\)/i));
       await user.type(screen.getByPlaceholderText(/you@company\.com/i), 'v@msp.com');
       await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'NoNumber!!!');
       await user.click(screen.getByRole('button', { name: /^continue$/i }));
@@ -170,7 +143,6 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
       const user = userEvent.setup();
       renderVendorSignup();
 
-      await user.click(screen.getByLabelText(/msp \(managed service provider\)/i));
       await user.type(screen.getByPlaceholderText(/you@company\.com/i), 'v@msp.com');
       await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'NoSymbol1234');
       await user.click(screen.getByRole('button', { name: /^continue$/i }));
@@ -217,8 +189,6 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
       await completeStep1(user);
       await waitFor(() => screen.getByPlaceholderText(/techpro solutions ltd/i));
 
-      // Use fireEvent.submit to bypass HTML5 'required' validation so the
-      // component's own JS validation runs and shows the custom error.
       const form = screen.getByRole('button', { name: /^continue$/i }).closest('form')!;
       fireEvent.submit(form);
 
@@ -271,7 +241,6 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
 
       await waitFor(() => screen.getByText(/software development/i));
 
-      // Proceed without selecting a service
       await user.click(screen.getByRole('button', { name: /^continue$/i }));
 
       expect(await screen.findByText(/select at least one service/i)).toBeInTheDocument();
@@ -292,7 +261,6 @@ describe('Feature: Vendor Registration (5-step flow)', () => {
       await completeStep3(user);
 
       await waitFor(() => {
-        // Step 4 shows UK document upload prompts
         expect(
           screen.getByText(/company registration certificate/i)
         ).toBeInTheDocument();

@@ -11,14 +11,8 @@ import {
   Tooltip, ResponsiveContainer
 } from 'recharts';
 
-const data = [
-  { name: 'Jan', views: 400, earnings: 2400 },
-  { name: 'Feb', views: 300, earnings: 1398 },
-  { name: 'Mar', views: 200, earnings: 9800 },
-  { name: 'Apr', views: 278, earnings: 3908 },
-  { name: 'May', views: 189, earnings: 4800 },
-  { name: 'Jun', views: 239, earnings: 3800 },
-];
+/* No hardcoded chart data — will be loaded from the database */
+const data: { name: string; views: number; earnings: number }[] = [];
 
 interface ResourceDetails {
   name: string;
@@ -53,11 +47,8 @@ const DashboardHome: React.FC = () => {
     }
   };
 
-  const resources: ResourceDetails[] = [
-    { name: "John Doe", project: "Web App Development", hours: 120, progress: 75 },
-    { name: "Jane Smith", project: "Mobile App", hours: 80, progress: 45 },
-    { name: "Mike Johnson", project: "UI/UX Design", hours: 60, progress: 90 }
-  ];
+  /* No hardcoded resources — data will be loaded from the database */
+  const resources: ResourceDetails[] = [];
 
   return (
     <div className="p-6">
@@ -110,14 +101,14 @@ const DashboardHome: React.FC = () => {
       {/* Key Metrics */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         {[
-          { title: 'Active Engagements', value: '3', icon: FileCheck, trend: '2 On Track' },
-          { title: 'Bench Capacity', value: '4 people', icon: Users, trend: 'Available now', onClick: () => setShowResourceModal(true) },
-          { title: 'Profile Views (30d)', value: '87', icon: BarChart2, trend: '+18%' },
-          { title: 'Enquiries This Month', value: '6', icon: MessageSquare, trend: '+2 this week' },
-          { title: 'Gross Revenue MTD', value: '£14,700', icon: DollarSign, trend: '+12% MoM' },
-          { title: 'Pending Payouts', value: '£10,700', icon: DollarSign, trend: 'In escrow' },
-          { title: 'Average Rating', value: '4.8', icon: Star, trend: '47 Reviews' },
-          { title: 'Open Proposals', value: '5', icon: TrendingUp, trend: '2 shortlisted' }
+          { title: 'Active Engagements', value: '—', icon: FileCheck, trend: '' },
+          { title: 'Bench Capacity', value: '—', icon: Users, trend: '', onClick: () => setShowResourceModal(true) },
+          { title: 'Profile Views (30d)', value: '—', icon: BarChart2, trend: '' },
+          { title: 'Enquiries This Month', value: '—', icon: MessageSquare, trend: '' },
+          { title: 'Gross Revenue MTD', value: '—', icon: DollarSign, trend: '' },
+          { title: 'Pending Payouts', value: '—', icon: DollarSign, trend: '' },
+          { title: 'Average Rating', value: '—', icon: Star, trend: '' },
+          { title: 'Open Proposals', value: '—', icon: TrendingUp, trend: '' }
         ].map((metric, index) => (
           <motion.div
             key={metric.title}

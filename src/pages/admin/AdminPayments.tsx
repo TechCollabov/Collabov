@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { CreditCard, ArrowDownToLine, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
-const ESCROW = [
-  { id: '1', project: 'Cloud Migration — FinEdge Capital', buyer: 'FinEdge Capital', vendor: 'DevForge Agency', milestone: 'Phase 1 Migration', amount: '£8,200', heldSince: '5 days ago', releaseDate: '12 Apr 2026', status: 'dispute', autoRelease: false },
-  { id: '2', project: 'React Native App — GreenPath', buyer: 'GreenPath Logistics', vendor: 'TechPro Solutions', milestone: 'MVP Build (Sprint 1)', amount: '£6,500', heldSince: '2 days ago', releaseDate: '18 Apr 2026', status: 'pending_approval', autoRelease: true },
-  { id: '3', project: 'ISO 27001 — MedCore Health', buyer: 'MedCore Health', vendor: 'CyberShield MSP', milestone: 'Gap Analysis & ISMS Setup', amount: '£5,500', heldSince: '10 days ago', releaseDate: '10 Apr 2026', status: 'auto_release', autoRelease: true },
-  { id: '4', project: 'M365 Migration — Brightstone', buyer: 'Brightstone Solicitors', vendor: 'CloudBridge MSP', milestone: 'Migration Complete', amount: '£3,200', heldSince: '3 weeks ago', releaseDate: '20 Mar 2026', status: 'released', autoRelease: false },
-];
+/* No hardcoded escrow data — will be loaded from the database */
+const ESCROW: {
+  id: string; project: string; buyer: string; vendor: string; milestone: string;
+  amount: string; heldSince: string; releaseDate: string; status: string; autoRelease: boolean;
+}[] = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   dispute: { label: 'In Dispute', color: 'bg-red-100 text-red-700', icon: <AlertCircle className="h-3.5 w-3.5" /> },
@@ -16,10 +15,10 @@ const STATUS_MAP: Record<string, { label: string; color: string; icon: React.Rea
 };
 
 const GMV_SUMMARY = [
-  { label: 'Total GMV All Time', value: '£762,000' },
-  { label: 'GMV This Month', value: '£94,200' },
-  { label: 'Total in Escrow', value: '£23,400' },
-  { label: 'Platform Fee (5%)', value: '£4,710' },
+  { label: 'Total GMV All Time', value: '—' },
+  { label: 'GMV This Month', value: '—' },
+  { label: 'Total in Escrow', value: '—' },
+  { label: 'Platform Fee (5%)', value: '—' },
 ];
 
 const AdminPayments: React.FC = () => {

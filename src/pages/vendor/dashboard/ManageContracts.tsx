@@ -152,34 +152,8 @@ const ManageContracts: React.FC = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [newService, setNewService] = useState({ name: '', price: '', description: '' });
 
-  // Mock data
-  const contracts: Contract[] = [
-    {
-      id: '1',
-      clientName: 'Tech Solutions Inc.',
-      projectName: 'E-commerce Platform Development',
-      startDate: '2024-02-01',
-      endDate: '2024-08-01',
-      value: '$50,000',
-      status: 'active',
-      services: [
-        { name: 'Frontend Development', description: 'React-based user interface', price: 2000 },
-        { name: 'Backend Development', description: 'Node.js API development', price: 2500 }
-      ]
-    },
-    {
-      id: '2',
-      clientName: 'Digital Innovations Ltd',
-      projectName: 'Mobile App Development',
-      startDate: '2024-03-01',
-      endDate: '2024-06-01',
-      value: '$35,000',
-      status: 'pending',
-      services: [
-        { name: 'React Native Development', description: 'Cross-platform mobile app', price: 3000 }
-      ]
-    }
-  ];
+  /* No hardcoded contracts — data will be loaded from the database */
+  const contracts: Contract[] = [];
 
   const filteredContracts = contracts.filter(contract => {
     const matchesSearch = contract.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||

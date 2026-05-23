@@ -68,7 +68,14 @@ const SignInPage: React.FC = () => {
       // The auth state change will trigger profile load, which will then trigger redirect
     } catch (err) {
       console.error('[SignIn] Sign in error:', err);
-      setError(err instanceof Error ? err.message : 'Invalid email or password');
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('not confirmed')) {
+        setError('Please confirm your email address before signing in. Check your inbox for a confirmation link.');
+      } else if (msg.toLowerCase().includes('invalid login') || msg.toLowerCase().includes('invalid credentials')) {
+        setError('Incorrect email or password. Please try again.');
+      } else {
+        setError(msg || 'Sign in failed. Please try again.');
+      }
       setIsLoading(false);
     }
   };

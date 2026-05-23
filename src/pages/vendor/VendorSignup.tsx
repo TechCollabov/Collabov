@@ -4,12 +4,6 @@ import { Globe, Eye, EyeOff, CheckCircle, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/authRedirect';
 
-const BUSINESS_TYPES = [
-  { value: 'msp', label: 'MSP (Managed Service Provider)' },
-  { value: 'agency', label: 'IT Agency' },
-  { value: 'staffaug', label: 'Staff Augmentation Firm' },
-];
-
 const SERVICE_CATEGORIES = [
   'Software Development', 'Managed IT', 'Staff Augmentation', 'Cybersecurity',
   'Cloud & Infrastructure', 'QA & Testing', 'DevOps', 'Data & Analytics',
@@ -38,7 +32,6 @@ const VendorSignup: React.FC = () => {
   // Step 1
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [businessType, setBusinessType] = useState(searchParams.get('type') || '');
 
   // Step 2
   const [companyName, setCompanyName] = useState('');
@@ -73,7 +66,6 @@ const VendorSignup: React.FC = () => {
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!businessType) { setError('Please select your business type'); return; }
     const pwErr = validatePassword(password);
     if (pwErr) { setError(pwErr); return; }
     setStep(2);
@@ -109,7 +101,6 @@ const VendorSignup: React.FC = () => {
         userType: 'vendor',
         additionalData: {
           companyName,
-          businessType,
           country,
           website,
           description,
@@ -163,25 +154,12 @@ const VendorSignup: React.FC = () => {
 
         {error && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>}
 
-        {/* Step 1 — Email + Password + Business Type */}
+        {/* Step 1 — Email + Password */}
         {step === 1 && (
           <>
             <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Create your provider account</h1>
             <p className="text-gray-500 text-sm mb-6">Join our network of verified IT service providers</p>
             <form onSubmit={handleStep1} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Business Type <span className="text-red-500">*</span></label>
-                <div className="space-y-2">
-                  {BUSINESS_TYPES.map(bt => (
-                    <label key={bt.value} className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-colors ${businessType === bt.value ? 'border-[#0070F3] bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}>
-                      <input type="radio" name="businessType" value={bt.value} checked={businessType === bt.value}
-                        onChange={() => setBusinessType(bt.value)} className="sr-only" />
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${businessType === bt.value ? 'border-[#0070F3] bg-[#0070F3]' : 'border-gray-300'}`} />
-                      <span className="text-sm font-medium text-gray-700">{bt.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Work Email <span className="text-red-500">*</span></label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
@@ -343,7 +321,7 @@ const VendorSignup: React.FC = () => {
             </div>
             <h1 className="text-2xl font-bold text-[#0B2D59] mb-3">Application submitted!</h1>
             <p className="text-gray-600 mb-2">
-              <span className="font-semibold">{companyName}</span> — {BUSINESS_TYPES.find(b => b.value === businessType)?.label}
+              <span className="font-semibold">{companyName}</span>
             </p>
             <p className="text-gray-500 text-sm mb-8">
               We review all applications within 2 business days. You will receive an email when your profile is approved.

@@ -7,57 +7,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-/* ── Mock data ── */
-const mockVendor = {
-  id: '1',
-  name: 'TechPro Solutions',
-  city: 'Warsaw',
-  country: 'Poland',
-  type: 'IT Agency',
-  verified: true,
-  rating: 4.8,
-  reviewCount: 47,
-  engagements: 23,
-  responseTime: '4 hours',
-  memberSince: 'January 2023',
-  tagline: 'Full-stack React and Node.js agency specialising in fintech and SaaS platforms',
-  description: 'TechPro Solutions is a Warsaw-based IT agency with over 8 years of experience delivering high-quality web applications for UK and European clients. We specialise in React, Node.js, and cloud-native architectures, with a strong focus on fintech, SaaS, and e-commerce verticals.\n\nOur team of 24 developers, designers, and QA engineers works in a structured agile process with weekly sprint reviews and transparent delivery tracking. Every engagement includes a dedicated project manager, weekly video standups, and access to our real-time delivery dashboard.',
-  monthlyRate: 3200,
-  hourlyRate: 45,
-  teamSize: 24,
-  timezone: 'CET (+1hr UK)',
-  languages: ['English (Fluent)', 'Polish'],
-  ir35: true,
-  gdpr: true,
-  availability: 'available' as const,
-  services: ['Software Development', 'Cloud & Infrastructure', 'QA & Testing', 'DevOps'],
-  techStack: {
-    Frontend: ['React', 'Next.js', 'TypeScript', 'Vue', 'Tailwind CSS'],
-    Backend: ['Node.js', 'Python', 'Java', 'FastAPI'],
-    Cloud: ['AWS', 'GCP', 'Azure'],
-    DevOps: ['Docker', 'Kubernetes', 'Terraform', 'CI/CD'],
-    Database: ['PostgreSQL', 'MongoDB', 'Redis', 'MySQL'],
-    Mobile: ['React Native', 'Flutter'],
-  },
-  industries: ['Fintech', 'SaaS', 'E-commerce', 'Healthcare'],
-  founded: 2016,
-};
-
-const mockTeam = [
-  { id: '1', name: 'Aleksander Nowak', title: 'Senior Full-Stack Developer', seniority: 'Senior', domain: 'Full-Stack', skills: ['React', 'Node.js', 'PostgreSQL'], rate: 3800, availability: 'available' as const },
-  { id: '2', name: 'Maria Kowalska', title: 'Lead Frontend Developer', seniority: 'Lead', domain: 'Frontend', skills: ['React', 'TypeScript', 'Next.js'], rate: 4200, availability: 'available' as const },
-  { id: '3', name: 'Piotr Wiśniewski', title: 'DevOps Engineer', seniority: 'Senior', domain: 'DevOps', skills: ['Docker', 'Kubernetes', 'AWS'], rate: 3600, availability: 'limited' as const },
-];
-
-const mockPackages = [
-  { id: '1', title: 'React SaaS Dashboard — Sprint Package', price: '£8,500', duration: '6 weeks', included: ['Discovery & architecture', 'UI/UX design', '2 development sprints', 'QA & testing', 'Deployment & handover'], ideal: 'Early-stage SaaS companies building their first dashboard' },
-  { id: '2', title: 'Node.js API Build — Fixed Price', price: '£5,200', duration: '4 weeks', included: ['API design & documentation', 'Auth & RBAC', 'Core endpoints', 'Unit tests', 'Deployment to AWS'], ideal: 'Companies needing a robust REST API fast' },
-];
-
-const mockReviews = [
-  { id: '1', reviewer: 'Fintech startup, London', projectType: 'Full-stack web development', value: '£15,000–£25,000', date: 'February 2026', rating: 5, text: 'Excellent team. Delivered on time and communicated proactively throughout. The React dashboard they built is robust and well-tested. Will definitely work with TechPro again.' },
-  { id: '2', reviewer: 'SaaS company, Manchester', projectType: 'API development', value: '£5,000–£10,000', date: 'January 2026', rating: 5, text: 'Very professional agency. The Node.js API was exactly what we specified. Sprint reviews were useful and the PM kept everything on track.' },
-];
+/* No hardcoded vendor data — profiles will be loaded from the database */
+const vendor: null = null;
+const team: never[] = [];
+const packages: never[] = [];
+const reviews: never[] = [];
 
 function Stars({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' }) {
   const s = size === 'md' ? 'h-5 w-5' : 'h-4 w-4';
@@ -102,9 +56,6 @@ const VendorProfilePage: React.FC = () => {
   const [caseStudyExpanded, setCaseStudyExpanded] = useState<Record<string, boolean>>({});
   const headerRef = useRef<HTMLDivElement>(null);
 
-  // Use mock vendor (in real app, fetch by vendorId)
-  const vendor = mockVendor;
-
   useEffect(() => {
     const onScroll = () => {
       if (headerRef.current) {
@@ -119,6 +70,21 @@ const VendorProfilePage: React.FC = () => {
     if (!user) { navigate(`/signin?returnUrl=/vendor/profile/${vendorId}`); return; }
     setShowRFP(true);
   };
+
+  if (!vendor) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-24">
+        <div className="text-center">
+          <Globe className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-gray-700 mb-2">Vendor profile not found</h1>
+          <p className="text-gray-500 text-sm mb-6">This profile may not exist or is pending approval.</p>
+          <Link to="/results" className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            Browse verified vendors
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

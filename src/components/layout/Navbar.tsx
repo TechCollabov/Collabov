@@ -38,20 +38,13 @@ const Navbar: React.FC = () => {
                 {isOutsourceOpen && (
                   <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 py-5 z-50">
                     <div className="px-5">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Long Term</p>
                       <div className="space-y-1 mb-4">
-                        <Link to="/results?type=dedicated" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
-                          Dedicated Teams
-                        </Link>
                         <Link to="/results?type=agency" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
                           IT Agencies
                         </Link>
                         <Link to="/results?type=msp" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
                           MSPs
                         </Link>
-                      </div>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Short Term</p>
-                      <div className="space-y-1 mb-4">
                         <Link to="/results?type=staffaug" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
                           Staff Augmentation
                         </Link>
@@ -60,8 +53,7 @@ const Navbar: React.FC = () => {
                           <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">Coming Soon</span>
                         </Link>
                       </div>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Other</p>
-                      <div className="space-y-1">
+                      <div className="border-t border-gray-100 pt-3 space-y-1">
                         <Link to="/ai-calculator" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
                           Outsourcing Calculator
                         </Link>
@@ -143,21 +135,15 @@ const Navbar: React.FC = () => {
               {/* Outsource */}
               <div className="mb-6">
                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Outsource</h3>
-                <p className="text-xs text-gray-400 mt-2 mb-1 ml-2">Long Term</p>
                 <div className="ml-2 space-y-1 mb-3">
-                  <Link to="/results?type=dedicated" className="block py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>Dedicated Teams</Link>
                   <Link to="/results?type=agency" className="block py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>IT Agencies</Link>
                   <Link to="/results?type=msp" className="block py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>MSPs</Link>
-                </div>
-                <p className="text-xs text-gray-400 mb-1 ml-2">Short Term</p>
-                <div className="ml-2 space-y-1 mb-3">
                   <Link to="/results?type=staffaug" className="block py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>Staff Augmentation</Link>
                   <Link to="/freelancers" className="flex items-center gap-2 py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>
                     Freelancers <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">Coming Soon</span>
                   </Link>
                 </div>
-                <p className="text-xs text-gray-400 mb-1 ml-2">Other</p>
-                <div className="ml-2">
+                <div className="ml-2 border-t border-gray-100 pt-2">
                   <Link to="/ai-calculator" className="block py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>Outsourcing Calculator</Link>
                 </div>
               </div>

@@ -34,31 +34,8 @@ const ManageEmployee: React.FC = () => {
     monthlyRate: ''
   });
 
-  // Mock data
-  const [employees, setEmployees] = useState<Employee[]>([
-    {
-      id: '1',
-      fullName: 'John Doe',
-      email: 'john.doe@example.com',
-      designation: 'Senior Frontend Developer',
-      hourlyRate: 50,
-      monthlyRate: 8000,
-      isAvailable: true
-    },
-    {
-      id: '2',
-      fullName: 'Jane Smith',
-      email: 'jane.smith@example.com',
-      designation: 'Backend Developer',
-      hourlyRate: 45,
-      monthlyRate: 7200,
-      isAvailable: false,
-      assignedTo: {
-        customer: 'Tech Corp',
-        project: 'E-commerce Platform'
-      }
-    }
-  ]);
+  /* No hardcoded team members — data will be loaded from the database */
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
   const handleAddEmployee = (e: React.FormEvent) => {
     e.preventDefault();
