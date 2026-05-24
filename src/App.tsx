@@ -13,6 +13,7 @@ import ComingSoonPage from './pages/ComingSoonPage';
 import UserTypeSelection from './pages/UserTypeSelection';
 import CustomerSignup from './pages/CustomerSignup';
 import SignInPage from './pages/SignInPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResultsPage from './pages/ResultsPage';
 import VendorProfilePage from './pages/VendorProfilePage';
 import ComparePage from './pages/ComparePage';
@@ -38,6 +39,7 @@ const hideNavbarFooterPaths = [
   '/admin',
   '/vendor/dashboard',
   '/signin',
+  '/forgot-password',
   '/user-type',
   '/signup',
   '/contractor/dashboard',
@@ -82,6 +84,7 @@ function AppContent() {
           <Route path="/vendor/signup" element={<VendorSignup />} />
           <Route path="/vendor/signup/:type" element={<VendorSignup />} />
           <Route path="/signin" element={<SignInPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* Customer */}
           <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
