@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-import { Menu, X, Globe, LogIn, ChevronDown, Briefcase } from 'lucide-react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Menu, X, Globe, LogIn, ChevronDown, Briefcase, LayoutDashboard, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { ROLE_TO_DASHBOARD } from '../../constants/roles';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isOutsourceOpen, setIsOutsourceOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
-  const { profile } = useAuth();
+  const { profile, user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const closeMenu = () => setIsOpen(false);
   const isCustomer = profile?.user_type === 'customer';
+  const dashboardPath = profile ? (ROLE_TO_DASHBOARD[profile.user_type] || '/') : '/';
+
+  const handleSignOut = async () => {
+    closeMenu();
+    await signOut();
+    navigate('/');
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-sm">
@@ -98,19 +107,34 @@ const Navbar: React.FC = () => {
 
             {/* Right-side action buttons */}
             <div className="flex items-center gap-2 ml-4">
-              {isCustomer && (
-                <Link to="/customer/dashboard" className="px-4 py-2 border-2 border-[#0070F3] text-[#0070F3] rounded-lg hover:bg-blue-50 transition-colors duration-200 font-medium flex items-center gap-1 text-sm">
-                  <Briefcase className="h-4 w-4" />
-                  Post a Job
-                </Link>
+              {user ? (
+                <>
+                  {isCustomer && (
+                    <Link to="/customer/dashboard" className="px-4 py-2 border-2 border-[#0070F3] text-[#0070F3] rounded-lg hover:bg-blue-50 transition-colors duration-200 font-medium flex items-center gap-1 text-sm">
+                      <Briefcase className="h-4 w-4" />
+                      Post a Job
+                    </Link>
+                  )}
+                  <Link to={dashboardPath} className="px-4 py-2 bg-[#0070F3] text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium flex items-center gap-1">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Link>
+                  <button onClick={handleSignOut} className="px-4 py-2 bg-white text-[#0070F3] border-2 border-[#0070F3] rounded-lg hover:bg-[#0070F3] hover:text-white transition-colors duration-200 font-medium flex items-center gap-1">
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/signin" className="px-4 py-2 bg-[#0070F3] text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium flex items-center gap-1">
+                    <LogIn className="h-4 w-4" />
+                    Sign In
+                  </Link>
+                  <Link to="/user-type" className="px-4 py-2 bg-white text-[#0070F3] border-2 border-[#0070F3] rounded-lg hover:bg-[#0070F3] hover:text-white transition-colors duration-200 font-medium">
+                    Sign Up
+                  </Link>
+                </>
               )}
-              <Link to="/signin" className="px-4 py-2 bg-[#0070F3] text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium flex items-center gap-1">
-                <LogIn className="h-4 w-4" />
-                Sign In
-              </Link>
-              <Link to="/user-type" className="px-4 py-2 bg-white text-[#0070F3] border-2 border-[#0070F3] rounded-lg hover:bg-[#0070F3] hover:text-white transition-colors duration-200 font-medium">
-                Sign Up
-              </Link>
             </div>
           </div>
 
@@ -172,12 +196,25 @@ const Navbar: React.FC = () => {
 
             {/* Mobile bottom CTA buttons */}
             <div className="container pb-8 space-y-3 border-t border-gray-100 pt-4">
-              <Link to="/signin" className="block w-full py-3 text-center bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors" onClick={closeMenu}>
-                Sign In
-              </Link>
-              <Link to="/user-type" className="block w-full py-3 text-center border-2 border-[#0070F3] text-[#0070F3] rounded-lg font-semibold hover:bg-blue-50 transition-colors" onClick={closeMenu}>
-                Sign Up
-              </Link>
+              {user ? (
+                <>
+                  <Link to={dashboardPath} className="block w-full py-3 text-center bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors" onClick={closeMenu}>
+                    Dashboard
+                  </Link>
+                  <button onClick={handleSignOut} className="block w-full py-3 text-center border-2 border-[#0070F3] text-[#0070F3] rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/signin" className="block w-full py-3 text-center bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors" onClick={closeMenu}>
+                    Sign In
+                  </Link>
+                  <Link to="/user-type" className="block w-full py-3 text-center border-2 border-[#0070F3] text-[#0070F3] rounded-lg font-semibold hover:bg-blue-50 transition-colors" onClick={closeMenu}>
+                    Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -1,0 +1,124 @@
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Globe, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { supabase } from '../lib/supabase';
+
+const ForgotPasswordPage: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send reset email. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <Link to="/" className="flex items-center justify-center space-x-2 mb-8">
+          <Globe className="h-10 w-10 text-[#0070F3]" />
+          <span className="text-2xl font-bold text-[#0B2D59]">Collabov</span>
+        </Link>
+        <h2 className="text-center text-3xl font-bold text-[#0B2D59] mb-2">
+          Reset your password
+        </h2>
+        <p className="text-center text-gray-600 mb-8">
+          Enter your email and we'll send you a reset link
+        </p>
+      </div>
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <motion.div
+          className="bg-white py-10 px-8 shadow-xl sm:rounded-2xl border border-gray-100"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          {sent ? (
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="h-8 w-8 text-green-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-[#0B2D59] mb-2">Check your email</h3>
+              <p className="text-gray-600 text-sm mb-6">
+                We sent a password reset link to <span className="font-medium">{email}</span>.
+                Check your inbox and click the link to reset your password.
+              </p>
+              <Link to="/signin" className="text-[#0070F3] font-medium hover:text-blue-600 text-sm flex items-center justify-center gap-1">
+                <ArrowLeft className="h-4 w-4" />
+                Back to sign in
+              </Link>
+            </div>
+          ) : (
+            <>
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-600 text-sm">{error}</p>
+                </div>
+              )}
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email address
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      required
+                      className="pl-10 block w-full shadow-sm focus:ring-[#0070F3] focus:border-[#0070F3] sm:text-sm border-gray-300 rounded-lg py-3"
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white transition-all duration-200 ${
+                    isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#0070F3] hover:bg-blue-600'
+                  }`}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                      Sending...
+                    </div>
+                  ) : (
+                    'Send reset link'
+                  )}
+                </button>
+              </form>
+              <div className="mt-6 text-center">
+                <Link to="/signin" className="text-[#0070F3] font-medium hover:text-blue-600 text-sm flex items-center justify-center gap-1">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to sign in
+                </Link>
+              </div>
+            </>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+export default ForgotPasswordPage;
