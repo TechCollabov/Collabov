@@ -35,6 +35,7 @@ import AdminContent from './pages/admin/AdminContent';
 import AdminSettings from './pages/admin/AdminSettings';
 import VendorSignup from './pages/vendor/VendorSignup';
 import VendorDashboard from './pages/vendor/VendorDashboard';
+import OAuthConsentPage from './pages/OAuthConsentPage';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -46,6 +47,7 @@ const hideNavbarFooterPaths = [
   '/signup',
   '/contractor/dashboard',
   '/customer/dashboard',
+  '/oauth/consent',
 ];
 
 function AppContent() {
@@ -88,6 +90,7 @@ function AppContent() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/oauth/consent" element={<OAuthConsentPage />} />
 
           {/* Customer */}
           <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
