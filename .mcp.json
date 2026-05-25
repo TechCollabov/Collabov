@@ -6,6 +6,13 @@
       "headers": {
         "Authorization": "Bearer sbp_915891ae7c65143a64bdd927370734d522199434"
       }
+    },
+    "render": {
+      "type": "http",
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer rnd_hyObO0XY2GJdi8CSc21zveU2F018"
+      }
     }
   }
 }
