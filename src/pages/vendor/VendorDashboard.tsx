@@ -10,6 +10,9 @@ import Inbox from './dashboard/Inbox';
 import Notifications from './dashboard/Notifications';
 import ManageEmployee from './dashboard/ManageEmployee';
 import AccountSettings from './dashboard/AccountSettings';
+import JobBoard from './dashboard/JobBoard';
+import VendorAnalytics from './dashboard/VendorAnalytics';
+import VendorPayments from './dashboard/VendorPayments';
 
 const VendorDashboard: React.FC = () => {
   return (
@@ -24,6 +27,9 @@ const VendorDashboard: React.FC = () => {
         <Route path="notifications" element={<Notifications />} />
         <Route path="employees" element={<ManageEmployee />} />
         <Route path="settings" element={<AccountSettings />} />
+        <Route path="jobs" element={<JobBoard />} />
+        <Route path="analytics" element={<VendorAnalytics />} />
+        <Route path="payments" element={<VendorPayments />} />
       </Route>
     </Routes>
   );
