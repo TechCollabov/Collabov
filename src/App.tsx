@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { CustomerRoute, VendorRoute, AdminRoute } from './components/auth/ProtectedRoute';
+import { CustomerRoute, VendorRoute, AdminRoute, ContractorRoute } from './components/auth/ProtectedRoute';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import HomePage from './pages/HomePage';
@@ -22,6 +22,8 @@ import PackagesPage from './pages/PackagesPage';
 import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
+import PostJobPage from './pages/customer/PostJobPage';
+import ContractorDashboard from './pages/contractor/ContractorDashboard';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -46,6 +48,7 @@ const hideNavbarFooterPaths = [
   '/user-type',
   '/signup',
   '/contractor/dashboard',
+  '/customer/post-job',
   '/customer/dashboard',
   '/oauth/consent',
 ];
@@ -94,6 +97,10 @@ function AppContent() {
 
           {/* Customer */}
           <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
+          <Route path="/customer/post-job" element={<CustomerRoute><PostJobPage /></CustomerRoute>} />
+
+          {/* Contractor */}
+          <Route path="/contractor/dashboard" element={<ContractorRoute><ContractorDashboard /></ContractorRoute>} />
 
           {/* Vendor */}
           <Route path="/vendor/dashboard/*" element={<VendorRoute><VendorDashboard /></VendorRoute>} />
