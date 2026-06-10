@@ -38,6 +38,53 @@ interface Vendor {
   availableFrom?: string;
   ir35: boolean;
   referrals: number;
+  service_categories?: string[];
+  tech_stack?: string[];
+  industry_focus?: string[];
+  match_score?: number;
+}
+
+/* ── Match scoring ── */
+function calculateMatchScore(vendor: { service_categories?: string[]; tech_stack?: string[]; industry_focus?: string[] }, query: string, type: string): number {
+  let score = 0;
+  const q = (query + ' ' + type).toLowerCase();
+
+  // Service category match (30 pts)
+  const serviceKeywords: Record<string, string[]> = {
+    'msp': ['managed', 'msp', 'infrastructure', 'support'],
+    'agency': ['agency', 'development', 'software', 'build'],
+    'staffaug': ['staff', 'augmentation', 'dedicated', 'team'],
+    'software': ['software', 'development', 'react', 'node'],
+    'cybersecurity': ['security', 'cyber', 'pentest'],
+    'cloud': ['cloud', 'aws', 'azure', 'devops'],
+    'qa': ['qa', 'testing', 'quality'],
+  };
+  const services = vendor.service_categories || [];
+  const serviceMatch = services.some(s => {
+    const sl = s.toLowerCase();
+    return Object.entries(serviceKeywords).some(([k, v]) =>
+      q.includes(k) && (sl.includes(k) || v.some(kw => sl.includes(kw)))
+    );
+  });
+  if (serviceMatch) score += 30;
+  else if (services.length > 0) score += 10; // partial
+
+  // Tech stack match (20 pts)
+  const techTerms = q.split(/[\s+,]+/).filter(t => t.length > 2);
+  const stack = vendor.tech_stack || [];
+  const techMatches = techTerms.filter(t => stack.some(s => s.toLowerCase().includes(t))).length;
+  score += Math.min(20, techMatches * 5);
+
+  // Industry match (25 pts) - using industry_focus as proxy for case study industry
+  const industries = vendor.industry_focus || [];
+  const industryMatch = industries.some(ind => q.includes(ind.toLowerCase()));
+  if (industryMatch) score += 25;
+  else score += 10;
+
+  // Case study tech + outcome (25 pts)
+  score += 15; // base for having case studies
+
+  return Math.min(100, score);
 }
 
 /* Sample vendor data — will be replaced by database results */
