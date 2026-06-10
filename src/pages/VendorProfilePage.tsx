@@ -1189,10 +1189,32 @@ const VendorProfilePage: React.FC = () => {
       } finally {
         if (!cancelled) setLoading(false);
       }
+
+      // Log profile view (fire and forget — never breaks the page)
+      const logProfileView = async () => {
+        try {
+          const { supabase: sb } = await import('../lib/supabase');
+          await sb.from('platform_event').insert({
+            event_type: 'profile_view',
+            actor_id: user?.id || '00000000-0000-0000-0000-000000000000',
+            actor_role: user ? (user.user_metadata?.user_type || 'anonymous') : 'anonymous',
+            entity_type: 'vendor',
+            entity_id: vendorId || 'demo',
+            payload: { page: 'vendor_profile', vendor_id: vendorId },
+          });
+          // Also increment profile_view_count
+          if (vendorId && vendorId !== 'demo') {
+            await sb.rpc('increment_profile_views', { vendor_id: vendorId });
+          }
+        } catch {
+          // Silent fail — tracking should never break the page
+        }
+      };
+      if (!cancelled) logProfileView();
     }
     load();
     return () => { cancelled = true; };
-  }, [vendorId]);
+  }, [vendorId, user]);
 
   useEffect(() => {
     const onScroll = () => {
