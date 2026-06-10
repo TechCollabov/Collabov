@@ -3,32 +3,225 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Star, ShieldCheck, Bookmark, BookmarkCheck, Share2, Flag, X, Upload,
   ChevronDown, Users, Briefcase, Globe, Clock, CheckCircle, Calendar,
-  Code, Cloud, Database, Smartphone, Server
+  Code, Cloud, Database, Smartphone, Server, UserCheck, TrendingUp,
+  MessageSquare, Phone, Video, MapPin,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
-/* No hardcoded vendor data — profiles will be loaded from the database */
-const vendor: null = null;
-const team: never[] = [];
-const packages: never[] = [];
-const reviews: never[] = [];
+// ─── Mock data ────────────────────────────────────────────────────────────────
+
+const DEMO_VENDOR = {
+  id: 'demo',
+  company_name: 'TechForge Solutions',
+  trading_name: 'TechForge Solutions',
+  tagline: 'UK-focused software development and cloud engineering for scale-ups',
+  description:
+    'TechForge Solutions is a 35-person IT agency based in Warsaw, Poland, specialising in building scalable web applications, cloud infrastructure, and DevOps automation for UK scale-ups and SMEs. We have delivered over 60 projects across fintech, healthtech, and SaaS — all on budget and on schedule.',
+  business_type: 'agency',
+  city: 'Warsaw',
+  country: 'Poland',
+  founded_year: 2016,
+  team_size_band: '11-50',
+  verification_status: 'verified',
+  rating: 4.8,
+  review_count: 23,
+  engagement_count: 31,
+  referral_count: 5,
+  monthly_rate_min: 4200,
+  monthly_rate_max: 12000,
+  hourly_rate_min: 55,
+  hourly_rate_max: 95,
+  minimum_project_value: 5000,
+  ir35_compliant: false,
+  gdpr_ready: true,
+  availability_status: 'available',
+  response_time_hours: 3,
+  timezone: 'CET',
+  languages: ['English', 'Polish'],
+  service_categories: ['Software Development', 'Cloud & Infrastructure', 'DevOps', 'QA & Testing'],
+  tech_stack: {
+    Frontend: ['React', 'TypeScript', 'Next.js', 'Vue.js'],
+    Backend: ['Node.js', 'Python', 'Go', 'NestJS'],
+    Cloud: ['AWS', 'GCP', 'Terraform'],
+    DevOps: ['Docker', 'Kubernetes', 'GitHub Actions'],
+    Database: ['PostgreSQL', 'MongoDB', 'Redis'],
+  },
+  engagement_models: ['Long-term Dedicated', 'Short-term Project'],
+  industry_focus: ['Fintech', 'HealthTech', 'SaaS', 'E-commerce'],
+  member_since: 'January 2024',
+  logo_url: null as string | null,
+};
+
+const DEMO_TEAM = [
+  { id: '1', name: 'Aleksei Nowak', title: 'Senior Full-Stack Developer', seniority: 'Senior', domain: 'Full-Stack', skills: ['React', 'Node.js', 'TypeScript', 'PostgreSQL', 'AWS'], rate_monthly: 4800, availability: 'available', available_from: null as string | null, engaged_until: null as string | null },
+  { id: '2', name: 'Karolina Wiśniewska', title: 'Lead DevOps Engineer', seniority: 'Lead', domain: 'DevOps', skills: ['Kubernetes', 'Terraform', 'AWS', 'Docker', 'CI/CD'], rate_monthly: 5200, availability: 'available_from', available_from: '1 July 2026', engaged_until: null as string | null },
+  { id: '3', name: 'Piotr Krawczyk', title: 'Senior Backend Developer', seniority: 'Senior', domain: 'Backend', skills: ['Go', 'Python', 'gRPC', 'PostgreSQL', 'Redis'], rate_monthly: 4600, availability: 'engaged', available_from: null as string | null, engaged_until: 'Aug 2026' },
+  { id: '4', name: 'Anna Kowalczyk', title: 'Mid Frontend Developer', seniority: 'Mid', domain: 'Frontend', skills: ['React', 'Next.js', 'TypeScript', 'Tailwind CSS'], rate_monthly: 3200, availability: 'available', available_from: null as string | null, engaged_until: null as string | null },
+  { id: '5', name: 'Marcin Zielinski', title: 'QA Engineer', seniority: 'Mid', domain: 'QA', skills: ['Playwright', 'Cypress', 'Jest', 'API Testing'], rate_monthly: 2800, availability: 'available', available_from: null as string | null, engaged_until: null as string | null },
+];
+
+const DEMO_CASE_STUDIES = [
+  {
+    id: '1',
+    title: 'Fintech Payment Gateway — Real-time Settlement Engine',
+    industry: 'Fintech',
+    services: ['Software Development', 'Cloud & Infrastructure'],
+    tech: ['Node.js', 'PostgreSQL', 'AWS Lambda', 'Stripe', 'React'],
+    duration: '6 months',
+    team_size: 4,
+    challenge:
+      'A UK-based fintech needed a real-time payment settlement engine capable of handling 50,000 transactions per day with sub-100ms latency. Their existing batch processing system caused 4-6 hour settlement delays, creating cash flow problems for merchants.',
+    solution:
+      'We designed an event-driven microservices architecture on AWS using Lambda functions for transaction processing and PostgreSQL with read replicas for high-volume queries. Implemented optimistic locking to prevent double-processing and built a React dashboard for real-time monitoring.',
+    outcomes: [
+      { metric: '99.97% uptime', description: 'Over 18 months of production operation' },
+      { metric: '< 80ms average settlement', description: 'Down from 4-6 hour batch window' },
+      { metric: '£2.3M in operational savings', description: 'First year vs. enterprise vendor alternative' },
+    ],
+    client_quote:
+      'TechForge delivered exactly what they scoped. No surprises, no overruns. The settlement engine has processed over £400M without a single critical incident.',
+  },
+  {
+    id: '2',
+    title: 'NHS-Contracted HealthTech — Patient Data Platform',
+    industry: 'HealthTech',
+    services: ['Software Development', 'QA & Testing'],
+    tech: ['React', 'Python', 'AWS', 'PostgreSQL', 'FHIR API'],
+    duration: '4 months',
+    team_size: 3,
+    challenge:
+      'A HealthTech SaaS company needed to integrate with NHS FHIR APIs to pull patient records into their care coordination platform. The integration required GDPR compliance, NHS DSP Toolkit alignment, and real-time sync from multiple trust systems.',
+    solution:
+      'Built a FHIR R4-compliant integration layer in Python with end-to-end encryption, role-based access control, and an audit trail for all data access events. Full test suite with 94% code coverage and penetration testing by third-party.',
+    outcomes: [
+      { metric: '3 NHS trusts integrated', description: 'Within 16 weeks of project start' },
+      { metric: '94% test coverage', description: 'Across all integration endpoints' },
+      { metric: 'DSPT-aligned', description: 'Passed NHS data security assessment first attempt' },
+    ],
+    client_quote: null as string | null,
+  },
+];
+
+const DEMO_REFERRALS = [
+  {
+    id: '1',
+    contact_name: 'Sarah Thompson',
+    job_title: 'Head of Engineering',
+    company: 'Paytrace Financial',
+    relationship_type: 'Client',
+    project_vouched_for: 'Payment Settlement Engine',
+    project_duration: '6 months',
+    project_value_band: '£50k+',
+    specific_outcome:
+      'Delivered a real-time settlement engine processing 50,000 transactions/day with 99.97% uptime. On budget, on schedule.',
+    written_statement:
+      'TechForge are one of the most professional engineering teams we have worked with. They flagged risks early, communicated daily, and delivered exactly what was scoped.',
+    confirmed: true,
+    confirmed_at: 'March 2025',
+  },
+  {
+    id: '2',
+    contact_name: 'Dr. James Okafor',
+    job_title: 'CTO',
+    company: 'CareSync Health',
+    relationship_type: 'Client',
+    project_vouched_for: 'NHS FHIR Integration Platform',
+    project_duration: '4 months',
+    project_value_band: '£10k-£50k',
+    specific_outcome:
+      'Built and delivered an NHS-compliant FHIR integration passing DSPT assessment first attempt.',
+    written_statement: null as string | null,
+    confirmed: true,
+    confirmed_at: 'November 2024',
+  },
+  {
+    id: '3',
+    contact_name: 'Mark Williams',
+    job_title: 'VP Product',
+    company: 'ShopBridge Commerce',
+    relationship_type: 'Client',
+    project_vouched_for: 'E-commerce Platform Migration',
+    project_duration: '3 months',
+    project_value_band: '£10k-£50k',
+    specific_outcome: null as string | null,
+    written_statement: null as string | null,
+    confirmed: false,
+    confirmed_at: null as string | null,
+  },
+];
+
+const DEMO_REVIEWS = [
+  {
+    id: '1',
+    company_type: 'Fintech scale-up',
+    location: 'London, UK',
+    project_type: 'Software Development',
+    budget_range: '£50k+',
+    date: 'March 2025',
+    overall: 5,
+    quality: 5,
+    communication: 5,
+    timeliness: 4,
+    professionalism: 5,
+    text: 'Exceptional team. They understood our domain quickly, proactively flagged two architectural risks we had missed, and delivered ahead of schedule. The codebase quality is excellent — our internal engineers were impressed.',
+    vendor_response: null as string | null,
+  },
+  {
+    id: '2',
+    company_type: 'SaaS platform',
+    location: 'Manchester, UK',
+    project_type: 'DevOps & Cloud',
+    budget_range: '£10k-£50k',
+    date: 'January 2025',
+    overall: 5,
+    quality: 4,
+    communication: 5,
+    timeliness: 5,
+    professionalism: 5,
+    text: 'Our CI/CD pipeline was a mess before TechForge came in. They restructured everything within 3 weeks. Kubernetes setup is solid and the documentation they left behind means our team can manage it themselves.',
+    vendor_response:
+      'Thank you for the kind words. It was a pleasure working on your infrastructure. The team did great work on the documentation — please reach out if you ever need anything else.',
+  },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function Stars({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' }) {
   const s = size === 'md' ? 'h-5 w-5' : 'h-4 w-4';
   return (
     <span className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(i => (
-        <Star key={i} className={`${s} ${i <= Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-200'}`} />
+        <Star
+          key={i}
+          className={`${s} ${i <= Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-200'}`}
+        />
       ))}
     </span>
   );
 }
 
-const TABS = ['Overview', 'Team Members', 'Services & Packages', 'Case Studies', 'Reviews', 'Calendar & Availability'];
+function Initials({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
+  const initials = name
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  const sizeClass = size === 'lg' ? 'w-20 h-20 text-2xl' : size === 'sm' ? 'w-9 h-9 text-sm' : 'w-12 h-12 text-base';
+  return (
+    <div className={`${sizeClass} rounded-xl bg-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0`}>
+      {initials}
+    </div>
+  );
+}
 
 const SENIORITY_COLOURS: Record<string, string> = {
-  Junior: 'bg-gray-100 text-gray-600', Mid: 'bg-blue-100 text-blue-700',
-  Senior: 'bg-green-100 text-green-700', Lead: 'bg-purple-100 text-purple-700', Principal: 'bg-navy-100 text-[#0B2D59]',
+  Junior: 'bg-gray-100 text-gray-600',
+  Mid: 'bg-blue-100 text-blue-700',
+  Senior: 'bg-green-100 text-green-700',
+  Lead: 'bg-purple-100 text-purple-700',
+  Principal: 'bg-[#0B2D59]/10 text-[#0B2D59]',
 };
 
 const SERVICE_ICONS: Record<string, React.ReactNode> = {
@@ -39,28 +232,943 @@ const SERVICE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const TECH_ICONS: Record<string, React.ReactNode> = {
-  Frontend: <Code className="h-4 w-4" />, Backend: <Server className="h-4 w-4" />,
-  Cloud: <Cloud className="h-4 w-4" />, DevOps: <Globe className="h-4 w-4" />,
-  Database: <Database className="h-4 w-4" />, Mobile: <Smartphone className="h-4 w-4" />,
+  Frontend: <Code className="h-4 w-4" />,
+  Backend: <Server className="h-4 w-4" />,
+  Cloud: <Cloud className="h-4 w-4" />,
+  DevOps: <Globe className="h-4 w-4" />,
+  Database: <Database className="h-4 w-4" />,
+  Mobile: <Smartphone className="h-4 w-4" />,
 };
+
+const TABS = [
+  'Overview',
+  'Team Members',
+  'Services & Packages',
+  'Case Studies',
+  'Referrals',
+  'Reviews',
+  'Calendar & Availability',
+];
+
+type VendorData = typeof DEMO_VENDOR;
+
+// ─── Interview Modal ──────────────────────────────────────────────────────────
+
+interface InterviewModalProps {
+  member: (typeof DEMO_TEAM)[0];
+  onClose: () => void;
+}
+
+function InterviewModal({ member, onClose }: InterviewModalProps) {
+  const [interviewType, setInterviewType] = useState<'candidate' | 'discovery'>('candidate');
+  const [format, setFormat] = useState<'video' | 'phone' | 'inperson'>('video');
+  const [message, setMessage] = useState('');
+  const [dates, setDates] = useState(['', '', '']);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#0B2D59]">Request Interview</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-6 space-y-5">
+          {/* Pre-filled candidate */}
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-[#0070F3] font-bold text-sm flex-shrink-0">
+              {member.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+            </div>
+            <div>
+              <div className="font-semibold text-gray-800 text-sm">{member.name}</div>
+              <div className="text-xs text-gray-500">{member.title}</div>
+            </div>
+          </div>
+
+          {/* Interview type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Interview type</label>
+            <div className="space-y-2">
+              {([['candidate', 'Interview this candidate'], ['discovery', 'General discovery call']] as const).map(
+                ([val, label]) => (
+                  <label key={val} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="interviewType"
+                      checked={interviewType === val}
+                      onChange={() => setInterviewType(val)}
+                      className="text-[#0070F3]"
+                    />
+                    <span className="text-sm text-gray-600">{label}</span>
+                  </label>
+                ),
+              )}
+            </div>
+          </div>
+
+          {/* Format */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Format</label>
+            <div className="flex gap-3">
+              {([
+                ['video', 'Video', <Video className="h-4 w-4" />],
+                ['phone', 'Phone', <Phone className="h-4 w-4" />],
+                ['inperson', 'In-person', <MapPin className="h-4 w-4" />],
+              ] as const).map(([val, label, icon]) => (
+                <button
+                  key={val}
+                  onClick={() => setFormat(val)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    format === val
+                      ? 'border-[#0070F3] bg-blue-50 text-[#0070F3]'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {icon}{label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date/time preferences */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Preferred date/time slots <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <div className="space-y-2">
+              {[0, 1, 2].map(i => (
+                <div key={i}>
+                  <label className="block text-xs text-gray-400 mb-1">Preferred date/time {i + 1}</label>
+                  <input
+                    type="datetime-local"
+                    value={dates[i]}
+                    onChange={e => setDates(prev => prev.map((d, j) => (j === i ? e.target.value : d)))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+            <textarea
+              rows={3}
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="Introduce yourself and describe the role or project..."
+              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Send Interview Request
+            </button>
+            <button
+              onClick={onClose}
+              className="px-5 py-3 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Discovery Call Modal ─────────────────────────────────────────────────────
+
+function DiscoveryModal({ onClose }: { onClose: () => void }) {
+  const [msg, setMsg] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl w-full max-w-md">
+        <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#0B2D59]">Book a Discovery Call</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-500">
+            Send a message to introduce your project. The vendor will respond with available times.
+          </p>
+          <textarea
+            rows={4}
+            value={msg}
+            onChange={e => setMsg(e.target.value)}
+            placeholder="Briefly describe your project and what you'd like to discuss..."
+            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+          />
+          <p className="text-xs text-gray-400">
+            Connect your calendar in vendor settings to enable direct booking.
+          </p>
+          <div className="flex gap-3">
+            <button className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+              Send Request
+            </button>
+            <button onClick={onClose} className="px-5 py-3 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
+function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
+  const avail = vendor.availability_status;
+  const availEl =
+    avail === 'available' ? (
+      <span className="flex items-center gap-2 text-sm"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-green-700 font-medium">Available now</span></span>
+    ) : avail === 'available_from' ? (
+      <span className="flex items-center gap-2 text-sm"><span className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-amber-700 font-medium">Available soon</span></span>
+    ) : (
+      <span className="flex items-center gap-2 text-sm"><span className="w-2 h-2 rounded-full bg-red-400" /><span className="text-red-700 font-medium">Fully booked</span></span>
+    );
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-20 space-y-3">
+      <div className="text-3xl font-black text-[#0B2D59]">From £{vendor.monthly_rate_min.toLocaleString()}/month</div>
+      <div className="text-sm text-gray-500">From £{vendor.hourly_rate_min}/hour</div>
+      <hr className="border-gray-100" />
+      {[
+        { label: 'Team size', value: vendor.team_size_band },
+        { label: 'Timezone', value: vendor.timezone },
+        { label: 'Languages', value: vendor.languages.join(', ') },
+        { label: 'Response time', value: `Within ${vendor.response_time_hours}h` },
+        { label: 'Min. project value', value: `£${vendor.minimum_project_value.toLocaleString()}` },
+      ].map(({ label, value }) => (
+        <div key={label} className="flex justify-between text-sm">
+          <span className="text-gray-400">{label}</span>
+          <span className="font-medium text-gray-700">{value}</span>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        {vendor.ir35_compliant && (
+          <span className="text-xs bg-green-50 text-green-700 border border-green-100 px-2 py-1 rounded-full font-medium">
+            IR35 Compliant
+          </span>
+        )}
+        {vendor.gdpr_ready && (
+          <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded-full font-medium">
+            GDPR-Ready
+          </span>
+        )}
+      </div>
+      {availEl}
+      <hr className="border-gray-100" />
+      <button
+        onClick={onRFP}
+        className="w-full py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Request a Proposal
+      </button>
+      <button
+        onClick={onRFP}
+        className="w-full py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+      >
+        Send a Message
+      </button>
+      <hr className="border-gray-100" />
+      <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors w-full">
+        <Share2 className="h-4 w-4" /> Copy link
+      </button>
+      <button className="flex items-center gap-2 text-xs text-gray-300 hover:text-gray-400 transition-colors w-full">
+        <Flag className="h-3.5 w-3.5" /> Report this listing
+      </button>
+    </div>
+  );
+}
+
+// ─── Tab: Overview ────────────────────────────────────────────────────────────
+
+function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
+  return (
+    <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex-[2] space-y-8">
+        {/* About */}
+        <section>
+          <h2 className="text-xl font-bold text-[#0B2D59] mb-4">About {vendor.company_name}</h2>
+          <div className="flex flex-wrap gap-3 mb-5">
+            {[
+              `Founded ${vendor.founded_year}`,
+              `${vendor.team_size_band} employees`,
+              `${vendor.city}, ${vendor.country}`,
+              `${vendor.engagement_count} engagements`,
+            ].map(f => (
+              <span key={f} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full">{f}</span>
+            ))}
+          </div>
+          <p className="text-gray-600 text-sm leading-relaxed">{vendor.description}</p>
+        </section>
+
+        {/* Core Services */}
+        <section>
+          <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Core Services</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {vendor.service_categories.map(s => (
+              <div key={s} className="bg-white rounded-xl p-4 border border-gray-100 text-center">
+                <div className="text-[#0070F3] mb-2 flex justify-center">
+                  {SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}
+                </div>
+                <div className="text-xs font-semibold text-gray-700">{s}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Tech Stack */}
+        <section>
+          <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Technology Stack</h2>
+          <div className="space-y-4">
+            {Object.entries(vendor.tech_stack).map(([cat, tags]) => (
+              <div key={cat} className="flex items-start gap-3">
+                <div className="flex items-center gap-1.5 w-24 flex-shrink-0 text-gray-400 text-sm pt-0.5">
+                  {TECH_ICONS[cat]}{cat}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(tags as string[]).map(t => (
+                    <span key={t} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{t}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Industries */}
+        <section>
+          <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Industries We Serve</h2>
+          <div className="flex flex-wrap gap-2">
+            {vendor.industry_focus.map(i => (
+              <span key={i} className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-sm font-medium text-gray-700">{i}</span>
+            ))}
+          </div>
+        </section>
+
+        {/* How We Work */}
+        <section>
+          <h2 className="text-xl font-bold text-[#0B2D59] mb-4">How We Work</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                title: 'Long-term Dedicated Resource',
+                body: 'Monthly pricing with a minimum 3-month commitment. Team members work exclusively for you. Replacement guarantee within 2 weeks if needed.',
+              },
+              {
+                title: 'Short-term Project',
+                body: 'Fixed-price or T&M engagement. Milestone-based delivery with clear acceptance criteria. Typically 4–16 weeks.',
+              },
+              {
+                title: 'Quick Engagement',
+                body: 'Sub-£10K single deliverable with a simplified process. Ideal for proofs of concept, audits, and scoped tasks.',
+              },
+            ].map(e => (
+              <div key={e.title} className="bg-white rounded-xl p-5 border border-gray-100">
+                <div className="font-semibold text-gray-800 text-sm mb-2">{e.title}</div>
+                <div className="text-gray-500 text-xs leading-relaxed">{e.body}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* Sidebar */}
+      <div className="lg:w-64 flex-shrink-0">
+        <Sidebar vendor={vendor} onRFP={onRFP} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab: Team Members ────────────────────────────────────────────────────────
+
+function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_TEAM)[0]) => void }) {
+  const [domainFilter, setDomainFilter] = useState('All');
+  const [seniorityFilter, setSeniorityFilter] = useState('All');
+  const [availableOnly, setAvailableOnly] = useState(false);
+
+  const domains = ['All', ...Array.from(new Set(DEMO_TEAM.map(m => m.domain)))];
+  const seniorities = ['All', ...Array.from(new Set(DEMO_TEAM.map(m => m.seniority)))];
+
+  const filtered = DEMO_TEAM.filter(m => {
+    if (domainFilter !== 'All' && m.domain !== domainFilter) return false;
+    if (seniorityFilter !== 'All' && m.seniority !== seniorityFilter) return false;
+    if (availableOnly && m.availability !== 'available') return false;
+    return true;
+  });
+
+  return (
+    <div>
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-500">Domain:</label>
+          <select
+            value={domainFilter}
+            onChange={e => setDomainFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+          >
+            {domains.map(d => <option key={d}>{d}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-500">Seniority:</label>
+          <select
+            value={seniorityFilter}
+            onChange={e => setSeniorityFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+          >
+            {seniorities.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-600">
+          <div
+            onClick={() => setAvailableOnly(v => !v)}
+            className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 cursor-pointer ${availableOnly ? 'bg-[#0070F3]' : 'bg-gray-200'}`}
+          >
+            <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${availableOnly ? 'translate-x-4' : ''}`} />
+          </div>
+          Available now only
+        </label>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-gray-400 text-sm">No team members match your filters.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(m => {
+            const isAvailable = m.availability === 'available';
+            const isAvailableFrom = m.availability === 'available_from';
+            const isEngaged = m.availability === 'engaged';
+
+            const availDot = isAvailable
+              ? 'bg-green-500'
+              : isAvailableFrom
+              ? 'bg-amber-400'
+              : 'bg-gray-400';
+
+            const availLabel = isAvailable
+              ? 'Available now'
+              : isAvailableFrom
+              ? `From ${m.available_from}`
+              : `Engaged until ${m.engaged_until}`;
+
+            const availColor = isAvailable
+              ? 'text-green-600'
+              : isAvailableFrom
+              ? 'text-amber-600'
+              : 'text-gray-500';
+
+            return (
+              <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-[#0070F3] font-bold flex-shrink-0">
+                    {m.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-800 text-sm">{m.name}</div>
+                    <div className="text-xs text-gray-500">{m.title}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SENIORITY_COLOURS[m.seniority] || 'bg-gray-100 text-gray-600'}`}>
+                    {m.seniority}
+                  </span>
+                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{m.domain}</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {m.skills.slice(0, 5).map(s => (
+                    <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{s}</span>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between text-sm mt-auto">
+                  <span className="font-bold text-[#0B2D59]">£{m.rate_monthly.toLocaleString()}/mo</span>
+                  <span className={`flex items-center gap-1 text-xs ${availColor}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${availDot}`} />
+                    {availLabel}
+                  </span>
+                </div>
+                {isEngaged ? (
+                  <button className="w-full py-2 border border-gray-200 text-xs font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+                    View Profile
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onInterviewRequest(m)}
+                    className="w-full py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    Request Interview
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab: Services & Packages ─────────────────────────────────────────────────
+
+function ServicesTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
+  const serviceDescriptions: Record<string, string> = {
+    'Software Development': 'Full-cycle web application development: discovery, architecture, build, QA, and deployment. We work in React, Node.js, Go, and Python.',
+    'Cloud & Infrastructure': 'Cloud architecture, migration, and ongoing management across AWS and GCP. Infrastructure-as-Code with Terraform.',
+    DevOps: 'CI/CD pipelines, Kubernetes orchestration, monitoring, and DevSecOps practices to accelerate your engineering team.',
+    'QA & Testing': 'End-to-end and integration testing with Playwright and Cypress. API and performance testing. 90%+ coverage targets.',
+  };
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Services</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {vendor.service_categories.map(s => (
+            <div key={s} className="bg-white rounded-xl border border-gray-100 p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-[#0070F3]">{SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}</div>
+                <h3 className="font-bold text-gray-800 text-sm">{s}</h3>
+              </div>
+              <p className="text-gray-500 text-xs leading-relaxed mb-4">
+                {serviceDescriptions[s] || 'Service description coming soon.'}
+              </p>
+              <button
+                onClick={onRFP}
+                className="px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                Request Quote
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Packages</h2>
+        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
+          <Briefcase className="h-8 w-8 mx-auto mb-3 text-gray-200" />
+          <p className="text-sm">No packages listed yet.</p>
+          <p className="text-xs mt-1">This vendor operates on a bespoke project basis. Use "Request Quote" above.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab: Case Studies ────────────────────────────────────────────────────────
+
+function CaseStudiesTab() {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Case Studies</h2>
+      {DEMO_CASE_STUDIES.map(cs => {
+        const isExpanded = expanded[cs.id];
+        return (
+          <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <h3 className="font-bold text-gray-800">{cs.title}</h3>
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {cs.tech.map(t => (
+                    <span key={t} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t}</span>
+                  ))}
+                </div>
+                <ul className="space-y-1">
+                  {cs.outcomes.slice(0, 2).map(o => (
+                    <li key={o.metric} className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                      <TrendingUp className="h-4 w-4 flex-shrink-0" />
+                      <span>{o.metric}</span>
+                      <span className="text-gray-400 font-normal text-xs">— {o.description}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => setExpanded(p => ({ ...p, [cs.id]: !p[cs.id] }))}
+                className="text-[#0070F3] text-sm font-medium hover:underline flex-shrink-0"
+              >
+                {isExpanded ? 'Show less' : 'Read more'}
+              </button>
+            </div>
+
+            {isExpanded && (
+              <div className="mt-5 pt-5 border-t border-gray-100 space-y-4">
+                <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-2">
+                  <span><span className="font-semibold text-gray-700">Duration:</span> {cs.duration}</span>
+                  <span><span className="font-semibold text-gray-700">Team size:</span> {cs.team_size} people</span>
+                  <span><span className="font-semibold text-gray-700">Services:</span> {cs.services.join(', ')}</span>
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-700 mb-1 text-sm">The Challenge</div>
+                  <p className="text-gray-500 text-sm">{cs.challenge}</p>
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-700 mb-1 text-sm">Our Solution</div>
+                  <p className="text-gray-500 text-sm">{cs.solution}</p>
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-700 mb-2 text-sm">Outcomes</div>
+                  <ul className="space-y-2">
+                    {cs.outcomes.map(o => (
+                      <li key={o.metric} className="flex items-start gap-2 text-sm">
+                        <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        <span>
+                          <span className="font-semibold text-gray-700">{o.metric}</span>
+                          <span className="text-gray-500"> — {o.description}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {cs.client_quote && (
+                  <div className="border-l-4 border-blue-300 pl-4 py-1 bg-blue-50 rounded-r-lg">
+                    <p className="text-sm text-blue-800 italic">"{cs.client_quote}"</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Tab: Referrals ───────────────────────────────────────────────────────────
+
+function ReferralsTab() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-[#0B2D59]">Referrals</h2>
+        <p className="text-xs text-gray-400">Referee email addresses are never shared with buyers.</p>
+      </div>
+      {DEMO_REFERRALS.length === 0 ? (
+        <p className="text-gray-400 text-sm">No referrals confirmed yet.</p>
+      ) : (
+        DEMO_REFERRALS.map(r => (
+          <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="font-semibold text-gray-800">{r.contact_name}</div>
+                <div className="text-sm text-gray-500">{r.job_title} · {r.company}</div>
+                <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{r.relationship_type}</span>
+              </div>
+              {r.confirmed ? (
+                <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium whitespace-nowrap">
+                  <CheckCircle className="h-4 w-4" />
+                  Confirmed {r.confirmed_at}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium whitespace-nowrap">
+                  <Clock className="h-4 w-4" />
+                  Confirmation pending
+                </span>
+              )}
+            </div>
+
+            {/* Project details */}
+            <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+              <div className="text-xs text-gray-500">
+                <span className="font-semibold text-gray-700">Project:</span> {r.project_vouched_for}
+              </div>
+              <div className="flex gap-4 text-xs text-gray-500">
+                <span><span className="font-semibold text-gray-700">Duration:</span> {r.project_duration}</span>
+                <span><span className="font-semibold text-gray-700">Value:</span> {r.project_value_band}</span>
+              </div>
+              {r.specific_outcome && (
+                <div className="text-xs text-gray-600 mt-1">{r.specific_outcome}</div>
+              )}
+            </div>
+
+            {/* Written statement */}
+            {r.written_statement && (
+              <div className="border-l-4 border-teal-300 pl-4 py-1 bg-teal-50 rounded-r-lg">
+                <p className="text-sm text-teal-800 italic">"{r.written_statement}"</p>
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ─── Tab: Reviews ─────────────────────────────────────────────────────────────
+
+function ReviewsTab({ vendor }: { vendor: VendorData }) {
+  const categories = [
+    { label: 'Quality', key: 'quality' as const },
+    { label: 'Communication', key: 'communication' as const },
+    { label: 'Timeliness', key: 'timeliness' as const },
+    { label: 'Professionalism', key: 'professionalism' as const },
+    { label: 'Overall', key: 'overall' as const },
+  ];
+
+  const avgByCategory = (key: keyof (typeof DEMO_REVIEWS)[0]) => {
+    const vals = DEMO_REVIEWS.map(r => r[key] as number);
+    return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+  };
+
+  return (
+    <div>
+      {/* Summary */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6 flex flex-col md:flex-row gap-8">
+        <div className="text-center flex-shrink-0">
+          <div className="text-5xl font-bold text-[#0B2D59] mb-1">{vendor.rating}</div>
+          <Stars rating={vendor.rating} size="md" />
+          <div className="text-sm text-gray-400 mt-1">out of 5</div>
+        </div>
+        <div className="flex-1 space-y-2">
+          {categories.map(({ label, key }) => (
+            <div key={label} className="flex items-center gap-3">
+              <span className="text-sm text-gray-500 w-32">{label}</span>
+              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-yellow-400 rounded-full"
+                  style={{ width: `${(parseFloat(avgByCategory(key)) / 5) * 100}%` }}
+                />
+              </div>
+              <span className="text-sm font-medium text-gray-700 w-8">{avgByCategory(key)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-center flex-shrink-0">
+          <div className="text-2xl font-bold text-gray-700">{vendor.review_count}</div>
+          <div className="text-sm text-gray-400">reviews</div>
+        </div>
+      </div>
+
+      {/* Individual reviews */}
+      <div className="space-y-4">
+        {DEMO_REVIEWS.map(r => (
+          <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5">
+            <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <div className="font-semibold text-gray-700 text-sm">{r.company_type}</div>
+                <div className="text-xs text-gray-400 flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />{r.location} · {r.project_type} · {r.budget_range} · {r.date}
+                </div>
+              </div>
+              <Stars rating={r.overall} />
+            </div>
+            <div className="flex gap-4 mb-3 flex-wrap text-xs text-gray-500">
+              {(['quality', 'communication', 'timeliness', 'professionalism'] as const).map(k => (
+                <span key={k} className="capitalize">
+                  <span className="font-medium text-gray-600">{k.charAt(0).toUpperCase() + k.slice(1)}:</span> {r[k]}/5
+                </span>
+              ))}
+            </div>
+            <p className="text-gray-600 text-sm">{r.text}</p>
+            {r.vendor_response && (
+              <div className="mt-3 border-l-4 border-blue-200 pl-4 py-2 bg-blue-50 rounded-r-lg">
+                <div className="text-xs font-semibold text-blue-700 mb-1">Vendor response</div>
+                <p className="text-sm text-blue-800">{r.vendor_response}</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab: Calendar & Availability ─────────────────────────────────────────────
+
+function CalendarTab({ onDiscovery }: { onDiscovery: () => void }) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  // Day of week of first day (0=Sun, adjust to Mon-first)
+  const firstDay = new Date(year, month, 1).getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const cells: (number | null)[] = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Calendar & Availability</h2>
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="text-sm font-semibold text-gray-700 mb-4">{monthName}</div>
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
+            <div key={d} className="font-medium">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((day, i) =>
+            day === null ? (
+              <div key={`empty-${i}`} />
+            ) : (
+              <div key={day} className="rounded-lg py-2 text-xs font-medium text-center bg-green-100 text-green-700">
+                {day}
+              </div>
+            ),
+          )}
+        </div>
+        <div className="flex gap-4 mt-4 text-xs text-gray-500">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 inline-block" /> Available</span>
+        </div>
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+          <div className="text-sm font-medium text-gray-700 mb-1">Vendor is currently available for new engagements.</div>
+          <div className="text-xs text-gray-400 mb-4">
+            Connect your calendar in vendor settings to enable direct booking.
+          </div>
+          <button
+            onClick={onDiscovery}
+            className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Book a Discovery Call
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── RFP Modal ────────────────────────────────────────────────────────────────
+
+function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-[#0B2D59]">Request a Proposal</h2>
+            <p className="text-xs text-gray-400">from {vendor.company_name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Project title <span className="text-red-500">*</span></label>
+            <input type="text" placeholder="e.g. React dashboard for SaaS platform" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Service type <span className="text-red-500">*</span></label>
+            <select className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]">
+              <option value="">Select service type</option>
+              {['Software Development', 'Cloud & Infrastructure', 'DevOps', 'QA & Testing', 'Staff Augmentation', 'Other'].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Project description <span className="text-red-500">*</span></label>
+            <textarea rows={4} placeholder="Describe what you need built or managed, key requirements, and any technical context." className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Budget from (£)</label>
+              <input type="number" placeholder="e.g. 10000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Budget to (£)</label>
+              <input type="number" placeholder="e.g. 50000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Engagement model</label>
+            <div className="space-y-2">
+              {['Long-term dedicated resource', 'Short-term project', 'Flexible', 'Not sure'].map(m => (
+                <label key={m} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="model" className="text-[#0070F3]" />
+                  <span className="text-sm text-gray-600">{m}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Attach a project brief (optional)</label>
+            <label className="flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-[#0070F3] transition-colors">
+              <Upload className="h-5 w-5 text-gray-400" />
+              <span className="text-sm text-gray-400">PDF or DOCX, max 10MB</span>
+              <input type="file" accept=".pdf,.docx" className="sr-only" />
+            </label>
+          </div>
+          <button className="w-full py-3 bg-[#0070F3] text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+            Send Proposal Request
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 const VendorProfilePage: React.FC = () => {
   const { vendorId } = useParams<{ vendorId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const [vendor, setVendor] = useState<VendorData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
   const [activeTab, setActiveTab] = useState('Overview');
   const [sticky, setSticky] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showRFP, setShowRFP] = useState(false);
-  const [caseStudyExpanded, setCaseStudyExpanded] = useState<Record<string, boolean>>({});
+  const [showDiscovery, setShowDiscovery] = useState(false);
+  const [interviewTarget, setInterviewTarget] = useState<(typeof DEMO_TEAM)[0] | null>(null);
+
   const headerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch from Supabase, fall back to mock
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      if (vendorId === 'demo') {
+        if (!cancelled) { setVendor(DEMO_VENDOR); setLoading(false); }
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('vendors')
+          .select('*')
+          .eq('id', vendorId)
+          .single();
+        if (cancelled) return;
+        if (error || !data) {
+          // Not found in DB — show not found unless it's the demo
+          setNotFound(true);
+        } else {
+          setVendor(data as VendorData);
+        }
+      } catch {
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [vendorId]);
 
   useEffect(() => {
     const onScroll = () => {
-      if (headerRef.current) {
-        setSticky(window.scrollY > headerRef.current.offsetHeight + 60);
-      }
+      if (headerRef.current) setSticky(window.scrollY > headerRef.current.offsetHeight + 60);
     };
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
@@ -71,7 +1179,23 @@ const VendorProfilePage: React.FC = () => {
     setShowRFP(true);
   };
 
-  if (!vendor) {
+  const handleInterviewRequest = (m: (typeof DEMO_TEAM)[0]) => {
+    if (!user) { navigate(`/signin?returnUrl=/vendor/profile/${vendorId}`); return; }
+    setInterviewTarget(m);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-[#0070F3] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Loading vendor profile…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !vendor) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center py-24">
         <div className="text-center">
@@ -86,18 +1210,23 @@ const VendorProfilePage: React.FC = () => {
     );
   }
 
+  const initials = vendor.company_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Compact sticky header */}
+      {/* Compact sticky bar */}
       {sticky && (
         <div className="fixed top-0 inset-x-0 z-40 bg-white border-b border-gray-200 shadow-sm px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-blue-500 flex items-center justify-center text-white text-sm font-bold">
-              {vendor.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+              {initials}
             </div>
             <div>
-              <div className="font-semibold text-[#0B2D59] text-sm">{vendor.name}</div>
-              <div className="flex items-center gap-1"><Stars rating={vendor.rating} /><span className="text-xs text-gray-500">{vendor.rating}</span></div>
+              <div className="font-semibold text-[#0B2D59] text-sm">{vendor.company_name}</div>
+              <div className="flex items-center gap-1">
+                <Stars rating={vendor.rating} />
+                <span className="text-xs text-gray-500">{vendor.rating}</span>
+              </div>
             </div>
           </div>
           <button onClick={openRFP} className="px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
@@ -112,28 +1241,41 @@ const VendorProfilePage: React.FC = () => {
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
             <div className="flex items-start gap-5">
               <div className="w-20 h-20 rounded-xl bg-blue-500 flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
-                {vendor.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                {initials}
               </div>
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl font-bold text-[#0B2D59]">{vendor.name}</h1>
-                  {vendor.verified && (
-                    <span className="flex items-center gap-1 text-sm text-[#0070F3] font-medium">
+                  <h1 className="text-2xl font-bold text-[#0B2D59]">{vendor.company_name}</h1>
+                  {vendor.verification_status === 'verified' && (
+                    <span className="flex items-center gap-1 text-sm text-[#0070F3] font-medium bg-blue-50 px-2 py-0.5 rounded-full">
                       <ShieldCheck className="h-4 w-4" /> Verified
                     </span>
                   )}
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">{vendor.type}</span>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 capitalize">
+                    {vendor.business_type}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 mt-1 flex-wrap text-sm text-gray-500">
+                {vendor.tagline && (
+                  <p className="text-sm text-gray-500 mt-1 max-w-xl">{vendor.tagline}</p>
+                )}
+                <div className="flex items-center gap-2 mt-2 flex-wrap text-sm text-gray-500">
                   <Stars rating={vendor.rating} />
                   <span className="font-bold text-gray-700">{vendor.rating}</span>
-                  <span>({vendor.reviewCount} reviews)</span>
+                  <span>({vendor.review_count} reviews)</span>
                   <span>·</span>
-                  <span>{vendor.engagements} engagements</span>
+                  <span>{vendor.engagement_count} engagements</span>
                   <span>·</span>
+                  {vendor.referral_count > 0 && (
+                    <>
+                      <span className="flex items-center gap-1 text-teal-600 font-medium">
+                        <UserCheck className="h-4 w-4" />{vendor.referral_count} referrals verified
+                      </span>
+                      <span>·</span>
+                    </>
+                  )}
                   <span>{vendor.city}, {vendor.country}</span>
                   <span>·</span>
-                  <span>Member since {vendor.memberSince}</span>
+                  <span>Member since {vendor.member_since}</span>
                 </div>
               </div>
             </div>
@@ -144,13 +1286,16 @@ const VendorProfilePage: React.FC = () => {
               <button onClick={openRFP} className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Send Message
               </button>
-              <button className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => setActiveTab('Calendar & Availability')}
+                className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
                 Check Availability
               </button>
-              <button className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                View Packages
-              </button>
-              <button onClick={() => setSaved(!saved)} className="p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-400 hover:text-[#0070F3]">
+              <button
+                onClick={() => setSaved(!saved)}
+                className="p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-400 hover:text-[#0070F3]"
+              >
                 {saved ? <BookmarkCheck className="h-5 w-5 text-[#0070F3]" /> : <Bookmark className="h-5 w-5" />}
               </button>
             </div>
@@ -164,7 +1309,9 @@ const VendorProfilePage: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === tab ? 'border-[#0070F3] text-[#0070F3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  activeTab === tab ? 'border-[#0070F3] text-[#0070F3]' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
                 {tab}
               </button>
@@ -175,367 +1322,20 @@ const VendorProfilePage: React.FC = () => {
 
       {/* Tab content */}
       <div className="container mx-auto px-6 py-8">
-
-        {/* ── Overview ── */}
-        {activeTab === 'Overview' && (
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Left 2/3 */}
-            <div className="flex-[2] space-y-8">
-              <section>
-                <h2 className="text-xl font-bold text-[#0B2D59] mb-4">About {vendor.name}</h2>
-                <div className="flex flex-wrap gap-3 mb-5">
-                  {[`Founded ${vendor.founded}`, `${vendor.teamSize} employees`, `${vendor.city}, ${vendor.country}`, `${vendor.engagements} engagements`].map(f => (
-                    <span key={f} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full">{f}</span>
-                  ))}
-                </div>
-                {vendor.description.split('\n\n').map((p, i) => (
-                  <p key={i} className="text-gray-600 text-sm leading-relaxed mb-3">{p}</p>
-                ))}
-              </section>
-
-              <section>
-                <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Core Services</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {vendor.services.map(s => (
-                    <div key={s} className="bg-white rounded-xl p-4 border border-gray-100 text-center">
-                      <div className="text-[#0070F3] mb-2 flex justify-center">{SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}</div>
-                      <div className="text-xs font-semibold text-gray-700">{s}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Technology Stack</h2>
-                <div className="space-y-4">
-                  {Object.entries(vendor.techStack).map(([cat, tags]) => (
-                    <div key={cat} className="flex items-start gap-3">
-                      <div className="flex items-center gap-1.5 w-24 flex-shrink-0 text-gray-400 text-sm pt-0.5">
-                        {TECH_ICONS[cat]}{cat}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {tags.map(t => <span key={t} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{t}</span>)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Industries We Serve</h2>
-                <div className="flex flex-wrap gap-2">
-                  {vendor.industries.map(i => (
-                    <span key={i} className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-sm font-medium text-gray-700">{i}</span>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <h2 className="text-xl font-bold text-[#0B2D59] mb-4">How We Work</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    { title: 'Long-term Dedicated Resource', body: 'Monthly pricing with a minimum 3-month commitment. Team members work exclusively for you. Replacement guarantee within 2 weeks if needed.' },
-                    { title: 'Short-term Project', body: 'Fixed-price or T&M engagement. Milestone-based delivery with clear acceptance criteria. Typically 4–16 weeks.' },
-                    { title: 'Quick Engagement', body: 'Sub-£10K single deliverable with a simplified process. Ideal for proofs of concept, audits, and scoped tasks.' },
-                  ].map(e => (
-                    <div key={e.title} className="bg-white rounded-xl p-5 border border-gray-100">
-                      <div className="font-semibold text-gray-800 text-sm mb-2">{e.title}</div>
-                      <div className="text-gray-500 text-xs leading-relaxed">{e.body}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            {/* Right sidebar */}
-            <div className="lg:w-72 flex-shrink-0">
-              <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-20 space-y-3">
-                <div className="text-2xl font-bold text-[#0B2D59]">From £{vendor.monthlyRate.toLocaleString()}/month</div>
-                <div className="text-sm text-gray-500">From £{vendor.hourlyRate}/hour</div>
-                <hr className="border-gray-100" />
-                {[
-                  { label: 'Team size', value: `${vendor.teamSize} people` },
-                  { label: 'Timezone', value: vendor.timezone },
-                  { label: 'Languages', value: vendor.languages.join(', ') },
-                  { label: 'Response time', value: `Within ${vendor.responseTime}` },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between text-sm">
-                    <span className="text-gray-400">{label}</span>
-                    <span className="font-medium text-gray-700">{value}</span>
-                  </div>
-                ))}
-                <div className="flex gap-2">
-                  {vendor.ir35 && <span className="text-xs bg-green-50 text-green-700 border border-green-100 px-2 py-1 rounded-full font-medium">IR35 Compliant</span>}
-                  {vendor.gdpr && <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded-full font-medium">GDPR-Ready</span>}
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
-                  <span className="text-green-700 font-medium">Available now</span>
-                </div>
-                <hr className="border-gray-100" />
-                <button onClick={openRFP} className="w-full py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-                  Request a Proposal
-                </button>
-                <button onClick={openRFP} className="w-full py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                  Send a Message
-                </button>
-                <hr className="border-gray-100" />
-                <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors w-full">
-                  <Share2 className="h-4 w-4" /> Copy link
-                </button>
-                <button className="flex items-center gap-2 text-xs text-gray-300 hover:text-gray-400 transition-colors w-full">
-                  <Flag className="h-3.5 w-3.5" /> Report this listing
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Team Members ── */}
-        {activeTab === 'Team Members' && (
-          <div>
-            <h2 className="text-xl font-bold text-[#0B2D59] mb-6">Team Members</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {mockTeam.map(m => (
-                <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-5">
-                  <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-[#0070F3] font-bold mb-3">
-                    {m.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
-                  </div>
-                  <div className="font-semibold text-gray-800">{m.name}</div>
-                  <div className="text-sm text-gray-500 mb-2">{m.title}</div>
-                  <div className="flex items-center gap-2 mb-3 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SENIORITY_COLOURS[m.seniority] || 'bg-gray-100 text-gray-600'}`}>{m.seniority}</span>
-                    <span className="text-xs text-gray-400">{m.domain}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {m.skills.map(s => <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{s}</span>)}
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-bold text-[#0B2D59]">£{m.rate.toLocaleString()}/mo</span>
-                    <span className={`flex items-center gap-1 text-xs ${m.availability === 'available' ? 'text-green-600' : 'text-amber-600'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${m.availability === 'available' ? 'bg-green-500' : 'bg-amber-400'}`} />
-                      {m.availability === 'available' ? 'Available now' : 'Limited'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Services & Packages ── */}
-        {activeTab === 'Services & Packages' && (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Fixed-Price Packages</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {mockPackages.map(pkg => (
-                  <div key={pkg.id} className="bg-white rounded-xl border border-gray-100 p-6">
-                    <h3 className="font-bold text-gray-800 mb-1">{pkg.title}</h3>
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="text-2xl font-bold text-[#0070F3]">{pkg.price}</span>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{pkg.duration}</span>
-                    </div>
-                    <ul className="space-y-1.5 mb-4">
-                      {pkg.included.map(i => (
-                        <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />{i}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-xs text-gray-400 mb-4">Ideal for: {pkg.ideal}</p>
-                    <button onClick={openRFP} className="w-full py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-                      Purchase Package
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Case Studies ── */}
-        {activeTab === 'Case Studies' && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Case Studies</h2>
-            {[
-              { id: 'cs1', title: 'E-commerce Platform Rebuild for UK Retailer', industry: 'E-commerce', outcomes: ['65% faster page load', '40% increase in checkout conversion', '99.9% uptime since launch'], challenge: 'A UK-based fashion retailer was suffering from a slow, fragile legacy platform built on an outdated PHP stack. Checkout conversion was declining and mobile performance was poor.', solution: 'We migrated the platform to a Next.js frontend with a Node.js API backend, hosted on AWS with CloudFront CDN. The checkout flow was rebuilt using Stripe with one-click purchasing.' },
-              { id: 'cs2', title: 'Fintech SaaS Dashboard for Investment Platform', industry: 'Fintech', outcomes: ['3x faster data load time', 'Launched in 8 weeks', '92% user satisfaction score'], challenge: 'A fintech startup needed a real-time investment dashboard with complex data visualisations and sub-second performance for their web app.', solution: 'We built a React dashboard with WebSocket-driven live data feeds, recharts visualisations, and a PostgreSQL backend with materialised views for query performance.' },
-            ].map(cs => {
-              const expanded = caseStudyExpanded[cs.id];
-              return (
-                <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h3 className="font-bold text-gray-800">{cs.title}</h3>
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>
-                      </div>
-                      <ul className="space-y-1">
-                        {cs.outcomes.slice(0, 2).map(o => (
-                          <li key={o} className="flex items-center gap-2 text-sm text-green-600 font-medium">
-                            <CheckCircle className="h-4 w-4 flex-shrink-0" />{o}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <button onClick={() => setCaseStudyExpanded(p => ({ ...p, [cs.id]: !p[cs.id] }))} className="text-[#0070F3] text-sm font-medium hover:underline ml-4 flex-shrink-0">
-                      {expanded ? 'Show less' : 'Read more'}
-                    </button>
-                  </div>
-                  {expanded && (
-                    <div className="mt-5 pt-5 border-t border-gray-100 space-y-4">
-                      <div><div className="font-semibold text-gray-700 mb-1 text-sm">The Challenge</div><p className="text-gray-500 text-sm">{cs.challenge}</p></div>
-                      <div><div className="font-semibold text-gray-700 mb-1 text-sm">Our Solution</div><p className="text-gray-500 text-sm">{cs.solution}</p></div>
-                      <div><div className="font-semibold text-gray-700 mb-2 text-sm">Outcomes</div>
-                        <ul className="space-y-1">
-                          {cs.outcomes.map(o => <li key={o} className="flex items-center gap-2 text-sm text-green-600 font-medium"><CheckCircle className="h-4 w-4" />{o}</li>)}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── Reviews ── */}
-        {activeTab === 'Reviews' && (
-          <div>
-            <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6 flex flex-col md:flex-row gap-8">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-[#0B2D59] mb-1">{vendor.rating}</div>
-                <Stars rating={vendor.rating} size="md" />
-                <div className="text-sm text-gray-400 mt-1">out of 5</div>
-              </div>
-              <div className="flex-1 space-y-2">
-                {[['Quality of Work', 4.9], ['Communication', 4.8], ['Timeliness', 4.7], ['Professionalism', 4.9], ['Overall', 4.8]].map(([label, score]) => (
-                  <div key={label as string} className="flex items-center gap-3">
-                    <span className="text-sm text-gray-500 w-36">{label as string}</span>
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${((score as number) / 5) * 100}%` }} />
-                    </div>
-                    <span className="text-sm font-medium text-gray-700 w-8">{score}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-700">{vendor.reviewCount}</div>
-                <div className="text-sm text-gray-400">reviews</div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {mockReviews.map(r => (
-                <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <div className="font-semibold text-gray-700 text-sm">{r.reviewer}</div>
-                      <div className="text-xs text-gray-400">{r.projectType} · {r.value} · {r.date}</div>
-                    </div>
-                    <Stars rating={r.rating} />
-                  </div>
-                  <p className="text-gray-600 text-sm">{r.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Calendar ── */}
-        {activeTab === 'Calendar & Availability' && (
-          <div>
-            <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Calendar & Availability</h2>
-            <div className="bg-white rounded-xl border border-gray-100 p-6">
-              <div className="text-sm text-gray-500 mb-4">April 2026</div>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <div key={d}>{d}</div>)}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {Array.from({ length: 30 }, (_, i) => {
-                  const day = i + 1;
-                  const colour = day <= 20 ? 'bg-green-100 text-green-700' : day <= 25 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400';
-                  return (
-                    <div key={day} className={`rounded-lg py-2 text-xs font-medium ${colour}`}>{day}</div>
-                  );
-                })}
-              </div>
-              <div className="flex gap-4 mt-4 text-xs text-gray-500">
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100" /> Available</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100" /> Limited</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-gray-100" /> Booked</span>
-              </div>
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <div className="text-sm font-medium text-gray-700 mb-1">Current capacity: 7 of 24 team members available</div>
-                <div className="text-sm text-gray-500 mb-4">Average lead time to start: 2 weeks</div>
-                <button onClick={openRFP} className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-                  Book a Discovery Call
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === 'Overview' && <OverviewTab vendor={vendor} onRFP={openRFP} />}
+        {activeTab === 'Team Members' && <TeamTab onInterviewRequest={handleInterviewRequest} />}
+        {activeTab === 'Services & Packages' && <ServicesTab vendor={vendor} onRFP={openRFP} />}
+        {activeTab === 'Case Studies' && <CaseStudiesTab />}
+        {activeTab === 'Referrals' && <ReferralsTab />}
+        {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} />}
+        {activeTab === 'Calendar & Availability' && <CalendarTab onDiscovery={() => setShowDiscovery(true)} />}
       </div>
 
-      {/* RFP Modal */}
-      {showRFP && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-[#0B2D59]">Request a Proposal</h2>
-              <button onClick={() => setShowRFP(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project title <span className="text-red-500">*</span></label>
-                <input type="text" placeholder="e.g. React dashboard for SaaS platform" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Service type <span className="text-red-500">*</span></label>
-                <select className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]">
-                  <option value="">Select service type</option>
-                  {['Software Development', 'Managed IT', 'Staff Augmentation', 'Cybersecurity', 'Cloud & Infra', 'QA & Testing', 'DevOps', 'Other'].map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project description <span className="text-red-500">*</span></label>
-                <textarea rows={4} placeholder="Describe what you need built or managed, key requirements, and any technical context." className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Budget from (£)</label>
-                  <input type="number" placeholder="e.g. 10000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Budget to (£)</label>
-                  <input type="number" placeholder="e.g. 25000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Engagement model</label>
-                <div className="space-y-2">
-                  {['Long-term dedicated resource', 'Short-term project', 'Flexible', 'Not sure'].map(m => (
-                    <label key={m} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="model" className="text-[#0070F3]" />
-                      <span className="text-sm text-gray-600">{m}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Attach a project brief (optional)</label>
-                <label className="flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 rounded-lg cursor-pointer hover:border-[#0070F3] transition-colors">
-                  <Upload className="h-5 w-5 text-gray-400" />
-                  <span className="text-sm text-gray-400">PDF or DOCX, max 10MB</span>
-                  <input type="file" accept=".pdf,.docx" className="sr-only" />
-                </label>
-              </div>
-              <button className="w-full py-3 bg-[#0070F3] text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-                Send Proposal Request
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Modals */}
+      {showRFP && <RFPModal vendor={vendor} onClose={() => setShowRFP(false)} />}
+      {showDiscovery && <DiscoveryModal onClose={() => setShowDiscovery(false)} />}
+      {interviewTarget && (
+        <InterviewModal member={interviewTarget} onClose={() => setInterviewTarget(null)} />
       )}
     </div>
   );
