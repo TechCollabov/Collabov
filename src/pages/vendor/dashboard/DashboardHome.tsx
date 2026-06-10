@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   BarChart2, DollarSign, Users, MessageSquare,
   Clock, Star, TrendingUp, Calendar, FileCheck,
-  AlertCircle, CheckCircle2
+  AlertCircle, CheckCircle2, User, Circle, ArrowRight
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -25,78 +25,87 @@ const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
   const [showResourceModal, setShowResourceModal] = useState(false);
 
-  // Mock profile completion data
-  const profileSections = [
-    { name: 'Company Information', completed: true, step: 1 },
-    { name: 'Contact Information', completed: false, step: 2 },
-    { name: 'Business Overview', completed: false, step: 3 },
-    { name: 'Service Details', completed: true, step: 4 },
-    { name: 'Client Information', completed: false, step: 5 },
-    { name: 'Documents', completed: false, step: 6 },
-    { name: 'Payment Details', completed: false, step: 7 }
+  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set(['company_info', 'services']));
+  const [submittedForVerification, setSubmittedForVerification] = useState(false);
+
+  const checklistItems = [
+    { id: 'company_info', label: 'Add company information', route: '/vendor/dashboard/listings' },
+    { id: 'services', label: 'Add services and tech stack', route: '/vendor/dashboard/listings' },
+    { id: 'case_study', label: 'Add at least one case study', route: '/vendor/dashboard/listings' },
+    { id: 'referral', label: 'Submit at least one referral', route: '/vendor/dashboard/listings' },
+    { id: 'documents', label: 'Upload verification documents', route: '/vendor/dashboard/listings' },
   ];
 
-  const completedSections = profileSections.filter(section => section.completed).length;
-  const profileCompletion = Math.round((completedSections / profileSections.length) * 100);
-
-  const handleCompleteProfile = () => {
-    // Find the first incomplete section
-    const incompleteSection = profileSections.find(section => !section.completed);
-    if (incompleteSection) {
-      navigate(`/vendor/dashboard/listings?step=${incompleteSection.step}`);
-    }
-  };
+  const allComplete = checklistItems.every(item => completedItems.has(item.id));
+  const completionPercent = Math.round((completedItems.size / checklistItems.length) * 100);
 
   /* No hardcoded resources — data will be loaded from the database */
   const resources: ResourceDetails[] = [];
 
   return (
     <div className="p-6">
-      {/* Profile Completion */}
-      <motion.div 
-        className="bg-white rounded-lg shadow p-6 mb-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Profile Completion</h2>
-          <button 
-            className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-            onClick={handleCompleteProfile}
-          >
-            Complete Profile
-          </button>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
-          <div 
-            className="bg-primary-600 h-2.5 rounded-full" 
-            style={{ width: `${profileCompletion}%` }}
-          ></div>
-        </div>
-        <p className="mt-2 text-sm text-gray-600">
-          {profileCompletion}% complete
-        </p>
-        
-        {/* Section Status */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-          {profileSections.map((section, index) => (
-            <div 
-              key={index}
-              className="flex items-center space-x-2"
-            >
-              {section.completed ? (
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-yellow-500" />
-              )}
-              <span className={section.completed ? 'text-gray-700' : 'text-gray-500'}>
-                {section.name}
-              </span>
+      {/* Profile Completion Widget */}
+      {completionPercent < 100 && !submittedForVerification && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[#0B2D59] rounded-xl flex items-center justify-center">
+                <User className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-xs font-bold tracking-widest uppercase text-gray-900">PROFILE COMPLETION</p>
+                <p className="text-xs text-gray-500 mt-0.5">{completionPercent}% complete — Complete your profile to go live</p>
+              </div>
             </div>
-          ))}
+            <span className="text-2xl font-black text-[#0070F3]">{completionPercent}%</span>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full bg-gray-100 rounded-full h-2 mb-5">
+            <div
+              className="bg-[#0070F3] h-2 rounded-full transition-all duration-500"
+              style={{ width: `${completionPercent}%` }}
+            />
+          </div>
+
+          {/* Checklist */}
+          <div className="space-y-2 mb-5">
+            {checklistItems.map(item => {
+              const done = completedItems.has(item.id);
+              return (
+                <Link key={item.id} to={item.route} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors group">
+                  {done
+                    ? <CheckCircle2 className="h-5 w-5 text-[#0E7C6A] flex-shrink-0" />
+                    : <Circle className="h-5 w-5 text-gray-300 flex-shrink-0" />
+                  }
+                  <span className={`text-sm ${done ? 'text-gray-400 line-through' : 'text-gray-700 group-hover:text-[#0070F3]'}`}>
+                    {item.label}
+                  </span>
+                  {!done && <ArrowRight className="h-4 w-4 text-gray-300 ml-auto group-hover:text-[#0070F3]" />}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Submit for Verification button — only when all complete */}
+          {allComplete && (
+            <button
+              onClick={() => setSubmittedForVerification(true)}
+              className="w-full bg-[#0070F3] text-white rounded-xl py-3 font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Submit for Verification →
+            </button>
+          )}
         </div>
-      </motion.div>
+      )}
+
+      {/* Submitted for verification banner */}
+      {submittedForVerification && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+          <p className="text-sm text-green-800">Profile submitted for verification — we'll review within 2 business days.</p>
+        </div>
+      )}
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
