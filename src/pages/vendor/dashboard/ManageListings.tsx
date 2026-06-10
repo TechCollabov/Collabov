@@ -728,46 +728,100 @@ const ManageListings: React.FC = () => {
             <h2 className="text-xl font-semibold">Portfolio & Case Studies</h2>
             <p className="text-sm text-gray-500">Add up to 3 case studies that showcase your work. These appear on your public vendor profile.</p>
 
-            {[1, 2, 3].map(n => (
-              <div key={n} className="border border-gray-200 rounded-xl p-5 space-y-4">
-                <div className="text-sm font-semibold text-gray-700">Case Study {n} {n === 1 && <span className="text-red-500">*</span>}</div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Title</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    placeholder="e.g., Cloud Migration for NHS Trust"
-                    required={n === 1}
-                  />
+            {[0, 1, 2].map(idx => {
+              const n = idx + 1;
+              const cs = caseStudyForms[idx];
+              const saved = caseStudies[idx];
+              return (
+                <div key={n} className="border border-gray-200 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold text-gray-700">
+                      Case Study {n} {n === 1 && <span className="text-red-500">*</span>}
+                    </div>
+                    {saved && (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle className="h-3.5 w-3.5" /> Saved
+                        {saved.ai_keyword_tags && saved.ai_keyword_tags.length > 0 && (
+                          <span className="ml-2 text-gray-400">· Tags: {saved.ai_keyword_tags.join(', ')}</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Project Title</label>
+                    <input
+                      type="text"
+                      value={cs.project_title}
+                      onChange={e => setCaseStudyForms(prev => prev.map((f, i) => i === idx ? { ...f, project_title: e.target.value } : f))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="e.g., Cloud Migration for NHS Trust"
+                      required={n === 1}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Client Industry</label>
+                    <input
+                      type="text"
+                      value={cs.industry}
+                      onChange={e => setCaseStudyForms(prev => prev.map((f, i) => i === idx ? { ...f, industry: e.target.value } : f))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="e.g., Healthcare, Financial Services, Retail"
+                      required={n === 1}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Challenge</label>
+                    <textarea
+                      rows={2}
+                      value={cs.challenge}
+                      onChange={e => setCaseStudyForms(prev => prev.map((f, i) => i === idx ? { ...f, challenge: e.target.value } : f))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="What was the client's problem or challenge?"
+                      required={n === 1}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Solution</label>
+                    <textarea
+                      rows={2}
+                      value={cs.solution}
+                      onChange={e => setCaseStudyForms(prev => prev.map((f, i) => i === idx ? { ...f, solution: e.target.value } : f))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="Describe your approach and solution..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Outcomes</label>
+                    <textarea
+                      rows={2}
+                      value={cs.outcomes as string}
+                      onChange={e => setCaseStudyForms(prev => prev.map((f, i) => i === idx ? { ...f, outcomes: e.target.value } : f))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="What were the measurable results?"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Key Result</label>
+                    <input
+                      type="text"
+                      value={cs.key_result}
+                      onChange={e => setCaseStudyForms(prev => prev.map((f, i) => i === idx ? { ...f, key_result: e.target.value } : f))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="e.g., Reduced infrastructure costs by 35%"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveCaseStudy(idx)}
+                      className="inline-flex items-center px-4 py-2 bg-[#0070F3] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Save Case Study {n}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client Industry</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    placeholder="e.g., Healthcare, Financial Services, Retail"
-                    required={n === 1}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Summary</label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    placeholder="Describe the challenge, your approach, and the outcome..."
-                    required={n === 1}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Key Result</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    placeholder="e.g., Reduced infrastructure costs by 35%"
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         );
 
