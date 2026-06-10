@@ -1,205 +1,351 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { BrainCircuit, FileText, Bot, UserSearch, LockKeyhole } from 'lucide-react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
 
-import Hero from '../components/ui/Hero';
-import SectionTitle from '../components/ui/SectionTitle';
-import FeatureCard from '../components/ui/FeatureCard';
-import CTA from '../components/ui/CTA';
+const SERVICES = [
+  'Software Development',
+  'Managed IT',
+  'Cybersecurity',
+  'Cloud & DevOps',
+  'QA & Testing',
+];
+
+const LOCATIONS = ['UK only', 'Eastern Europe', 'South Asia', 'No preference'] as const;
+type Location = (typeof LOCATIONS)[number];
+
+const LOCATION_MULTIPLIER: Record<Location, number> = {
+  'UK only': 0.85,
+  'Eastern Europe': 0.45,
+  'South Asia': 0.30,
+  'No preference': 0.40,
+};
+
+const BLOCKED_DOMAINS = ['gmail', 'yahoo', 'hotmail', 'outlook'];
+
+function formatGBP(value: number): string {
+  return '£' + Math.round(value).toLocaleString('en-GB');
+}
+
+function isBusinessEmail(email: string): boolean {
+  const domain = email.split('@')[1];
+  if (!domain) return false;
+  const domainBase = domain.split('.')[0].toLowerCase();
+  return !BLOCKED_DOMAINS.includes(domainBase);
+}
+
+// Total steps: 4 questions + 1 email = 5
+const TOTAL_STEPS = 5;
 
 const AiCalculatorPage: React.FC = () => {
+  const navigate = useNavigate();
+
+  const [step, setStep] = useState(1);
+  const [staffCount, setStaffCount] = useState<string>('');
+  const [avgSalary, setAvgSalary] = useState<string>('');
+  const [services, setServices] = useState<string[]>([]);
+  const [location, setLocation] = useState<Location | ''>('');
+  const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [showResults, setShowResults] = useState(false);
+
+  // Computed results
+  const staffNum = parseInt(staffCount, 10) || 0;
+  const salaryNum = parseInt(avgSalary, 10) || 0;
+  const ukEquivalentCost = staffNum * salaryNum;
+  const multiplier = location ? LOCATION_MULTIPLIER[location as Location] : 0;
+  const estimatedPlatformCost = ukEquivalentCost * multiplier;
+  const estimatedSaving = ukEquivalentCost - estimatedPlatformCost;
+  const savingPercent = ukEquivalentCost > 0 ? Math.round((estimatedSaving / ukEquivalentCost) * 100) : 0;
+
+  const progressPercent = Math.round(((step - 1) / (TOTAL_STEPS - 1)) * 100);
+
+  function toggleService(s: string) {
+    setServices(prev =>
+      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+    );
+  }
+
+  function canProceed(): boolean {
+    if (step === 1) return staffNum >= 1;
+    if (step === 2) return salaryNum > 0;
+    if (step === 3) return services.length > 0;
+    if (step === 4) return location !== '';
+    return false;
+  }
+
+  function handleNext() {
+    if (step < 4) setStep(s => s + 1);
+    else if (step === 4) setStep(5); // email step
+  }
+
+  function handleBack() {
+    if (step > 1) setStep(s => s - 1);
+  }
+
+  function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email) {
+      setEmailError('Please enter your work email.');
+      return;
+    }
+    if (!isBusinessEmail(email)) {
+      setEmailError('Please use a business email address (not Gmail, Yahoo, Hotmail, or Outlook).');
+      return;
+    }
+    setEmailError('');
+    setShowResults(true);
+  }
+
+  function handleFindVendors() {
+    const q = services.join('+');
+    navigate(`/results?q=${encodeURIComponent(q)}&location=${encodeURIComponent(location)}`);
+  }
+
+  const stepLabel = step <= 4 ? `Step ${step} of 4` : 'Almost there!';
+
   return (
-    <>
-      <Hero 
-        title="AI Outsourcing Calculator"
-        subtitle="Coming Soon: Discover what to outsource – instantly with our AI-powered decision engine"
-        primaryCTA={{ text: "Join Waitlist", link: "/contact" }}
-        backgroundImage="https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2"
-      />
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
+      {/* Page Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-black text-[#0B2D59] mb-2">
+          Should You Outsource? Find Out in 60 Seconds.
+        </h1>
+        <p className="text-gray-500">
+          Rules-based savings estimate. Free. No sign-up required until you want results.
+        </p>
+      </div>
 
-      {/* Coming Soon Section */}
-      <section className="section">
-        <div className="container">
-          <SectionTitle 
-            title="Discover What to Outsource – Instantly"
-            subtitle="Our AI calculator will analyze your business and recommend the most effective outsourcing strategy based on your specific needs, budget, and goals."
-            centered={true}
-          />
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12">
-            <FeatureCard 
-              icon={<BrainCircuit className="h-6 w-6" />}
-              title="AI-Powered Analysis"
-              description="Advanced algorithms analyze your business needs and market conditions to provide tailored recommendations."
-              delay={0}
-            />
-            <FeatureCard 
-              icon={<FileText className="h-6 w-6" />}
-              title="PDF Report Generation"
-              description="Receive a comprehensive report with detailed outsourcing recommendations and cost projections."
-              delay={0.2}
-            />
-            <FeatureCard 
-              icon={<Bot className="h-6 w-6" />}
-              title="Smart Chatbot"
-              description="Interactive chatbot helps refine your requirements and answers questions about the recommendations."
-              delay={0.4}
-            />
-            <FeatureCard 
-              icon={<UserSearch className="h-6 w-6" />}
-              title="Vendor Matching"
-              description="Direct links to matched vendors who meet your specific requirements and budget constraints."
-              delay={0.6}
+      {/* Card */}
+      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+        {/* Progress bar */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-500">{stepLabel}</span>
+            <span className="text-sm font-medium text-[#0070F3]">{progressPercent}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="h-2 rounded-full transition-all duration-300"
+              style={{ width: `${progressPercent}%`, backgroundColor: '#0070F3' }}
             />
           </div>
         </div>
-      </section>
 
-      {/* How It Works Section */}
-      <section className="section bg-secondary-50">
-        <div className="container">
-          <SectionTitle 
-            title="How It Will Work"
-            subtitle="A simple yet powerful process to determine your optimal outsourcing strategy"
-            centered={true}
-          />
-          
-          <div className="max-w-3xl mx-auto mt-12">
-            <div className="border border-secondary-200 rounded-lg bg-white overflow-hidden">
-              <div className="p-6 border-b border-secondary-200">
-                <h3 className="text-xl font-semibold mb-2">Step 1: Business Assessment</h3>
-                <p className="text-secondary-600">
-                  Answer a series of smart questions about your business, current operations, and goals.
-                </p>
+        {/* Results view */}
+        {showResults ? (
+          <div>
+            <h2 className="text-xl font-bold text-[#0B2D59] mb-6">Your Savings Estimate</h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+                <p className="text-xs text-gray-500 mb-1">Your current team cost estimate</p>
+                <p className="text-2xl font-black text-[#0B2D59]">{formatGBP(ukEquivalentCost)}</p>
+                <p className="text-xs text-gray-400 mt-1">/ year</p>
               </div>
-              <div className="p-6 border-b border-secondary-200">
-                <h3 className="text-xl font-semibold mb-2">Step 2: AI Analysis</h3>
-                <p className="text-secondary-600">
-                  Our algorithm processes your inputs against industry benchmarks and outsourcing best practices.
-                </p>
+              <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+                <p className="text-xs text-gray-500 mb-1">Estimated platform cost</p>
+                <p className="text-2xl font-black text-[#0070F3]">{formatGBP(estimatedPlatformCost)}</p>
+                <p className="text-xs text-gray-400 mt-1">/ year</p>
               </div>
-              <div className="p-6 border-b border-secondary-200">
-                <h3 className="text-xl font-semibold mb-2">Step 3: Recommendation Report</h3>
-                <p className="text-secondary-600">
-                  Receive a detailed report with actionable outsourcing recommendations, cost projections, and ROI analysis.
-                </p>
-              </div>
-              <div className="p-6">
-                <h3 className="text-xl font-semibold mb-2">Step 4: Vendor Matching</h3>
-                <p className="text-secondary-600">
-                  Get connected with pre-vetted vendors that match your specific requirements and business needs.
-                </p>
+              <div className="bg-[#0E7C6A]/10 rounded-xl p-4 text-center border border-[#0E7C6A]/30">
+                <p className="text-xs text-[#0E7C6A] font-medium mb-1">Potential annual saving</p>
+                <p className="text-2xl font-black text-[#0E7C6A]">{formatGBP(estimatedSaving)}</p>
+                <p className="text-xs text-[#0E7C6A] mt-1">{savingPercent}% reduction</p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Waitlist Section */}
-      <section className="section">
-        <div className="container">
-          <div className="bg-primary-50 rounded-2xl p-8 md:p-12">
-            <div className="grid md:grid-cols-2 gap-10 items-center">
-              <motion.div
-                initial={{ opacity: 0, x: -30 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
+            <p className="text-sm text-gray-500 mb-8">
+              Based on {staffNum} IT staff at {formatGBP(salaryNum)} average salary, sourcing from {location}.
+            </p>
+
+            <button
+              onClick={handleFindVendors}
+              className="w-full py-3 px-6 rounded-xl text-white font-bold text-lg transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#0070F3' }}
+            >
+              Find Matching Vendors
+            </button>
+          </div>
+        ) : step === 5 ? (
+          /* Email capture step */
+          <form onSubmit={handleEmailSubmit}>
+            <h2 className="text-xl font-bold text-[#0B2D59] mb-2">One last step</h2>
+            <p className="text-gray-500 mb-6">Enter your work email to see your full savings report</p>
+
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="work-email">
+              Work email address
+            </label>
+            <input
+              id="work-email"
+              type="email"
+              required
+              value={email}
+              onChange={e => { setEmail(e.target.value); setEmailError(''); }}
+              placeholder="you@company.com"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#0070F3] mb-2"
+            />
+            {emailError && (
+              <p className="text-red-500 text-sm mb-3">{emailError}</p>
+            )}
+
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="flex items-center gap-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
               >
-                <h2 className="text-3xl font-bold mb-4">Join Our Waitlist</h2>
-                <p className="text-lg text-secondary-600 mb-6">
-                  Be among the first to access our AI Outsourcing Calculator when it launches. Early access members will receive:
-                </p>
-                <ul className="space-y-4 mb-8">
-                  <li className="flex items-start space-x-3">
-                    <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0 mt-1">
-                      <span className="text-sm font-semibold">1</span>
-                    </div>
-                    <p>Priority access to the beta version</p>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0 mt-1">
-                      <span className="text-sm font-semibold">2</span>
-                    </div>
-                    <p>Free in-depth consultation with our outsourcing experts</p>
-                  </li>
-                  <li className="flex items-start space-x-3">
-                    <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 flex-shrink-0 mt-1">
-                      <span className="text-sm font-semibold">3</span>
-                    </div>
-                    <p>Exclusive discount on your first outsourcing engagement</p>
-                  </li>
-                </ul>
-                <Link to="/contact" className="btn-primary">
-                  Join Waitlist
-                </Link>
-              </motion.div>
-              
-              <motion.div
-                initial={{ opacity: 0, x: 30 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
+                <ChevronLeft className="h-4 w-4" /> Back
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-3 px-6 rounded-xl text-white font-bold transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#0070F3' }}
               >
-                <div className="bg-white p-6 rounded-lg shadow-lg">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-semibold">Calculator Preview</h3>
-                    <LockKeyhole className="h-5 w-5 text-secondary-500" />
-                  </div>
-                  <div className="space-y-4 mb-8">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-secondary-700">Business Type</label>
-                      <select className="w-full p-2 border border-secondary-300 rounded-md bg-secondary-50 text-secondary-400 cursor-not-allowed" disabled>
-                        <option>Select business type...</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-secondary-700">Team Size</label>
-                      <select className="w-full p-2 border border-secondary-300 rounded-md bg-secondary-50 text-secondary-400 cursor-not-allowed" disabled>
-                        <option>Select team size...</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-secondary-700">Monthly Budget</label>
-                      <select className="w-full p-2 border border-secondary-300 rounded-md bg-secondary-50 text-secondary-400 cursor-not-allowed" disabled>
-                        <option>Select budget range...</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-secondary-700">Needs Assessment</label>
-                      <div className="flex items-center space-x-2">
-                        <input type="checkbox" className="h-4 w-4 cursor-not-allowed opacity-50" disabled />
-                        <span className="text-secondary-400">Development</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input type="checkbox" className="h-4 w-4 cursor-not-allowed opacity-50" disabled />
-                        <span className="text-secondary-400">Design</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input type="checkbox" className="h-4 w-4 cursor-not-allowed opacity-50" disabled />
-                        <span className="text-secondary-400">Marketing</span>
-                      </div>
-                    </div>
-                  </div>
-                  <button className="w-full btn bg-secondary-200 text-secondary-400 cursor-not-allowed" disabled>
-                    Coming Soon
-                  </button>
+                See My Savings Report
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* Questions 1–4 */
+          <div>
+            {step === 1 && (
+              <div>
+                <h2 className="text-xl font-bold text-[#0B2D59] mb-6">
+                  How many IT staff do you currently have?
+                </h2>
+                <input
+                  type="number"
+                  min={1}
+                  value={staffCount}
+                  onChange={e => setStaffCount(e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-800 text-lg focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+              </div>
+            )}
+
+            {step === 2 && (
+              <div>
+                <h2 className="text-xl font-bold text-[#0B2D59] mb-6">
+                  What is the average annual salary per person?
+                </h2>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg font-medium">£</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={avgSalary}
+                    onChange={e => setAvgSalary(e.target.value)}
+                    placeholder="65000"
+                    className="w-full border border-gray-300 rounded-xl pl-9 pr-4 py-3 text-gray-800 text-lg focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                  />
                 </div>
-              </motion.div>
+                <p className="text-sm text-gray-400 mt-2">e.g. £65,000</p>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div>
+                <h2 className="text-xl font-bold text-[#0B2D59] mb-6">
+                  Which services do you need?
+                </h2>
+                <div className="space-y-3">
+                  {SERVICES.map(s => (
+                    <label
+                      key={s}
+                      className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                        services.includes(s)
+                          ? 'border-[#0070F3] bg-[#0070F3]/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded flex items-center justify-center border-2 flex-shrink-0 transition-colors ${
+                          services.includes(s)
+                            ? 'border-[#0070F3] bg-[#0070F3]'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {services.includes(s) && <CheckCircle className="h-4 w-4 text-white" />}
+                      </div>
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={services.includes(s)}
+                        onChange={() => toggleService(s)}
+                      />
+                      <span className="font-medium text-gray-700">{s}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 4 && (
+              <div>
+                <h2 className="text-xl font-bold text-[#0B2D59] mb-6">
+                  Where would you prefer your vendor to be based?
+                </h2>
+                <div className="space-y-3">
+                  {LOCATIONS.map(loc => (
+                    <label
+                      key={loc}
+                      className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                        location === loc
+                          ? 'border-[#0070F3] bg-[#0070F3]/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                          location === loc ? 'border-[#0070F3]' : 'border-gray-300'
+                        }`}
+                      >
+                        {location === loc && (
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#0070F3]" />
+                        )}
+                      </div>
+                      <input
+                        type="radio"
+                        name="location"
+                        value={loc}
+                        className="sr-only"
+                        checked={location === loc}
+                        onChange={() => setLocation(loc)}
+                      />
+                      <span className="font-medium text-gray-700">{loc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex gap-3 mt-8">
+              {step > 1 && (
+                <button
+                  onClick={handleBack}
+                  className="flex items-center gap-1 px-4 py-2 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Back
+                </button>
+              )}
+              <button
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className={`flex-1 flex items-center justify-center gap-1 py-3 px-6 rounded-xl text-white font-bold transition-opacity ${
+                  canProceed() ? 'hover:opacity-90' : 'opacity-40 cursor-not-allowed'
+                }`}
+                style={{ backgroundColor: '#0070F3' }}
+              >
+                {step === 4 ? 'Continue to email capture' : 'Next'}
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <CTA 
-        title="Stay Updated on Our AI Calculator Launch"
-        description="Join our newsletter to receive updates on the development and launch of our AI Outsourcing Calculator."
-        buttonText="Subscribe Now"
-        buttonLink="/contact"
-      />
-    </>
+        )}
+      </div>
+    </div>
   );
 };
 
