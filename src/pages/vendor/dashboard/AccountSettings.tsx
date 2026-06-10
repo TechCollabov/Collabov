@@ -6,7 +6,7 @@ import {
   ChevronDown, Upload, AlertTriangle, CheckCircle,
   Smartphone, Bell, Languages, CreditCard, FileText,
   Users, Eye, EyeOff, Download, MessageSquare,
-  BellRing, Palette, Clock, BookOpen
+  BellRing, Palette, Clock, BookOpen, Calendar
 } from 'lucide-react';
 
 interface SettingsSection {
@@ -23,6 +23,9 @@ const AccountSettings: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [otpValue, setOtpValue] = useState('');
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [calendlyUrl, setCalendlyUrl] = useState('');
+  const [calendlySaved, setCalendlySaved] = useState(false);
 
   const sections: SettingsSection[] = [
     { id: 'general', title: 'General Settings', icon: Settings },
@@ -125,6 +128,74 @@ const AccountSettings: React.FC = () => {
                   <input type="checkbox" className="form-checkbox" />
                   <span>In-App Notifications</span>
                 </label>
+              </div>
+            </div>
+
+            {/* Calendar Connections */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 bg-[#0B2D59] rounded-xl flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold tracking-widest uppercase text-gray-900">CALENDAR CONNECTIONS</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Connect your calendar so buyers can book discovery calls directly from your profile.</p>
+                </div>
+              </div>
+
+              {/* Google Calendar */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
+                    <span className="text-xs font-bold text-[#4285F4]">G</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Google Calendar</p>
+                    <p className="text-xs text-gray-500">Allow buyers to book discovery calls via your Google Calendar</p>
+                  </div>
+                </div>
+                {googleCalendarConnected ? (
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>
+                    <button onClick={() => setGoogleCalendarConnected(false)} className="text-xs text-red-500 hover:text-red-600">Disconnect</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setGoogleCalendarConnected(true); /* TODO: Real OAuth flow */ }}
+                    className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
+                  >
+                    Connect Google Calendar
+                  </button>
+                )}
+              </div>
+
+              {/* Calendly URL */}
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
+                    <span className="text-xs font-bold text-[#006BFF]">Cal</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Calendly URL</p>
+                    <p className="text-xs text-gray-500">Paste your Calendly booking link — buyers will see an embedded booking page</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={calendlyUrl}
+                    onChange={e => setCalendlyUrl(e.target.value)}
+                    placeholder="https://calendly.com/yourname/discovery-call"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                  />
+                  <button
+                    onClick={() => { if (calendlyUrl) { setCalendlySaved(true); } }}
+                    className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700"
+                  >
+                    {calendlySaved ? 'Saved ✓' : 'Save'}
+                  </button>
+                </div>
+                {calendlySaved && <p className="text-xs text-green-600 mt-1.5">Calendly URL saved. Buyers can now book directly from your profile.</p>}
               </div>
             </div>
           </div>

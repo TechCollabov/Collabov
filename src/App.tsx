@@ -47,6 +47,10 @@ import MessagingPage from './pages/MessagingPage';
 import ProposalTriagePage from './pages/ProposalTriagePage';
 import DiscoveryBriefPage from './pages/DiscoveryBriefPage';
 import SOWWizardPage from './pages/SOWWizardPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import ReviewPage from './pages/ReviewPage';
+import MyVendorsPage from './pages/customer/MyVendorsPage';
+import EvidenceBuilderPage from './pages/vendor/dashboard/EvidenceBuilder';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -64,6 +68,8 @@ const hideNavbarFooterPaths = [
   '/proposals',
   '/sow-wizard',
   '/discovery-brief',
+  '/project',
+  '/review',
 ];
 
 function AppContent() {
@@ -98,6 +104,11 @@ function AppContent() {
           <Route path="/discovery-brief" element={<CustomerRoute><DiscoveryBriefPage /></CustomerRoute>} />
           <Route path="/sow-wizard" element={<CustomerRoute><SOWWizardPage /></CustomerRoute>} />
           <Route path="/messages" element={<MessagingPage />} />
+
+          {/* Sprint 3 — Engagement flows */}
+          <Route path="/project/:engagementId" element={<ProjectDetailPage />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/customer/my-vendors" element={<CustomerRoute><MyVendorsPage /></CustomerRoute>} />
 
           {/* Legal & Info */}
           <Route path="/terms" element={<TermsPage />} />

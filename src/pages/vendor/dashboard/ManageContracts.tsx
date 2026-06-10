@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Search, Filter, Calendar, FileText, X, 
+import {
+  Search, Filter, Calendar, FileText, X,
   Upload, Edit, Eye, AlertCircle, CheckCircle,
-  ChevronDown, Plus, Send, Download, DollarSign
+  ChevronDown, Plus, Send, Download, DollarSign,
+  AlertTriangle
 } from 'lucide-react';
 
 interface Service {
@@ -19,7 +20,9 @@ interface Contract {
   startDate: string;
   endDate: string;
   value: string;
-  status: 'active' | 'pending' | 'cancelled';
+  status: 'active' | 'pending' | 'cancelled' | 'notice_served';
+  noticeEndDate?: string;
+  contractType?: 'MSP' | 'IT Agency' | 'Staff Aug';
   services: Service[];
   contractNumber?: string;
   clientAddress?: string;
@@ -151,6 +154,31 @@ const ManageContracts: React.FC = () => {
   const [sortBy, setSortBy] = useState<'date' | 'name'>('date');
   const [cancelReason, setCancelReason] = useState('');
   const [newService, setNewService] = useState({ name: '', price: '', description: '' });
+  const [terminationStep, setTerminationStep] = useState(1);
+  const [terminationReason, setTerminationReason] = useState('');
+  const [terminationNotice, setTerminationNotice] = useState('');
+  const [terminationAcknowledged, setTerminationAcknowledged] = useState(false);
+  const [terminationSuccess, setTerminationSuccess] = useState(false);
+
+  const getNoticePeriodDays = (contractType?: string) => {
+    if (contractType === 'IT Agency') return 14;
+    if (contractType === 'Staff Aug') return 28;
+    return 30; // MSP default
+  };
+
+  const getNoticeEndDate = (contractType?: string) => {
+    const days = getNoticePeriodDays(contractType);
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  const getDaysRemaining = (noticeEndDate?: string) => {
+    if (!noticeEndDate) return 0;
+    const end = new Date(noticeEndDate);
+    const now = new Date();
+    return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  };
 
   /* No hardcoded contracts — data will be loaded from the database */
   const contracts: Contract[] = [];
@@ -287,7 +315,20 @@ const ManageContracts: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredContracts.map((contract) => (
-                  <tr key={contract.id}>
+                  <React.Fragment key={contract.id}>
+                  {contract.status === 'notice_served' && (
+                    <tr>
+                      <td colSpan={5} className="px-6 pt-3 pb-0">
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3">
+                          <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                          <p className="text-sm text-amber-800">
+                            Termination notice served — contract active until {contract.noticeEndDate || 'N/A'}. {getDaysRemaining(contract.noticeEndDate)} days remaining in notice period.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
                         {contract.clientName}
@@ -348,6 +389,7 @@ const ManageContracts: React.FC = () => {
                       )}
                     </td>
                   </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -436,36 +478,117 @@ const ManageContracts: React.FC = () => {
 
       {showCancelModal && selectedContract && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Cancel Contract</h3>
-            <p className="text-gray-600 mb-4">
-              Are you sure you want to cancel the contract with {selectedContract.clientName}?
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cancellation Reason
-              </label>
-              <textarea
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                rows={4}
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-              ></textarea>
-            </div>
-            <div className="flex justify-end space-x-4">
-              <button
-                className="px-4 py-2 text-gray-600 hover:text-gray-700"
-                onClick={() => setShowCancelModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleCancelContract}
-              >
-                Confirm Cancellation
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold">Serve Termination Notice</h3>
+              <button onClick={() => { setShowCancelModal(false); setTerminationStep(1); setTerminationReason(''); setTerminationNotice(''); setTerminationAcknowledged(false); setTerminationSuccess(false); }} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
+
+            {terminationSuccess ? (
+              <div className="text-center py-6">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <p className="text-base font-semibold text-gray-900 mb-1">Termination notice served.</p>
+                <p className="text-sm text-gray-600">Contract active until {getNoticeEndDate(selectedContract.contractType)}.</p>
+                <button
+                  className="mt-5 px-5 py-2 bg-gray-100 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-200"
+                  onClick={() => { setShowCancelModal(false); setTerminationStep(1); setTerminationReason(''); setTerminationNotice(''); setTerminationAcknowledged(false); setTerminationSuccess(false); }}
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Step 1: Reason + notice period info */}
+                {terminationStep === 1 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Reason for termination</label>
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 text-sm"
+                        value={terminationReason}
+                        onChange={e => setTerminationReason(e.target.value)}
+                      >
+                        <option value="">Select a reason…</option>
+                        <option value="project_complete">Project completed early</option>
+                        <option value="budget">Budget constraints</option>
+                        <option value="performance">Performance issues</option>
+                        <option value="scope_change">Scope change / restructure</option>
+                        <option value="mutual">Mutual agreement</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                      <p className="text-xs font-semibold text-amber-800 mb-1">Notice period for this contract type</p>
+                      <ul className="text-xs text-amber-700 space-y-0.5">
+                        <li>• MSP contracts: 30 days</li>
+                        <li>• IT Agency contracts: 14 days</li>
+                        <li>• Staff Augmentation: 28 days</li>
+                      </ul>
+                      <p className="text-xs font-semibold text-amber-800 mt-2">
+                        Notice period from today: <span className="font-bold">{getNoticeEndDate(selectedContract.contractType)}</span>
+                        {' '}({getNoticePeriodDays(selectedContract.contractType)} days)
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800" onClick={() => setShowCancelModal(false)}>Cancel</button>
+                      <button
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                        disabled={!terminationReason}
+                        onClick={() => setTerminationStep(2)}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Written notice + acknowledgement */}
+                {terminationStep === 2 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Written notice <span className="text-gray-400 font-normal">(minimum 50 characters)</span></label>
+                      <textarea
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 text-sm"
+                        rows={4}
+                        placeholder="Provide formal notice of your intent to terminate this contract…"
+                        value={terminationNotice}
+                        onChange={e => setTerminationNotice(e.target.value)}
+                      />
+                      <p className={`text-xs mt-1 ${terminationNotice.length < 50 ? 'text-gray-400' : 'text-green-600'}`}>{terminationNotice.length}/50 characters minimum</p>
+                    </div>
+
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={terminationAcknowledged}
+                        onChange={e => setTerminationAcknowledged(e.target.checked)}
+                      />
+                      <span className="text-xs text-gray-700">
+                        I acknowledge the notice period and understand the contract remains active until <strong>{getNoticeEndDate(selectedContract.contractType)}</strong>.
+                      </span>
+                    </label>
+
+                    <div className="flex justify-between gap-3 pt-2">
+                      <button className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800" onClick={() => setTerminationStep(1)}>← Back</button>
+                      <button
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                        disabled={terminationNotice.length < 50 || !terminationAcknowledged}
+                        onClick={() => { handleCancelContract(); setTerminationSuccess(true); }}
+                      >
+                        Serve Termination Notice
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
