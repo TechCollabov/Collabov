@@ -38,6 +38,10 @@ import AdminSettings from './pages/admin/AdminSettings';
 import VendorSignup from './pages/vendor/VendorSignup';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import OAuthConsentPage from './pages/OAuthConsentPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
+import IR35GuidancePage from './pages/IR35GuidancePage';
+import PlaceholderPage from './pages/PlaceholderPage';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -79,6 +83,21 @@ function AppContent() {
           <Route path="/packages" element={<PackagesPage />} />
           <Route path="/tenders" element={<TendersPage />} />
           <Route path="/jobs" element={<JobsPage />} />
+
+          {/* Legal & Info */}
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/ir35-guidance" element={<IR35GuidancePage />} />
+          <Route path="/ir35" element={<IR35GuidancePage />} />
+
+          {/* Placeholder pages */}
+          <Route path="/careers" element={<PlaceholderPage title="Careers at Collabov" description="We're building the team. Check back soon for open roles." />} />
+          <Route path="/blog" element={<PlaceholderPage title="Collabov Blog" description="Insights on IT outsourcing, IR35, and building remote teams. Coming soon." />} />
+          <Route path="/help" element={<PlaceholderPage title="Help Centre" description="Our help centre is being built. For urgent support, email support@collabov.com" />} />
+          <Route path="/faq" element={<PlaceholderPage title="Frequently Asked Questions" description="Common questions about Collabov, answered." />} />
+          <Route path="/partner" element={<PlaceholderPage title="Partner Programme" description="Our partner programme is launching soon. Register your interest at partners@collabov.com" />} />
+          <Route path="/security" element={<PlaceholderPage title="Security at Collabov" description="We take platform security seriously. Full security documentation coming soon." />} />
+          <Route path="/coming-soon" element={<ComingSoonPage />} />
 
           {/* Coming Soon */}
           <Route path="/freelancers" element={<ComingSoonPage />} />
