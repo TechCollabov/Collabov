@@ -2,9 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, Star, ShieldCheck, Bookmark, BookmarkCheck, X, Filter,
-  ChevronDown, ChevronUp, ArrowRight, CheckSquare, Square
+  ChevronDown, ChevronUp, ArrowRight, CheckSquare, Square, TrendingUp, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+
+/* ── Market Insight Data ── */
+const MARKET_INSIGHT_DATA: Record<string, { rate: string; demand: string; tip: string }> = {
+  'msp': { rate: '£1,200–£3,500/month', demand: 'High demand — 847 active searches this month', tip: 'MSPs with SLA guarantees and sub-4hr response times receive 3× more enquiries.' },
+  'agency': { rate: '£8,000–£45,000/project', demand: 'High demand — 1,203 active searches this month', tip: 'Agencies with case studies in your industry receive 4× higher proposal acceptance rates.' },
+  'staffaug': { rate: '£2,800–£6,500/month per person', demand: 'Growing demand — 634 active searches this month', tip: 'Staff aug providers with 3+ verified referrals win contracts 60% faster.' },
+  'software+development': { rate: '£350–£650/day or £8,500+ project', demand: 'Very high demand — 1,847 searches this month', tip: 'React and Node.js skills are most requested by UK SMEs right now.' },
+  'cybersecurity': { rate: '£3,500–£15,000/engagement', demand: 'Growing demand — 421 searches this month', tip: 'Vendors with ISO 27001 certification convert enquiries at 2× the platform average.' },
+  'managed+it': { rate: '£800–£2,400/month', demand: 'Steady demand — 398 searches this month', tip: 'Buyers in this category prioritise response time guarantees above price.' },
+};
 
 /* ── Types ── */
 type VendorType = 'MSP' | 'Agency' | 'Staff Aug';
@@ -27,10 +37,54 @@ interface Vendor {
   availability: Availability;
   availableFrom?: string;
   ir35: boolean;
+  referrals: number;
 }
 
-/* No hardcoded vendors — data will be loaded from the database */
-const MOCK_VENDORS: Vendor[] = [];
+/* Sample vendor data — will be replaced by database results */
+const MOCK_VENDORS: Vendor[] = [
+  {
+    id: 'v1', name: 'NexaTech Solutions', city: 'London', country: 'UK', type: 'MSP',
+    verified: true, rating: 4.8, reviewCount: 124, engagements: 87, responseTime: '2hrs',
+    tagline: 'Proactive managed IT services keeping your business running 24/7.',
+    techStack: ['Microsoft 365', 'Azure', 'Cisco', 'SentinelOne', 'ConnectWise'],
+    monthlyRate: 2400, availability: 'available', ir35: true, referrals: 12,
+  },
+  {
+    id: 'v2', name: 'Brightwave Agency', city: 'Manchester', country: 'UK', type: 'Agency',
+    verified: true, rating: 4.6, reviewCount: 89, engagements: 61, responseTime: '4hrs',
+    tagline: 'Full-stack digital agency delivering scalable web and mobile products.',
+    techStack: ['React', 'Node.js', 'TypeScript', 'AWS', 'PostgreSQL', 'Docker'],
+    monthlyRate: 12000, availability: 'limited', availableFrom: 'Jul 2026', ir35: false, referrals: 7,
+  },
+  {
+    id: 'v3', name: 'Apex Staff Augmentation', city: 'Edinburgh', country: 'UK', type: 'Staff Aug',
+    verified: true, rating: 4.5, reviewCount: 56, engagements: 43, responseTime: '6hrs',
+    tagline: 'Highly skilled contractors embedded in your team, exactly when you need them.',
+    techStack: ['Java', 'Spring Boot', 'Kubernetes', 'Terraform', 'Jenkins'],
+    monthlyRate: 4800, availability: 'available', ir35: true, referrals: 9,
+  },
+  {
+    id: 'v4', name: 'CipherShield Security', city: 'Bristol', country: 'UK', type: 'MSP',
+    verified: true, rating: 4.9, reviewCount: 41, engagements: 29, responseTime: '1hr',
+    tagline: 'Enterprise-grade cybersecurity and compliance for UK SMEs and mid-market.',
+    techStack: ['ISO 27001', 'Splunk', 'CrowdStrike', 'Palo Alto', 'Zero Trust'],
+    monthlyRate: 3800, availability: 'available', ir35: true, referrals: 15,
+  },
+  {
+    id: 'v5', name: 'PixelForge Creative', city: 'Leeds', country: 'UK', type: 'Agency',
+    verified: false, rating: 0, reviewCount: 0, engagements: 0, responseTime: '24hrs',
+    tagline: 'Bold branding and UX design for startups and scale-ups.',
+    techStack: ['Figma', 'Webflow', 'Framer', 'Adobe CC'],
+    monthlyRate: 6500, availability: 'available', ir35: false, referrals: 2,
+  },
+  {
+    id: 'v6', name: 'CloudBridge IT', city: 'Birmingham', country: 'UK', type: 'MSP',
+    verified: true, rating: 4.3, reviewCount: 33, engagements: 27, responseTime: '3hrs',
+    tagline: 'Cloud migration and managed infrastructure specialists for growing businesses.',
+    techStack: ['AWS', 'Azure', 'GCP', 'VMware', 'Veeam', 'Zabbix'],
+    monthlyRate: 1900, availability: 'limited', availableFrom: 'Aug 2026', ir35: true, referrals: 5,
+  },
+];
 
 const TYPE_COLOURS: Record<VendorType, string> = {
   'MSP': 'bg-blue-100 text-blue-700',
@@ -279,31 +333,43 @@ const ResultsPage: React.FC = () => {
           {/* Main content */}
           <div className="flex-1 min-w-0">
             {/* Market Insight Strip */}
-            {!insightDismissed && (
-              <div className="bg-[#EAF0FB] rounded-xl p-4 mb-4 relative">
-                <button onClick={() => setInsightDismissed(true)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
-                  <X className="h-4 w-4" />
-                </button>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pr-6">
-                  <div>
-                    <div className="text-xs font-semibold text-blue-900">Avg. monthly rate</div>
-                    <div className="text-sm text-blue-700 mt-0.5">£3,200–£4,800 {query ? `for ${query}` : ''}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-blue-900">Demand this week</div>
-                    <div className="text-sm text-blue-700 mt-0.5">High — 142 active buyers searching</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-blue-900">Matching vendors</div>
-                    <div className="text-sm text-blue-700 mt-0.5">{results.length} verified vendors match</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-blue-900">Market insight</div>
-                    <div className="text-sm text-blue-700 mt-0.5">Eastern European teams offer 38% cost saving vs UK onshore</div>
-                  </div>
+            {!insightDismissed && (() => {
+              const insightKey = typeParam
+                ? typeParam.toLowerCase().replace(/\s+/g, '+')
+                : query.toLowerCase().replace(/\s+/g, '+');
+              const insight = MARKET_INSIGHT_DATA[insightKey];
+              return (
+                <div className="bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-100 rounded-xl p-5 mb-6 relative">
+                  <button
+                    onClick={() => setInsightDismissed(true)}
+                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  {insight ? (
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 pr-6">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5 text-[#0070F3] flex-shrink-0" />
+                          <span className="font-semibold text-[#0B2D59] text-sm">{insight.rate}</span>
+                        </div>
+                        <p className="text-sm text-blue-700 ml-7">{insight.demand}</p>
+                        <p className="text-sm text-blue-700 ml-7">24 verified vendors match your search</p>
+                      </div>
+                      <p className="text-sm text-gray-600 italic lg:max-w-xs">{insight.tip}</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 pr-6">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-[#0070F3] flex-shrink-0" />
+                        <span className="text-sm text-blue-700 font-medium">24 verified vendors match your search</span>
+                      </div>
+                      <p className="text-sm text-gray-600 italic">Market data not available for this specific query — filter by service category for benchmark rates.</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Results header */}
             <div className="flex items-center justify-between mb-4">
@@ -382,10 +448,18 @@ const ResultsPage: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Row 3 — Tagline */}
+                      {/* Row 3 — Referrals */}
+                      {vendor.referrals > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs text-teal-700 font-medium">
+                          <UserCheck className="h-3.5 w-3.5 text-teal-600" />
+                          {vendor.referrals} referrals verified
+                        </div>
+                      )}
+
+                      {/* Row 4 — Tagline */}
                       <p className="text-sm text-gray-600 truncate">{vendor.tagline}</p>
 
-                      {/* Row 4 — Tech stack */}
+                      {/* Row 5 — Tech stack */}
                       <div className="flex flex-wrap gap-1.5">
                         {vendor.techStack.slice(0, 5).map(t => (
                           <span key={t} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{t}</span>
@@ -395,7 +469,7 @@ const ResultsPage: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Row 5 — Rate + availability */}
+                      {/* Row 6 — Rate + availability */}
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-[#0B2D59]">From £{vendor.monthlyRate.toLocaleString()}/month</span>
                         <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
@@ -406,7 +480,7 @@ const ResultsPage: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* Row 6 — Actions */}
+                      {/* Row 7 — Actions */}
                       <div className="flex items-center gap-2 pt-1 border-t border-gray-50">
                         <Link to={`/vendor/profile/${vendor.id}`} className="flex-1 py-2 text-center bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
                           View Profile
