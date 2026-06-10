@@ -1,28 +1,77 @@
-import React from 'react';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useState } from 'react';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { TrendingUp, Eye, MessageSquare, ArrowUpRight, Lightbulb } from 'lucide-react';
 
-/* No hardcoded analytics data — will be loaded from the database */
-const profileViewsData: { month: string; views: number }[] = [];
-const revenueData: { month: string; revenue: number }[] = [];
-const funnelData: { stage: string; count: number; pct: number }[] = [];
-const TIPS: string[] = [];
+const profileViewsData = [
+  { month: 'Jan', views: 145 },
+  { month: 'Feb', views: 189 },
+  { month: 'Mar', views: 234 },
+  { month: 'Apr', views: 198 },
+  { month: 'May', views: 312 },
+  { month: 'Jun', views: 287 },
+];
+
+const funnelData = [
+  { stage: 'Profile Views', count: 287, pct: 100 },
+  { stage: 'Enquiries Received', count: 24, pct: 8 },
+  { stage: 'Proposals Sent', count: 18, pct: 6 },
+  { stage: 'Contracts Won', count: 6, pct: 2 },
+];
+
+const revenueData = [
+  { month: 'Jan', software: 8200, cloud: 4100, devops: 2800 },
+  { month: 'Feb', software: 12400, cloud: 4100, devops: 0 },
+  { month: 'Mar', software: 9800, cloud: 4100, devops: 5600 },
+  { month: 'Apr', software: 15200, cloud: 8200, devops: 2800 },
+  { month: 'May', software: 11600, cloud: 4100, devops: 5600 },
+  { month: 'Jun', software: 8400, cloud: 8200, devops: 2800 },
+];
+
+const TIPS: string[] = [
+  'Add a case study to your profile — vendors with case studies receive 3× more enquiries.',
+  'Respond to enquiries within 4 hours to improve your conversion rate.',
+  'Keep your availability calendar up to date to appear in more buyer searches.',
+  'Request reviews from completed contracts to boost your trust score.',
+];
+
+const DATE_RANGES = ['30d', '3m', '6m', '12m'] as const;
+type DateRange = typeof DATE_RANGES[number];
 
 const VendorAnalytics: React.FC = () => {
+  const [dateRange, setDateRange] = useState<DateRange>('6m');
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#0B2D59]">Analytics</h1>
-        <p className="text-sm text-gray-500 mt-1">Profile performance and revenue insights for the last 7 months</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0B2D59]">Analytics</h1>
+          <p className="text-sm text-gray-500 mt-1">Profile performance and revenue insights for the last 6 months</p>
+        </div>
+        {/* Date range selector — visual only, mock data is static */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+          {DATE_RANGES.map(range => (
+            <button
+              key={range}
+              onClick={() => setDateRange(range)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                dateRange === range
+                  ? 'bg-white text-[#0B2D59] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {range}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Profile Views (30d)', value: '—', change: '', icon: <Eye className="h-5 w-5 text-[#0070F3]" /> },
-          { label: 'Enquiries (30d)', value: '—', change: '', icon: <MessageSquare className="h-5 w-5 text-[#0070F3]" /> },
-          { label: 'Conversion Rate', value: '—', change: '', icon: <TrendingUp className="h-5 w-5 text-[#0070F3]" /> },
-          { label: 'Gross Revenue MTD', value: '—', change: '', icon: <ArrowUpRight className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Profile Views (30d)', value: '287', change: '+8% vs last month', icon: <Eye className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Enquiries (30d)', value: '24', change: '+14% vs last month', icon: <MessageSquare className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Conversion Rate', value: '33%', change: 'Contracts won / proposals sent', icon: <TrendingUp className="h-5 w-5 text-[#0070F3]" /> },
+          { label: 'Gross Revenue MTD', value: '£19,400', change: '+12% vs last month', icon: <ArrowUpRight className="h-5 w-5 text-[#0070F3]" /> },
         ].map(kpi => (
           <div key={kpi.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center gap-2 mb-2">
@@ -63,9 +112,24 @@ const VendorAnalytics: React.FC = () => {
             <BarChart data={revenueData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `£${(v / 1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }} formatter={(v: number) => [`£${v.toLocaleString()}`, 'Revenue']} />
-              <Bar dataKey="revenue" fill="#0070F3" radius={[4, 4, 0, 0]} />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={v => `£${(v / 1000).toFixed(0)}k`}
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }}
+                formatter={(v: number, name: string) => [`£${v.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)]}
+              />
+              <Legend
+                iconType="square"
+                iconSize={10}
+                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+              />
+              <Bar dataKey="software" stackId="rev" fill="#0070F3" name="Software" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="cloud" stackId="rev" fill="#0E7C6A" name="Cloud" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="devops" stackId="rev" fill="#7C3AED" name="DevOps" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
