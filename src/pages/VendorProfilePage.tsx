@@ -51,6 +51,7 @@ const DEMO_VENDOR = {
   industry_focus: ['Fintech', 'HealthTech', 'SaaS', 'E-commerce'],
   member_since: 'January 2024',
   logo_url: null as string | null,
+  payment_reputation_rate: 97,
 };
 
 const DEMO_TEAM = [
@@ -421,6 +422,29 @@ function DiscoveryModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Payment Badge ────────────────────────────────────────────────────────────
+
+const PaymentBadge = ({ rate }: { rate: number }) => {
+  if (rate >= 95) return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+      <span className="text-green-700 font-medium">Reliable payer</span>
+    </div>
+  );
+  if (rate >= 80) return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+      <span className="text-amber-700 font-medium">Average payer</span>
+    </div>
+  );
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+      <span className="text-red-700 font-medium">Late payer history</span>
+    </div>
+  );
+};
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
@@ -464,6 +488,10 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
         )}
       </div>
       {availEl}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">Buyer payment history</div>
+        <PaymentBadge rate={(vendor as typeof DEMO_VENDOR).payment_reputation_rate || 97} />
+      </div>
       <hr className="border-gray-100" />
       <button
         onClick={onRFP}

@@ -95,6 +95,9 @@ const MOCK_VENDORS: Vendor[] = [
     tagline: 'Proactive managed IT services keeping your business running 24/7.',
     techStack: ['Microsoft 365', 'Azure', 'Cisco', 'SentinelOne', 'ConnectWise'],
     monthlyRate: 2400, availability: 'available', ir35: true, referrals: 12,
+    service_categories: ['Managed IT', 'Cybersecurity'],
+    tech_stack: ['Microsoft 365', 'Azure', 'Cisco', 'SentinelOne', 'ConnectWise'],
+    industry_focus: ['SME', 'Professional Services', 'Finance'],
   },
   {
     id: 'v2', name: 'Brightwave Agency', city: 'Manchester', country: 'UK', type: 'Agency',
@@ -102,6 +105,9 @@ const MOCK_VENDORS: Vendor[] = [
     tagline: 'Full-stack digital agency delivering scalable web and mobile products.',
     techStack: ['React', 'Node.js', 'TypeScript', 'AWS', 'PostgreSQL', 'Docker'],
     monthlyRate: 12000, availability: 'limited', availableFrom: 'Jul 2026', ir35: false, referrals: 7,
+    service_categories: ['Software Development', 'Cloud & Infrastructure'],
+    tech_stack: ['React', 'Node.js', 'TypeScript', 'AWS', 'PostgreSQL', 'Docker'],
+    industry_focus: ['SaaS', 'E-commerce', 'Fintech'],
   },
   {
     id: 'v3', name: 'Apex Staff Augmentation', city: 'Edinburgh', country: 'UK', type: 'Staff Aug',
@@ -109,6 +115,9 @@ const MOCK_VENDORS: Vendor[] = [
     tagline: 'Highly skilled contractors embedded in your team, exactly when you need them.',
     techStack: ['Java', 'Spring Boot', 'Kubernetes', 'Terraform', 'Jenkins'],
     monthlyRate: 4800, availability: 'available', ir35: true, referrals: 9,
+    service_categories: ['Staff Augmentation', 'DevOps'],
+    tech_stack: ['Java', 'Spring Boot', 'Kubernetes', 'Terraform', 'Jenkins'],
+    industry_focus: ['HealthTech', 'Enterprise', 'SaaS'],
   },
   {
     id: 'v4', name: 'CipherShield Security', city: 'Bristol', country: 'UK', type: 'MSP',
@@ -116,6 +125,9 @@ const MOCK_VENDORS: Vendor[] = [
     tagline: 'Enterprise-grade cybersecurity and compliance for UK SMEs and mid-market.',
     techStack: ['ISO 27001', 'Splunk', 'CrowdStrike', 'Palo Alto', 'Zero Trust'],
     monthlyRate: 3800, availability: 'available', ir35: true, referrals: 15,
+    service_categories: ['Cybersecurity', 'Managed IT'],
+    tech_stack: ['ISO 27001', 'Splunk', 'CrowdStrike', 'Palo Alto', 'Zero Trust'],
+    industry_focus: ['Finance', 'Legal', 'Healthcare'],
   },
   {
     id: 'v5', name: 'PixelForge Creative', city: 'Leeds', country: 'UK', type: 'Agency',
@@ -123,6 +135,9 @@ const MOCK_VENDORS: Vendor[] = [
     tagline: 'Bold branding and UX design for startups and scale-ups.',
     techStack: ['Figma', 'Webflow', 'Framer', 'Adobe CC'],
     monthlyRate: 6500, availability: 'available', ir35: false, referrals: 2,
+    service_categories: ['UI/UX Design'],
+    tech_stack: ['Figma', 'Webflow', 'Framer', 'Adobe CC'],
+    industry_focus: ['Startups', 'E-commerce', 'Consumer'],
   },
   {
     id: 'v6', name: 'CloudBridge IT', city: 'Birmingham', country: 'UK', type: 'MSP',
@@ -130,6 +145,9 @@ const MOCK_VENDORS: Vendor[] = [
     tagline: 'Cloud migration and managed infrastructure specialists for growing businesses.',
     techStack: ['AWS', 'Azure', 'GCP', 'VMware', 'Veeam', 'Zabbix'],
     monthlyRate: 1900, availability: 'limited', availableFrom: 'Aug 2026', ir35: true, referrals: 5,
+    service_categories: ['Cloud & Infrastructure', 'Managed IT'],
+    tech_stack: ['AWS', 'Azure', 'GCP', 'VMware', 'Veeam', 'Zabbix'],
+    industry_focus: ['SME', 'Retail', 'Manufacturing'],
   },
 ];
 
@@ -246,7 +264,10 @@ const ResultsPage: React.FC = () => {
   };
 
   /* Compute results */
-  let results = MOCK_VENDORS.filter(v => {
+  let results = MOCK_VENDORS.map(v => ({
+    ...v,
+    match_score: calculateMatchScore(v, query, typeParam),
+  })).filter(v => {
     if (filters.verifiedOnly && !v.verified) return false;
     if (filters.availableNow && v.availability !== 'available') return false;
     if (filters.ir35Only && !v.ir35) return false;
@@ -257,7 +278,8 @@ const ResultsPage: React.FC = () => {
     return true;
   });
 
-  if (sort === 'rating') results = [...results].sort((a, b) => b.rating - a.rating);
+  if (sort === 'best') results = [...results].sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
+  else if (sort === 'rating') results = [...results].sort((a, b) => b.rating - a.rating);
   else if (sort === 'reviews') results = [...results].sort((a, b) => b.reviewCount - a.reviewCount);
   else if (sort === 'rate') results = [...results].sort((a, b) => a.monthlyRate - b.monthlyRate);
 
@@ -468,6 +490,15 @@ const ResultsPage: React.FC = () => {
                             {vendor.verified && (
                               <span className="flex items-center gap-1 text-xs text-[#0070F3] font-medium">
                                 <ShieldCheck className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            )}
+                            {vendor.match_score !== undefined && vendor.match_score > 0 && (
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                vendor.match_score >= 70 ? 'bg-green-100 text-green-700' :
+                                vendor.match_score >= 40 ? 'bg-amber-100 text-amber-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {vendor.match_score >= 70 ? 'Strong match' : vendor.match_score >= 40 ? 'Good match' : 'Partial match'}
                               </span>
                             )}
                           </div>
