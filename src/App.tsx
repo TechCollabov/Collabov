@@ -23,6 +23,7 @@ import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import PostJobPage from './pages/customer/PostJobPage';
+import BYOVPage from './pages/customer/BYOVPage';
 import ContractorDashboard from './pages/contractor/ContractorDashboard';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './components/admin/AdminLayout';
@@ -117,6 +118,7 @@ function AppContent() {
           {/* Customer */}
           <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
           <Route path="/customer/post-job" element={<CustomerRoute><PostJobPage /></CustomerRoute>} />
+          <Route path="/customer/byov" element={<CustomerRoute><BYOVPage /></CustomerRoute>} />
 
           {/* Contractor */}
           <Route path="/contractor/dashboard" element={<ContractorRoute><ContractorDashboard /></ContractorRoute>} />
