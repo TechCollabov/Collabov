@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { 
-  LayoutDashboard, Plus, FileText, Bot, Bookmark, 
-  FolderOpen, FileCheck, CreditCard, MessageSquare, 
+import {
+  LayoutDashboard, Plus, FileText, Bot, Bookmark,
+  FolderOpen, FileCheck, CreditCard, MessageSquare,
   AlertTriangle, HelpCircle, Search, Filter, Calendar,
   Clock, DollarSign, Users, Star, TrendingUp, Bell,
   Settings, LogOut, ChevronDown, User, Globe, Eye,
   Edit, Trash2, Download, Upload, CheckCircle,
   AlertCircle, Target, Briefcase, Building2, Zap,
-  BarChart3, PieChart, Activity, ArrowRight, Send
+  BarChart3, PieChart, Activity, ArrowRight, Send, UserPlus
 } from 'lucide-react';
 
 const CustomerDashboard: React.FC = () => {
@@ -31,7 +31,8 @@ const CustomerDashboard: React.FC = () => {
     { id: 'invoices', label: 'Payments', icon: CreditCard },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'disputes', label: 'Disputes', icon: AlertTriangle },
-    { id: 'help', label: 'Help Center', icon: HelpCircle }
+    { id: 'help', label: 'Help Center', icon: HelpCircle },
+    { id: 'invite-vendor', label: 'Invite a Vendor', icon: UserPlus }
   ];
 
   // Mock data
@@ -165,7 +166,15 @@ const CustomerDashboard: React.FC = () => {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => {
+                      if (tab.id === 'invite-vendor') {
+                        navigate('/customer/byov');
+                      } else if (tab.id === 'post-job') {
+                        navigate('/customer/post-job');
+                      } else {
+                        setActiveTab(tab.id);
+                      }
+                    }}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       activeTab === tab.id
                         ? 'bg-[#0070F3] text-white'
@@ -369,6 +378,20 @@ const CustomerDashboard: React.FC = () => {
                   <div className="text-left">
                     <h3 className="font-medium text-gray-900">Upload Project Brief</h3>
                     <p className="text-sm text-gray-600">Detailed project requirements</p>
+                  </div>
+                </button>
+
+                <button
+                  className="flex items-center space-x-3 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-[#0070F3] hover:bg-blue-50 transition-all group"
+                  onClick={() => navigate('/customer/byov')}
+                  type="button"
+                >
+                  <div className="p-2 bg-[#0070F3] rounded-lg group-hover:scale-110 transition-transform">
+                    <UserPlus className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-medium text-gray-900">Invite a Vendor</h3>
+                    <p className="text-sm text-gray-600">Bring your existing vendor on-platform</p>
                   </div>
                 </button>
               </div>
