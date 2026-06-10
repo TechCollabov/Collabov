@@ -1,119 +1,301 @@
-import React from 'react';
-import { BarChart, Bar, AreaChart, Area, FunnelChart, Funnel, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import { TrendingUp, Users, Globe, DollarSign } from 'lucide-react';
+import React, { useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { ChevronUp, ChevronDown, Download, ExternalLink } from 'lucide-react';
 
-/* No hardcoded analytics data — will be loaded from the database */
-const revenueData: { month: string; gmv: number }[] = [];
-const signupData: { month: string; buyers: number; vendors: number }[] = [];
-const funnelData: { name: string; value: number; fill: string }[] = [];
-const geoData: { region: string; buyers: number; vendors: number }[] = [];
-
-const KPIS = [
-  { label: 'Monthly Active Users', value: '—', change: '', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { label: 'Avg. Time on Site', value: '—', change: '', icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-  { label: 'Top Traffic Source', value: '—', change: '', icon: Globe, color: 'text-purple-600', bg: 'bg-purple-50' },
-  { label: 'Platform Fee Revenue', value: '—', change: '', icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50' },
+const gmvMonthly = [
+  { month: 'Jan', gmv: 42000, fees: 2100 },
+  { month: 'Feb', gmv: 58000, fees: 2900 },
+  { month: 'Mar', gmv: 71000, fees: 3550 },
+  { month: 'Apr', gmv: 89000, fees: 4450 },
+  { month: 'May', gmv: 104000, fees: 5200 },
+  { month: 'Jun', gmv: 127000, fees: 6350 },
 ];
 
-const AdminAnalytics: React.FC = () => {
+const conversionFunnel = [
+  { stage: 'Homepage visits', count: 8420, pct: 100 },
+  { stage: 'Searches performed', count: 3180, pct: 38 },
+  { stage: 'Profile views', count: 1240, pct: 15 },
+  { stage: 'RFPs submitted', count: 187, pct: 2.2 },
+  { stage: 'Contracts signed', count: 43, pct: 0.5 },
+  { stage: 'Milestones completed', count: 89, pct: 1.1 },
+  { stage: 'Contracts completed', count: 18, pct: 0.2 },
+];
+
+const vendorPerformance = [
+  { company: 'TechForge Solutions', type: 'IT Agency', completed: 12, dispute_rate: '0%', avg_rating: 4.8, verified: '2024-01-15' },
+  { company: 'CloudNorth MSP', type: 'MSP', completed: 8, dispute_rate: '0%', avg_rating: 4.6, verified: '2024-02-20' },
+  { company: 'DevStream Ltd', type: 'IT Agency', completed: 6, dispute_rate: '4%', avg_rating: 4.3, verified: '2024-03-10' },
+  { company: 'DataBridge Analytics', type: 'IT Agency', completed: 4, dispute_rate: '0%', avg_rating: 4.9, verified: '2024-04-05' },
+  { company: 'StaffPro UK', type: 'Staff Aug', completed: 7, dispute_rate: '2%', avg_rating: 4.4, verified: '2024-04-18' },
+];
+
+const paymentReputation = [
+  { company: 'Paytrace Financial', on_time_rate: 98, late_count: 0, failed_count: 0, dispute_ratio: '0%', badge: 'green' },
+  { company: 'Morrison Logistics', on_time_rate: 87, late_count: 2, failed_count: 0, dispute_ratio: '2%', badge: 'amber' },
+  { company: 'CareSync Health', on_time_rate: 100, late_count: 0, failed_count: 0, dispute_ratio: '0%', badge: 'green' },
+  { company: 'ShopBridge Commerce', on_time_rate: 72, late_count: 4, failed_count: 1, dispute_ratio: '8%', badge: 'red' },
+];
+
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  return active ? (
+    dir === 'asc' ? <ChevronUp className="inline h-3.5 w-3.5 ml-0.5" /> : <ChevronDown className="inline h-3.5 w-3.5 ml-0.5" />
+  ) : (
+    <ChevronDown className="inline h-3.5 w-3.5 ml-0.5 opacity-30" />
+  );
+}
+
+function StarRating({ rating }: { rating: number }) {
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Platform Analytics</h1>
+    <span className="text-amber-400 text-sm">
+      {'★'.repeat(Math.floor(rating))}{'☆'.repeat(5 - Math.floor(rating))}
+      <span className="text-slate-400 text-xs ml-1">{rating}</span>
+    </span>
+  );
+}
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {KPIS.map(kpi => {
-          const Icon = kpi.icon;
-          return (
-            <div key={kpi.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className={`w-7 h-7 rounded-lg ${kpi.bg} flex items-center justify-center`}>
-                  <Icon className={`h-4 w-4 ${kpi.color}`} />
-                </div>
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{kpi.label}</span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900">{kpi.value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{kpi.change}</div>
-            </div>
-          );
-        })}
-      </div>
+function BadgeChip({ badge }: { badge: string }) {
+  if (badge === 'green') return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-900/40 text-green-400 border border-green-700/50">Reliable</span>;
+  if (badge === 'amber') return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-900/40 text-amber-400 border border-amber-700/50">Average</span>;
+  return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-900/40 text-red-400 border border-red-700/50">Late payer</span>;
+}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        {/* Revenue */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="text-sm font-semibold text-gray-800 mb-4">GMV by Month (£)</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={revenueData}>
-              <defs>
-                <linearGradient id="gmvGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0070F3" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#0070F3" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `£${(v / 1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }} formatter={(v: number) => [`£${v.toLocaleString()}`, 'GMV']} />
-              <Area type="monotone" dataKey="gmv" stroke="#0070F3" strokeWidth={2} fill="url(#gmvGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
+function exportCSV(data: Record<string, unknown>[], filename: string) {
+  if (!data.length) return;
+  const headers = Object.keys(data[0]).join(',');
+  const rows = data.map(r => Object.values(r).join(','));
+  const blob = new Blob([[headers, ...rows].join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const AdminAnalytics: React.FC = () => {
+  const [vendorSort, setVendorSort] = useState<{ key: keyof typeof vendorPerformance[0]; dir: SortDir }>({ key: 'completed', dir: 'desc' });
+  const [paySort, setPaySort] = useState<{ key: keyof typeof paymentReputation[0]; dir: SortDir }>({ key: 'on_time_rate', dir: 'desc' });
+
+  function sortVendor(key: keyof typeof vendorPerformance[0]) {
+    setVendorSort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
+  }
+  function sortPay(key: keyof typeof paymentReputation[0]) {
+    setPaySort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
+  }
+
+  const sortedVendors = [...vendorPerformance].sort((a, b) => {
+    const av = a[vendorSort.key];
+    const bv = b[vendorSort.key];
+    if (typeof av === 'number' && typeof bv === 'number') return vendorSort.dir === 'asc' ? av - bv : bv - av;
+    return vendorSort.dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+
+  const sortedPay = [...paymentReputation].sort((a, b) => {
+    const av = a[paySort.key];
+    const bv = b[paySort.key];
+    if (typeof av === 'number' && typeof bv === 'number') return paySort.dir === 'asc' ? av - bv : bv - av;
+    return paySort.dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+
+  return (
+    <div className="space-y-8">
+      <h1 className="text-2xl font-semibold text-white">Platform Analytics</h1>
+
+      {/* 1. GMV Dashboard */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-4">GMV Dashboard</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-[#0B2D59] rounded-xl p-5 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-blue-300 uppercase tracking-wide">GMV This Month</span>
+            <span className="text-4xl font-black text-white">£127,000</span>
+            <span className="text-xs text-blue-300">June 2024</span>
+          </div>
+          <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">All-time GMV</span>
+            <span className="text-4xl font-black text-white">£491,000</span>
+            <span className="text-xs text-slate-500">Since launch</span>
+          </div>
+          <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Platform Fees (Jun)</span>
+            <span className="text-4xl font-black text-white">£6,350</span>
+            <span className="text-xs text-slate-500">5% of GMV</span>
+          </div>
+          <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Outstanding Escrow</span>
+            <span className="text-4xl font-black text-white">£84,200</span>
+            <span className="text-xs text-slate-500">Held in escrow</span>
+          </div>
         </div>
 
-        {/* Signups */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="text-sm font-semibold text-gray-800 mb-4">New Signups — Buyers vs Vendors</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={signupData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: 12 }} />
-              <Bar dataKey="buyers" fill="#0070F3" radius={[2, 2, 0, 0]} name="Buyers" />
-              <Bar dataKey="vendors" fill="#60a5fa" radius={[2, 2, 0, 0]} name="Vendors" />
+        <div className="bg-slate-800 rounded-xl p-5">
+          <div className="text-sm font-semibold text-white mb-4">Last 6 Months — GMV &amp; Platform Fees (£)</div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={gmvMonthly} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `£${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', fontSize: 12, color: '#f1f5f9' }}
+                formatter={(v: number, name: string) => [`£${v.toLocaleString()}`, name === 'gmv' ? 'GMV' : 'Fees']}
+              />
+              <Legend formatter={v => v === 'gmv' ? 'GMV' : 'Platform Fees'} wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
+              <Bar dataKey="gmv" stackId="a" fill="#0070F3" radius={[0, 0, 0, 0]} name="gmv" />
+              <Bar dataKey="fees" stackId="a" fill="#0d9488" radius={[4, 4, 0, 0]} name="fees" />
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Conversion funnel */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="text-sm font-semibold text-gray-800 mb-4">Conversion Funnel</div>
-          <div className="space-y-3">
-            {funnelData.map((f, i) => {
-              const pct = Math.round((f.value / funnelData[0].value) * 100);
-              return (
-                <div key={f.name}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600">{f.name}</span>
-                    <span className="font-semibold text-[#0B2D59]">{f.value.toLocaleString()}</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className="h-2 rounded-full bg-[#0070F3] transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Geographic breakdown */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="text-sm font-semibold text-gray-800 mb-4">Geographic Breakdown (UK)</div>
-          <div className="space-y-2">
-            {geoData.map(g => (
-              <div key={g.region} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                <span className="text-sm text-gray-700">{g.region}</span>
-                <div className="flex gap-4 text-xs">
-                  <span className="text-[#0070F3] font-medium">{g.buyers} buyers</span>
-                  <span className="text-gray-400">{g.vendors} vendors</span>
-                </div>
+      {/* 2. Conversion Funnel */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-4">Conversion Funnel — this month</h2>
+        <div className="bg-slate-800 rounded-xl p-6 space-y-3">
+          {conversionFunnel.map(row => (
+            <div key={row.stage} className="flex items-center gap-3">
+              <span className="text-sm text-slate-300 w-48 shrink-0">{row.stage}</span>
+              <div className="flex-1 bg-slate-700 rounded-full h-8 overflow-hidden">
+                <div
+                  className="h-8 rounded-full bg-[#0070F3] transition-all"
+                  style={{ width: `${row.pct}%` }}
+                />
               </div>
-            ))}
+              <span className="text-sm font-semibold text-white w-16 text-right">{row.count.toLocaleString()}</span>
+              <span className="text-xs text-slate-400 w-12 text-right">{row.pct}%</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3. Vendor Performance Table */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white">Vendor Performance</h2>
+          <button
+            onClick={() => exportCSV(vendorPerformance as unknown as Record<string, unknown>[], 'vendor-performance.csv')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 border border-slate-600 rounded-lg hover:border-slate-400 hover:text-white transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </button>
+        </div>
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/60 border-b border-slate-700">
+              <tr>
+                {[
+                  { label: 'Company', key: 'company' },
+                  { label: 'Type', key: 'type' },
+                  { label: 'Completed', key: 'completed' },
+                  { label: 'Dispute Rate', key: 'dispute_rate' },
+                  { label: 'Avg Rating', key: 'avg_rating' },
+                  { label: 'Verified Date', key: 'verified' },
+                ].map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => sortVendor(col.key as keyof typeof vendorPerformance[0])}
+                    className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-white select-none"
+                  >
+                    {col.label}
+                    <SortIcon active={vendorSort.key === col.key} dir={vendorSort.dir} />
+                  </th>
+                ))}
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {sortedVendors.map(v => (
+                <tr key={v.company} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-white">{v.company}</td>
+                  <td className="px-5 py-3.5">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/40 text-blue-300 border border-blue-700/40">{v.type}</span>
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-300">{v.completed}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{v.dispute_rate}</td>
+                  <td className="px-5 py-3.5"><StarRating rating={v.avg_rating} /></td>
+                  <td className="px-5 py-3.5 text-slate-400">{v.verified}</td>
+                  <td className="px-5 py-3.5">
+                    <a href="#" className="flex items-center gap-1 text-[#0070F3] hover:text-blue-300 text-xs font-medium">
+                      View profile <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 4. Payment Reputation Table */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white">Buyer Payment Reputation</h2>
+          <button
+            onClick={() => exportCSV(paymentReputation as unknown as Record<string, unknown>[], 'payment-reputation.csv')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 border border-slate-600 rounded-lg hover:border-slate-400 hover:text-white transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" /> Export CSV
+          </button>
+        </div>
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/60 border-b border-slate-700">
+              <tr>
+                {[
+                  { label: 'Buyer', key: 'company' },
+                  { label: 'On-time Rate', key: 'on_time_rate' },
+                  { label: 'Late Count', key: 'late_count' },
+                  { label: 'Failed Count', key: 'failed_count' },
+                  { label: 'Dispute Ratio', key: 'dispute_ratio' },
+                ].map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => sortPay(col.key as keyof typeof paymentReputation[0])}
+                    className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-white select-none"
+                  >
+                    {col.label}
+                    <SortIcon active={paySort.key === col.key} dir={paySort.dir} />
+                  </th>
+                ))}
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Badge</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {sortedPay.map(p => (
+                <tr key={p.company} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-white">{p.company}</td>
+                  <td className="px-5 py-3.5">
+                    <span className={`font-semibold ${p.on_time_rate >= 95 ? 'text-green-400' : p.on_time_rate >= 80 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {p.on_time_rate}%
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-slate-300">{p.late_count}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{p.failed_count}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{p.dispute_ratio}</td>
+                  <td className="px-5 py-3.5"><BadgeChip badge={p.badge} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 5. Phase 2 Placeholders */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-4">Coming in Phase 2</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border-2 border-dashed border-slate-600 p-8 flex flex-col items-center justify-center gap-2 opacity-60">
+            <span className="text-2xl">🗺️</span>
+            <span className="text-sm font-semibold text-slate-400">Supply-demand heatmap — Phase 2</span>
+            <span className="text-xs text-slate-500">Geographic demand vs vendor coverage overlay</span>
+          </div>
+          <div className="rounded-xl border-2 border-dashed border-slate-600 p-8 flex flex-col items-center justify-center gap-2 opacity-60">
+            <span className="text-2xl">📍</span>
+            <span className="text-sm font-semibold text-slate-400">Geographic activity breakdown — Phase 2</span>
+            <span className="text-xs text-slate-500">Regional buyer and vendor activity by city/region</span>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
