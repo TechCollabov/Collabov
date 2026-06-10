@@ -43,6 +43,10 @@ import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import IR35GuidancePage from './pages/IR35GuidancePage';
 import PlaceholderPage from './pages/PlaceholderPage';
+import MessagingPage from './pages/MessagingPage';
+import ProposalTriagePage from './pages/ProposalTriagePage';
+import DiscoveryBriefPage from './pages/DiscoveryBriefPage';
+import SOWWizardPage from './pages/SOWWizardPage';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -56,6 +60,10 @@ const hideNavbarFooterPaths = [
   '/customer/post-job',
   '/customer/dashboard',
   '/oauth/consent',
+  '/messages',
+  '/proposals',
+  '/sow-wizard',
+  '/discovery-brief',
 ];
 
 function AppContent() {
@@ -84,6 +92,12 @@ function AppContent() {
           <Route path="/packages" element={<PackagesPage />} />
           <Route path="/tenders" element={<TendersPage />} />
           <Route path="/jobs" element={<JobsPage />} />
+
+          {/* Sprint 2 — Proposal & Contract flows */}
+          <Route path="/proposals" element={<CustomerRoute><ProposalTriagePage /></CustomerRoute>} />
+          <Route path="/discovery-brief" element={<CustomerRoute><DiscoveryBriefPage /></CustomerRoute>} />
+          <Route path="/sow-wizard" element={<CustomerRoute><SOWWizardPage /></CustomerRoute>} />
+          <Route path="/messages" element={<MessagingPage />} />
 
           {/* Legal & Info */}
           <Route path="/terms" element={<TermsPage />} />
