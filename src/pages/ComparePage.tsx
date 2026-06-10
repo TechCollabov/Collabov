@@ -34,6 +34,7 @@ const ComparePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const ids = (searchParams.get('ids') || '').split(',').filter(Boolean).slice(0, 4);
   const vendors = ids.map(id => MOCK_VENDORS[id]).filter(Boolean);
+  const vendorIds = vendors.map((v: any) => v.id);
 
   if (vendors.length < 2) {
     return (
@@ -52,6 +53,21 @@ const ComparePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-6 py-8">
+        {vendors.length >= 2 && (
+          <div className="mb-6 flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl p-4">
+            <div>
+              <p className="text-sm font-semibold text-[#0B2D59]">Post a Job to these {vendors.length} vendors</p>
+              <p className="text-xs text-gray-500 mt-0.5">Create a private job post visible only to selected vendors.</p>
+            </div>
+            <Link
+              to={`/customer/post-job?private=true&vendors=${vendorIds.join(',')}`}
+              className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Post a Private Job →
+            </Link>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-6">
           <Link to="/results" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
             <ArrowLeft className="h-4 w-4" /> Back to results

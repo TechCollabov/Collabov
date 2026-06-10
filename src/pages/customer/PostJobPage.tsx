@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft, ArrowRight, Plus, X, DollarSign, 
@@ -23,10 +23,15 @@ export interface JobData {
   projectType: string;
   location: string;
   attachments: File[];
+  visibility: 'public' | 'private';
+  invitedVendors: string[];
 }
 
 const PostJobPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isPrivate = searchParams.get('private') === 'true';
+  const preSelectedVendors = searchParams.get('vendors')?.split(',') || [];
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
   const [newSkill, setNewSkill] = useState('');
@@ -46,7 +51,9 @@ const PostJobPage: React.FC = () => {
     experienceLevel: '',
     projectType: '',
     location: '',
-    attachments: []
+    attachments: [],
+    visibility: isPrivate ? 'private' : 'public',
+    invitedVendors: preSelectedVendors,
   });
 
   const categories = [
@@ -508,6 +515,22 @@ const PostJobPage: React.FC = () => {
                   <span className="text-sm font-medium text-gray-600">Project Type:</span>
                   <p className="text-gray-900 capitalize">{jobData.projectType?.replace('-', ' ')}</p>
                 </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Visibility:</span>
+                  <p className="text-gray-900 capitalize">{jobData.visibility === 'private' ? 'Private — invite only' : 'Public'}</p>
+                </div>
+                {jobData.invitedVendors.length > 0 && (
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">Invited Vendors:</span>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {jobData.invitedVendors.map((id) => (
+                        <span key={id} className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                          Vendor #{id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
