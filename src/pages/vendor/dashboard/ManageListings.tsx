@@ -34,6 +34,9 @@ interface FormData {
   servicesOffered: string;
   hourlyRate: string;
   monthlyRate: string;
+  minimum_project_value: number;
+  ir35_compliant: boolean;
+  gdpr_ready: boolean;
 
   // Client Information
   clientTypes: string;
@@ -55,6 +58,70 @@ interface FormData {
   bankName: string;
   registeredEmail: string;
 }
+
+interface CaseStudyForm {
+  project_title: string;
+  industry: string;
+  services_delivered: string | string[];
+  tech_stack: string | string[];
+  challenge: string;
+  solution: string;
+  outcomes: string | string[];
+  key_result: string;
+  ai_keyword_tags?: string[];
+}
+
+const extractCaseStudyKeywords = async (caseStudy: CaseStudyForm): Promise<string[]> => {
+  // Only call if ANTHROPIC_API_KEY is configured
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.log('Claude API not configured — case study keywords skipped');
+    return [];
+  }
+
+  try {
+    const prompt = `Extract 3-5 keyword tags from this IT project case study. Return ONLY a JSON array of strings, no other text.
+
+Project: ${caseStudy.project_title}
+Industry: ${caseStudy.industry}
+Services: ${Array.isArray(caseStudy.services_delivered) ? caseStudy.services_delivered.join(', ') : caseStudy.services_delivered}
+Tech stack: ${Array.isArray(caseStudy.tech_stack) ? caseStudy.tech_stack.join(', ') : caseStudy.tech_stack}
+Challenge: ${caseStudy.challenge}
+Solution: ${caseStudy.solution}
+Outcomes: ${Array.isArray(caseStudy.outcomes) ? caseStudy.outcomes.join('. ') : caseStudy.outcomes}
+
+Return 3-5 specific keyword tags as a JSON array, e.g. ["fintech", "real-time-payments", "aws-lambda"]`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) throw new Error('API error');
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '[]';
+    const tags = JSON.parse(text);
+    return Array.isArray(tags) ? tags : [];
+  } catch (err) {
+    console.log('Case study keyword extraction failed — saving without tags');
+    return [];
+  }
+};
 
 const ManageListings: React.FC = () => {
   const location = useLocation();
@@ -81,6 +148,9 @@ const ManageListings: React.FC = () => {
     servicesOffered: '',
     hourlyRate: '',
     monthlyRate: '',
+    minimum_project_value: 0,
+    ir35_compliant: false,
+    gdpr_ready: false,
     clientTypes: '',
     notableProjects: '',
     clientReferences: '',
@@ -111,6 +181,31 @@ const ManageListings: React.FC = () => {
   // Add new state for service keywords
   const [serviceKeyword, setServiceKeyword] = useState('');
   const [serviceKeywords, setServiceKeywords] = useState<string[]>([]);
+
+  // Case studies state
+  const [caseStudies, setCaseStudies] = useState<CaseStudyForm[]>([]);
+  const [caseStudyForms, setCaseStudyForms] = useState<CaseStudyForm[]>([
+    { project_title: '', industry: '', services_delivered: '', tech_stack: '', challenge: '', solution: '', outcomes: '', key_result: '' },
+    { project_title: '', industry: '', services_delivered: '', tech_stack: '', challenge: '', solution: '', outcomes: '', key_result: '' },
+    { project_title: '', industry: '', services_delivered: '', tech_stack: '', challenge: '', solution: '', outcomes: '', key_result: '' },
+  ]);
+
+  const handleSaveCaseStudy = async (index: number) => {
+    const caseStudyData = caseStudyForms[index];
+    // Save case study to state
+    setCaseStudies(prev => {
+      const updated = [...prev];
+      updated[index] = caseStudyData;
+      return updated;
+    });
+    // Extract AI keyword tags asynchronously and update
+    const keywords = await extractCaseStudyKeywords(caseStudyData);
+    setCaseStudies(prev => {
+      const updated = [...prev];
+      updated[index] = { ...caseStudyData, ai_keyword_tags: keywords };
+      return updated;
+    });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -576,6 +671,53 @@ const ManageListings: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Minimum Project Value (£)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-gray-400 text-sm">£</span>
+                <input
+                  type="number"
+                  min="500"
+                  step="500"
+                  value={formData.minimum_project_value || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, minimum_project_value: parseInt(e.target.value) || 0 }))}
+                  placeholder="5000"
+                  className="w-full pl-7 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Shown in your public profile sidebar. Min £500.</p>
+            </div>
+
+            {/* IR35 Compliant toggle */}
+            <div className="flex items-center justify-between p-4 bg-purple-50 rounded-xl border border-purple-100">
+              <div>
+                <p className="font-semibold text-[#0B2D59] text-sm">IR35 Compliant</p>
+                <p className="text-xs text-gray-500 mt-0.5">Shows IR35 badge on your profile and search cards. Only enable if you have obtained a favourable SDS determination.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, ir35_compliant: !prev.ir35_compliant }))}
+                className={`relative w-12 h-6 rounded-full transition-colors ${formData.ir35_compliant ? 'bg-[#0070F3]' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${formData.ir35_compliant ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+
+            {/* GDPR Ready toggle */}
+            <div className="flex items-center justify-between p-4 bg-teal-50 rounded-xl border border-teal-100 mt-3">
+              <div>
+                <p className="font-semibold text-[#0B2D59] text-sm">GDPR Ready</p>
+                <p className="text-xs text-gray-500 mt-0.5">Shows GDPR-Ready badge on your profile. Only enable if you have appropriate data processing agreements and procedures in place.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, gdpr_ready: !prev.gdpr_ready }))}
+                className={`relative w-12 h-6 rounded-full transition-colors ${formData.gdpr_ready ? 'bg-[#0E7C6A]' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${formData.gdpr_ready ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </button>
             </div>
           </div>
         );
