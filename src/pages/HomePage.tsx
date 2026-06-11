@@ -5,7 +5,7 @@ import cities from 'cities.json';
 import {
   Search, MapPin, ArrowRight, Calculator,
   CheckCircle, Users, Briefcase, ShieldCheck,
-  BarChart2, Lock, FileText, Headphones
+  BarChart2, Lock, FileText, Headphones, Star
 } from 'lucide-react';
 
 const categoryTags = [
@@ -473,8 +473,8 @@ const HomePage: React.FC = () => {
               <Link to="/vendor/signup?type=agency" className="px-6 py-3 bg-white text-[#0070F3] rounded-lg font-semibold hover:bg-gray-100 transition-colors text-center">
                 Join as an Agency
               </Link>
-              <Link to="/vendor/signup?type=dedicated" className="px-6 py-3 bg-white text-[#0070F3] rounded-lg font-semibold hover:bg-gray-100 transition-colors text-center">
-                Join as a Dedicated Team Provider
+              <Link to="/vendor/signup?type=staffaug" className="px-6 py-3 bg-white text-[#0070F3] rounded-lg font-semibold hover:bg-gray-100 transition-colors text-center">
+                Join as a Team Provider
               </Link>
             </div>
           </div>
@@ -518,6 +518,45 @@ const HomePage: React.FC = () => {
                 <Link to={card.route} className="text-[#0070F3] font-semibold text-sm hover:underline">
                   {card.cta}
                 </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ── */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold text-[#0B2D59] mb-3">What Our Customers Say</h2>
+            <p className="text-gray-600">Real results from real businesses.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {[
+              {
+                quote: "We found a React development team in Poland within three days. The contract was signed on the platform, milestones tracked automatically, and we paid only when each piece of work was delivered. First time outsourcing has ever felt completely under control.",
+                name: "James Whitfield",
+                role: "CTO — Paytrace Financial, London",
+                type: "buyer",
+              },
+              {
+                quote: "As a 12-person agency in Krakow, getting in front of UK clients used to take months of sales effort. Collabov gave us a verified profile and we received our first RFP within two weeks. The escrow payment system means we never have to chase invoices.",
+                name: "Marta Kowalska",
+                role: "MD — CodeForge Solutions, Krakow",
+                type: "vendor",
+              },
+            ].map((t) => (
+              <div key={t.name} className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+                <div className="flex gap-1 mb-4">
+                  {[1,2,3,4,5].map(i => (
+                    <Star key={i} className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                  ))}
+                </div>
+                <p className="text-gray-700 italic mb-4 leading-relaxed">"{t.quote}"</p>
+                <div>
+                  <p className="font-semibold text-[#0B2D59]">{t.name}</p>
+                  <p className="text-sm text-gray-500">{t.role}</p>
+                </div>
               </div>
             ))}
           </div>

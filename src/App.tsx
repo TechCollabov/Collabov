@@ -23,6 +23,7 @@ import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import PostJobPage from './pages/customer/PostJobPage';
+import BYOVPage from './pages/customer/BYOVPage';
 import ContractorDashboard from './pages/contractor/ContractorDashboard';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './components/admin/AdminLayout';
@@ -38,6 +39,18 @@ import AdminSettings from './pages/admin/AdminSettings';
 import VendorSignup from './pages/vendor/VendorSignup';
 import VendorDashboard from './pages/vendor/VendorDashboard';
 import OAuthConsentPage from './pages/OAuthConsentPage';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
+import IR35GuidancePage from './pages/IR35GuidancePage';
+import PlaceholderPage from './pages/PlaceholderPage';
+import MessagingPage from './pages/MessagingPage';
+import ProposalTriagePage from './pages/ProposalTriagePage';
+import DiscoveryBriefPage from './pages/DiscoveryBriefPage';
+import SOWWizardPage from './pages/SOWWizardPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import ReviewPage from './pages/ReviewPage';
+import MyVendorsPage from './pages/customer/MyVendorsPage';
+import EvidenceBuilderPage from './pages/vendor/dashboard/EvidenceBuilder';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -51,6 +64,12 @@ const hideNavbarFooterPaths = [
   '/customer/post-job',
   '/customer/dashboard',
   '/oauth/consent',
+  '/messages',
+  '/proposals',
+  '/sow-wizard',
+  '/discovery-brief',
+  '/project',
+  '/review',
 ];
 
 function AppContent() {
@@ -80,6 +99,32 @@ function AppContent() {
           <Route path="/tenders" element={<TendersPage />} />
           <Route path="/jobs" element={<JobsPage />} />
 
+          {/* Sprint 2 — Proposal & Contract flows */}
+          <Route path="/proposals" element={<CustomerRoute><ProposalTriagePage /></CustomerRoute>} />
+          <Route path="/discovery-brief" element={<CustomerRoute><DiscoveryBriefPage /></CustomerRoute>} />
+          <Route path="/sow-wizard" element={<CustomerRoute><SOWWizardPage /></CustomerRoute>} />
+          <Route path="/messages" element={<MessagingPage />} />
+
+          {/* Sprint 3 — Engagement flows */}
+          <Route path="/project/:engagementId" element={<ProjectDetailPage />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/customer/my-vendors" element={<CustomerRoute><MyVendorsPage /></CustomerRoute>} />
+
+          {/* Legal & Info */}
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/ir35-guidance" element={<IR35GuidancePage />} />
+          <Route path="/ir35" element={<IR35GuidancePage />} />
+
+          {/* Placeholder pages */}
+          <Route path="/careers" element={<PlaceholderPage title="Careers at Collabov" description="We're building the team. Check back soon for open roles." />} />
+          <Route path="/blog" element={<PlaceholderPage title="Collabov Blog" description="Insights on IT outsourcing, IR35, and building remote teams. Coming soon." />} />
+          <Route path="/help" element={<PlaceholderPage title="Help Centre" description="Our help centre is being built. For urgent support, email support@collabov.com" />} />
+          <Route path="/faq" element={<PlaceholderPage title="Frequently Asked Questions" description="Common questions about Collabov, answered." />} />
+          <Route path="/partner" element={<PlaceholderPage title="Partner Programme" description="Our partner programme is launching soon. Register your interest at partners@collabov.com" />} />
+          <Route path="/security" element={<PlaceholderPage title="Security at Collabov" description="We take platform security seriously. Full security documentation coming soon." />} />
+          <Route path="/coming-soon" element={<ComingSoonPage />} />
+
           {/* Coming Soon */}
           <Route path="/freelancers" element={<ComingSoonPage />} />
           <Route path="/market-insight" element={<ComingSoonPage />} />
@@ -98,6 +143,7 @@ function AppContent() {
           {/* Customer */}
           <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
           <Route path="/customer/post-job" element={<CustomerRoute><PostJobPage /></CustomerRoute>} />
+          <Route path="/customer/byov" element={<CustomerRoute><BYOVPage /></CustomerRoute>} />
 
           {/* Contractor */}
           <Route path="/contractor/dashboard" element={<ContractorRoute><ContractorDashboard /></ContractorRoute>} />
