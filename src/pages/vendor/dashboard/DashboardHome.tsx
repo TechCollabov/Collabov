@@ -5,7 +5,7 @@ import {
   Brain, Lock, Lightbulb, User, CheckCircle2, Circle,
   ArrowRight
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
