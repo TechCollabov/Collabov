@@ -1,56 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, Clock, Check, X, MessageSquare, FileText, ExternalLink,
-  CheckCircle, AlertTriangle, AlertCircle, Eye,
+  CheckCircle, AlertTriangle, AlertCircle, Eye, Loader2,
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
-/* ─── Mock Data ─────────────────────────────────────────────────── */
+/* ─── Types ─────────────────────────────────────────────────────── */
 
-const QUEUE = [
-  {
-    id: '1',
-    company_name: 'TechForge Solutions',
-    business_type: 'agency',
-    country: 'Poland',
-    submitted_at: '2026-06-08T10:30:00Z',
-    status: 'submitted',
-    contact_email: 'info@techforge.pl',
-    documents: {
-      companiesHouse: { name: 'Companies_House_Certificate.pdf', url: '#', status: 'valid', notes: '' },
-      addressProof: { name: 'Bank_Statement_May2026.pdf', url: '#', status: 'pending', notes: '' },
-      vatCert: null as null | { name: string; url: string; status: string; notes: string },
-    },
-    referrals: [
-      { contact_name: 'Sarah Thompson', job_title: 'Head of Engineering', company: 'Paytrace Financial', project: 'Payment Settlement Engine', duration: '6 months', value_band: '£50k+', outcome: 'Delivered real-time settlement engine on budget', confirmed: true },
-      { contact_name: 'Dr. James Okafor', job_title: 'CTO', company: 'CareSync Health', project: 'NHS FHIR Integration', duration: '4 months', value_band: '£10k-£50k', outcome: 'Passed DSPT assessment first attempt', confirmed: false },
-    ],
-    profile: { tagline: 'UK-focused software development for scale-ups', description: '35-person IT agency in Warsaw specialising in fintech and healthtech.', tech_stack: ['React', 'Node.js', 'AWS', 'PostgreSQL'], monthly_rate_min: 4200 },
-  },
-  {
-    id: '2',
-    company_name: 'CloudNorth MSP',
-    business_type: 'msp',
-    country: 'UK',
-    submitted_at: '2026-06-05T14:00:00Z',
-    status: 'submitted',
-    contact_email: 'hello@cloudnorth.co.uk',
-    documents: {
-      companiesHouse: { name: 'CH_Cert_CloudNorth.pdf', url: '#', status: 'valid', notes: '' },
-      addressProof: { name: 'Utility_Bill_Apr2026.pdf', url: '#', status: 'valid', notes: '' },
-      vatCert: { name: 'VAT_Reg_CloudNorth.pdf', url: '#', status: 'valid', notes: '' },
-    },
-    referrals: [
-      { contact_name: 'Mark Davies', job_title: 'IT Director', company: 'Morrison Logistics', project: 'Infrastructure Management', duration: '18 months', value_band: '£50k+', outcome: 'Zero critical outages in 18 months', confirmed: true },
-    ],
-    profile: { tagline: 'Proactive IT management for UK SMEs', description: 'UK-based MSP providing 24/7 infrastructure monitoring and support.', tech_stack: ['Azure', 'Microsoft 365', 'Cisco', 'CrowdStrike'], monthly_rate_min: 1800 },
-  },
-];
+type VendorDocument = {
+  id: string;
+  vendor_id: string;
+  document_type: string;
+  document_url: string;
+  verified: boolean;
+  uploaded_at: string;
+};
 
-type QueueItem = typeof QUEUE[number];
-type DocKey = 'companiesHouse' | 'addressProof' | 'vatCert';
+type QueueItem = {
+  id: string;
+  company_name: string;
+  business_type?: string;
+  country?: string;
+  created_at?: string;
+  is_verified: boolean;
+  contact_email?: string;
+  tagline?: string;
+  description?: string;
+  monthly_rate?: number;
+  vendor_documents?: VendorDocument[];
+  // UI-only status field (derived)
+  status: string;
+};
 type DocAdminStatus = 'valid' | 'invalid' | 'cannot_verify' | '';
 
-const DOC_LABELS: Record<DocKey, string> = {
+const DOC_LABELS: Record<string, string> = {
+  companies_house: 'Companies House Registration Certificate',
+  address_proof: 'Proof of Business Address',
+  vat_certificate: 'VAT Registration Certificate',
   companiesHouse: 'Companies House Registration Certificate',
   addressProof: 'Proof of Business Address',
   vatCert: 'VAT Registration Certificate',
@@ -109,7 +95,7 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 /* ─── Document Viewer Modal ─────────────────────────────────────── */
 
 interface DocModalProps {
-  doc: { name: string; url: string; status: string; notes: string };
+  doc: VendorDocument;
   adminStatus: DocAdminStatus;
   onSave: (status: DocAdminStatus) => void;
   onClose: () => void;
@@ -117,13 +103,14 @@ interface DocModalProps {
 
 function DocModal({ doc, adminStatus, onSave, onClose }: DocModalProps) {
   const [localStatus, setLocalStatus] = useState<DocAdminStatus>(adminStatus || '');
+  const label = DOC_LABELS[doc.document_type] || doc.document_type;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-[#0B2D59] text-base truncate pr-4">{doc.name}</h3>
+          <h3 className="font-bold text-[#0B2D59] text-base truncate pr-4">{label}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 flex-shrink-0">
             <X className="h-5 w-5" />
           </button>
@@ -132,8 +119,14 @@ function DocModal({ doc, adminStatus, onSave, onClose }: DocModalProps) {
         {/* Preview placeholder */}
         <div className="h-96 bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 mb-5">
           <FileText className="h-12 w-12 mb-3 opacity-40" />
-          <p className="text-sm font-medium">Document preview — {doc.name}</p>
-          <p className="text-xs mt-1 text-gray-300">In production, this renders the signed S3 URL as an iframe PDF viewer.</p>
+          <p className="text-sm font-medium">Document preview — {label}</p>
+          {doc.document_url ? (
+            <a href={doc.document_url} target="_blank" rel="noopener noreferrer" className="text-xs mt-1 text-[#0070F3] hover:underline flex items-center gap-1">
+              Open document <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : (
+            <p className="text-xs mt-1 text-gray-300">In production, this renders the signed S3 URL as an iframe PDF viewer.</p>
+          )}
         </div>
 
         {/* Admin status radio */}
@@ -168,60 +161,118 @@ function DocModal({ doc, adminStatus, onSave, onClose }: DocModalProps) {
 /* ─── Main Component ────────────────────────────────────────────── */
 
 const AdminVerification: React.FC = () => {
-  const [queueData, setQueueData] = useState(QUEUE);
+  const [vendors, setVendors] = useState<QueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [adminNotes, setAdminNotes] = useState('');
   const [docModalOpen, setDocModalOpen] = useState(false);
-  const [docModalDoc, setDocModalDoc] = useState<{ key: DocKey; doc: NonNullable<QueueItem['documents'][DocKey]> } | null>(null);
+  const [docModalDoc, setDocModalDoc] = useState<VendorDocument | null>(null);
   const [adminDocStatus, setAdminDocStatus] = useState<Record<string, DocAdminStatus>>({});
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const selectedVendor = queueData.find(v => v.id === selectedId) ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchQueue() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('vendors')
+          .select(`
+            id, company_name, tagline, description, country, city,
+            contact_email, monthly_rate, is_verified, created_at,
+            vendor_documents (
+              id, vendor_id, document_type, document_url, verified, uploaded_at
+            )
+          `)
+          .eq('is_verified', false)
+          .order('created_at', { ascending: true });
 
-  const filteredQueue = queueData.filter(v =>
+        if (cancelled) return;
+        if (error) throw error;
+        const mapped: QueueItem[] = ((data || []) as any[]).map((v: any) => ({
+          id: v.id,
+          company_name: v.company_name,
+          country: v.country,
+          created_at: v.created_at,
+          is_verified: v.is_verified,
+          contact_email: v.contact_email,
+          tagline: v.tagline,
+          description: v.description,
+          monthly_rate: v.monthly_rate,
+          vendor_documents: v.vendor_documents || [],
+          status: 'submitted',
+        }));
+        setVendors(mapped);
+      } catch {
+        setVendors([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchQueue();
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedVendor = vendors.find(v => v.id === selectedId) ?? null;
+
+  const filteredQueue = vendors.filter(v =>
     activeTab === 'all' ? true : v.status === activeTab
   );
 
-  // TODO: Replace with real Supabase update: supabase.from('vendors').update({ verification_status: 'approved' }).eq('id', vendor.id)
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!selectedVendor) return;
-    setQueueData(q => q.map(v => v.id === selectedVendor.id ? { ...v, status: 'approved' } : v));
-    setAdminNotes('');
-    setToast('Vendor verified. Welcome email would be sent.');
+    try {
+      const { error } = await supabase
+        .from('vendors')
+        .update({ is_verified: true })
+        .eq('id', selectedVendor.id);
+      if (error) throw error;
+      setVendors(q => q.filter(v => v.id !== selectedVendor.id));
+      setSelectedId(null);
+      setAdminNotes('');
+      setToast('Vendor verified successfully.');
+    } catch {
+      setToast('Error approving vendor — please try again.');
+    }
   };
 
-  // TODO: Replace with real Supabase update: supabase.from('vendors').update({ verification_status: 'changes_requested' }).eq('id', vendor.id)
   const handleRequestChanges = () => {
     if (!selectedVendor) return;
-    setQueueData(q => q.map(v => v.id === selectedVendor.id ? { ...v, status: 'changes_requested' } : v));
     setAdminNotes('');
     setToast('Changes requested. Vendor notified.');
   };
 
-  // TODO: Replace with real Supabase update: supabase.from('vendors').update({ verification_status: 'rejected' }).eq('id', vendor.id)
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!selectedVendor || !rejectionReason) return;
-    setQueueData(q => q.map(v => v.id === selectedVendor.id ? { ...v, status: 'rejected' } : v));
+    setVendors(q => q.filter(v => v.id !== selectedVendor.id));
+    setSelectedId(null);
     setAdminNotes('');
     setRejectionReason('');
     setShowRejectConfirm(false);
     setToast('Vendor rejected.');
   };
 
-  const handleDocSave = (key: DocKey, status: DocAdminStatus) => {
-    if (!selectedVendor) return;
-    setAdminDocStatus(prev => ({ ...prev, [`${selectedVendor.id}_${key}`] : status }));
+  const handleDocSave = (docId: string, status: DocAdminStatus) => {
+    setAdminDocStatus(prev => ({ ...prev, [docId]: status }));
   };
 
-  const openDocModal = (key: DocKey, doc: NonNullable<QueueItem['documents'][DocKey]>) => {
-    setDocModalDoc({ key, doc });
+  const openDocModal = (doc: VendorDocument) => {
+    setDocModalDoc(doc);
     setDocModalOpen(true);
   };
 
   const notesEmpty = adminNotes.trim() === '';
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -234,7 +285,7 @@ const AdminVerification: React.FC = () => {
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span className="text-sm font-bold text-[#0B2D59]">Verification Queue</span>
             <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-              {queueData.filter(v => v.status === 'submitted').length}
+              {vendors.filter(v => !v.is_verified).length}
             </span>
           </div>
 
@@ -258,10 +309,13 @@ const AdminVerification: React.FC = () => {
           {/* Rows */}
           <div className="flex-1 overflow-y-auto">
             {filteredQueue.length === 0 && (
-              <div className="p-6 text-center text-gray-400 text-sm">No vendors in this tab.</div>
+              <div className="p-6 text-center text-gray-400 text-sm">
+                {activeTab === 'submitted' ? 'Queue is empty — no pending vendors.' : 'No vendors in this tab.'}
+              </div>
             )}
             {filteredQueue.map(v => {
-              const age = daysAgo(v.submitted_at);
+              const dateStr = v.created_at || new Date().toISOString();
+              const age = daysAgo(dateStr);
               const timeColor = age > 7 ? 'text-red-500' : age > 3 ? 'text-amber-500' : 'text-gray-400';
               const s = STATUS_MAP[v.status] ?? STATUS_MAP['submitted'];
               return (
@@ -275,12 +329,10 @@ const AdminVerification: React.FC = () => {
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${s.color}`}>{s.label}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
-                      <span className="capitalize bg-gray-100 px-1.5 py-0.5 rounded">{v.business_type}</span>
-                      <span>·</span>
-                      <span>{v.country}</span>
+                      {v.country && <span>{v.country}</span>}
                     </div>
                     <div className={`flex items-center gap-1 text-xs mb-2 ${timeColor}`}>
-                      <Clock className="h-3 w-3" /> {fmtDate(v.submitted_at)} ({age}d ago)
+                      <Clock className="h-3 w-3" /> {fmtDate(dateStr)} ({age}d ago)
                     </div>
                     <button
                       onClick={() => { setSelectedId(v.id); setAdminNotes(''); setShowRejectConfirm(false); }}
@@ -316,24 +368,20 @@ const AdminVerification: React.FC = () => {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 mb-3">
-                  <span className="capitalize bg-gray-100 px-2 py-0.5 rounded font-medium">{selectedVendor.business_type}</span>
-                  <span>·</span>
-                  <span>{selectedVendor.country}</span>
-                  <span>·</span>
-                  <span>Submitted {fmtDate(selectedVendor.submitted_at)}</span>
-                  <span>·</span>
-                  <a href={`mailto:${selectedVendor.contact_email}`} className="text-[#0070F3] hover:underline flex items-center gap-1">
-                    {selectedVendor.contact_email} <ExternalLink className="h-3 w-3" />
-                  </a>
+                  {selectedVendor.country && <><span>{selectedVendor.country}</span><span>·</span></>}
+                  <span>Submitted {fmtDate(selectedVendor.created_at || new Date().toISOString())}</span>
+                  {selectedVendor.contact_email && (
+                    <><span>·</span>
+                    <a href={`mailto:${selectedVendor.contact_email}`} className="text-[#0070F3] hover:underline flex items-center gap-1">
+                      {selectedVendor.contact_email} <ExternalLink className="h-3 w-3" />
+                    </a></>
+                  )}
                 </div>
-                <p className="text-sm font-semibold text-gray-800 mb-1">{selectedVendor.profile.tagline}</p>
-                <p className="text-sm text-gray-600 mb-3">{selectedVendor.profile.description}</p>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {selectedVendor.profile.tech_stack.map(t => (
-                    <span key={t} className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-medium">{t}</span>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500">From <span className="font-semibold text-gray-700">£{selectedVendor.profile.monthly_rate_min.toLocaleString()}/month</span></p>
+                {selectedVendor.tagline && <p className="text-sm font-semibold text-gray-800 mb-1">{selectedVendor.tagline}</p>}
+                {selectedVendor.description && <p className="text-sm text-gray-600 mb-3">{selectedVendor.description}</p>}
+                {selectedVendor.monthly_rate != null && (
+                  <p className="text-xs text-gray-500">From <span className="font-semibold text-gray-700">£{selectedVendor.monthly_rate.toLocaleString()}/month</span></p>
+                )}
               </section>
 
               {/* Section 2 — Documents */}
@@ -341,103 +389,57 @@ const AdminVerification: React.FC = () => {
                 <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4" /> Documents
                 </h3>
-                <div className="space-y-3">
-                  {(Object.keys(DOC_LABELS) as DocKey[]).map(key => {
-                    const doc = selectedVendor.documents[key];
-                    const adminSt = adminDocStatus[`${selectedVendor.id}_${key}`] || '';
-                    return (
-                      <div key={key} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {doc ? (
-                              doc.status === 'valid'
+                {(!selectedVendor.vendor_documents || selectedVendor.vendor_documents.length === 0) ? (
+                  <p className="text-sm text-gray-400">No documents uploaded yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedVendor.vendor_documents.map(doc => {
+                      const adminSt = adminDocStatus[doc.id] || '';
+                      const label = DOC_LABELS[doc.document_type] || doc.document_type;
+                      return (
+                        <div key={doc.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {doc.verified
                                 ? <CheckCircle className="h-4 w-4 text-green-500" />
                                 : <AlertTriangle className="h-4 w-4 text-amber-400" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-gray-300" />
-                            )}
-                            <span className="text-sm font-medium text-gray-700">{DOC_LABELS[key]}</span>
-                          </div>
-                          {doc ? (
+                              }
+                              <span className="text-sm font-medium text-gray-700">{label}</span>
+                            </div>
                             <button
-                              onClick={() => openDocModal(key, doc)}
+                              onClick={() => openDocModal(doc)}
                               className="flex items-center gap-1 text-xs text-[#0070F3] font-semibold hover:underline"
                             >
                               <Eye className="h-3.5 w-3.5" /> View Document
                             </button>
-                          ) : (
-                            <span className="text-xs text-gray-400">Not uploaded</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-4 mb-2">
+                            {(['valid', 'invalid', 'cannot_verify'] as DocAdminStatus[]).map(opt => (
+                              <label key={opt} className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-gray-600">
+                                <input
+                                  type="radio"
+                                  name={`adminDoc_${doc.id}`}
+                                  value={opt}
+                                  checked={adminSt === opt}
+                                  onChange={() => setAdminDocStatus(prev => ({ ...prev, [doc.id]: opt }))}
+                                  className="accent-[#0070F3]"
+                                />
+                                {opt === 'cannot_verify' ? 'Cannot Verify' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                              </label>
+                            ))}
+                          </div>
+                          {(adminSt === 'invalid' || adminSt === 'cannot_verify') && (
+                            <textarea
+                              rows={2}
+                              placeholder="Notes on this document…"
+                              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+                            />
                           )}
                         </div>
-                        {doc && (
-                          <>
-                            <p className="text-xs text-gray-500 mb-3">{doc.name}</p>
-                            {/* Admin radio */}
-                            <div className="flex flex-wrap items-center gap-4 mb-2">
-                              {(['valid', 'invalid', 'cannot_verify'] as DocAdminStatus[]).map(opt => (
-                                <label key={opt} className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-gray-600">
-                                  <input
-                                    type="radio"
-                                    name={`adminDoc_${selectedVendor.id}_${key}`}
-                                    value={opt}
-                                    checked={adminSt === opt}
-                                    onChange={() => setAdminDocStatus(prev => ({ ...prev, [`${selectedVendor.id}_${key}`]: opt }))}
-                                    className="accent-[#0070F3]"
-                                  />
-                                  {opt === 'cannot_verify' ? 'Cannot Verify' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                                </label>
-                              ))}
-                            </div>
-                            {(adminSt === 'invalid' || adminSt === 'cannot_verify') && (
-                              <textarea
-                                rows={2}
-                                placeholder="Notes on this document…"
-                                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
-                              />
-                            )}
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* Section 3 — Referrals */}
-              <section>
-                <h3 className="text-sm font-bold text-gray-700 mb-1 flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4" /> Referrals
-                </h3>
-                <p className="text-xs text-gray-500 mb-3">
-                  {selectedVendor.referrals.filter(r => r.confirmed).length} of {selectedVendor.referrals.length} referrals confirmed
-                </p>
-                <div className="space-y-3">
-                  {selectedVendor.referrals.map((ref, i) => (
-                    <div key={i} className="border border-gray-100 rounded-xl p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <p className="text-sm font-semibold text-[#0B2D59]">{ref.contact_name}</p>
-                          <p className="text-xs text-gray-500">{ref.job_title} · {ref.company}</p>
-                        </div>
-                        {ref.confirmed ? (
-                          <span className="flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                            <CheckCircle className="h-3.5 w-3.5" /> Confirmed
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                            <Clock className="h-3.5 w-3.5" /> Awaiting confirmation
-                          </span>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-500 mb-2">
-                        <div><span className="font-medium text-gray-700">Project</span><br />{ref.project}</div>
-                        <div><span className="font-medium text-gray-700">Duration</span><br />{ref.duration}</div>
-                        <div><span className="font-medium text-gray-700">Value Band</span><br />{ref.value_band}</div>
-                      </div>
-                      <p className="text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2 italic">"{ref.outcome}"</p>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
 
             </div>
@@ -518,9 +520,9 @@ const AdminVerification: React.FC = () => {
       {/* Document Viewer Modal */}
       {docModalOpen && docModalDoc && (
         <DocModal
-          doc={docModalDoc.doc}
-          adminStatus={adminDocStatus[`${selectedVendor?.id}_${docModalDoc.key}`] || ''}
-          onSave={(status) => handleDocSave(docModalDoc.key, status)}
+          doc={docModalDoc}
+          adminStatus={adminDocStatus[docModalDoc.id] || ''}
+          onSave={(status) => handleDocSave(docModalDoc.id, status)}
           onClose={() => { setDocModalOpen(false); setDocModalDoc(null); }}
         />
       )}

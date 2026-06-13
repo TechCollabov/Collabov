@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,7 +18,9 @@ import {
   RefreshCw,
   CheckSquare,
   Square,
+  Loader2,
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 // navy: #0B2D59  blue: #0070F3  teal: #0E7C6A  amber: #B06000  red: #C0392B
@@ -94,165 +96,6 @@ interface Engagement {
   replacementSlaTriggered: boolean;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MOCK_ENGAGEMENT: Engagement = {
-  id: 'eng-001',
-  projectName: 'Senior React Developer — Fintech Platform',
-  vendorName: 'NorthTech Staffing Ltd',
-  type: 'staffaug',
-  status: 'active',
-  startDate: '2026-04-01',
-  budget: 48000,
-  escrowBalance: 12000,
-  nextMilestoneAmount: 4000,
-  milestones: [
-    {
-      id: 'm1',
-      name: 'Onboarding & Environment Setup',
-      dueDate: '2026-04-14',
-      amount: 2000,
-      status: 'approved',
-    },
-    {
-      id: 'm2',
-      name: 'Sprint 1 — Authentication Module',
-      dueDate: '2026-05-09',
-      amount: 4000,
-      status: 'in_review',
-      evidence: [
-        {
-          id: 'ev1',
-          fileName: 'auth_module_demo.mp4',
-          description:
-            'Screen recording of the full authentication flow including 2FA setup, login, and password reset.',
-          uploadedDate: '2026-05-07',
-          status: 'pending',
-        },
-        {
-          id: 'ev2',
-          fileName: 'test_coverage_report.pdf',
-          description:
-            'Jest test coverage report showing 84% coverage across auth components.',
-          uploadedDate: '2026-05-07',
-          status: 'pending',
-        },
-        {
-          id: 'ev3',
-          fileName: 'github_pr_links.txt',
-          description: 'Links to all merged PRs for this sprint.',
-          uploadedDate: '2026-05-08',
-          status: 'pending',
-        },
-      ],
-    },
-    {
-      id: 'm3',
-      name: 'Sprint 2 — Dashboard & Reporting',
-      dueDate: '2026-06-06',
-      amount: 4000,
-      status: 'disputed',
-    },
-    {
-      id: 'm4',
-      name: 'Sprint 3 — Payment Integration',
-      dueDate: '2026-07-04',
-      amount: 4000,
-      status: 'pending',
-    },
-  ],
-  weeklyLogs: [
-    {
-      id: 'wl1',
-      week: '31 Mar – 4 Apr 2026',
-      hours: 40,
-      tasksCompleted: 'Dev environment configured, repo access granted, first standup completed.',
-      vendorNotes: 'Smooth onboarding. Client team very responsive.',
-    },
-    {
-      id: 'wl2',
-      week: '7 – 11 Apr 2026',
-      hours: 38,
-      tasksCompleted: 'JWT auth scaffold, user model schema, login endpoint.',
-      vendorNotes: 'Slightly below hours due to public holiday Monday.',
-    },
-    {
-      id: 'wl3',
-      week: '14 – 18 Apr 2026',
-      hours: 40,
-      tasksCompleted: 'Password reset flow, 2FA integration with Authy, unit tests.',
-      vendorNotes: 'On track for sprint delivery.',
-    },
-    {
-      id: 'wl4',
-      week: '21 – 25 Apr 2026',
-      hours: 40,
-      tasksCompleted: 'Code review feedback addressed, staging deployment, QA sign-off.',
-      vendorNotes: 'Sprint 1 feature-complete.',
-    },
-  ],
-  messages: [
-    {
-      id: 'msg1',
-      sender: 'NorthTech Staffing Ltd',
-      text: 'Sprint 1 evidence has been submitted for your review. All three files are attached.',
-      timestamp: '2026-05-07 16:30',
-    },
-    {
-      id: 'msg2',
-      sender: 'Paytrace Financial',
-      text: 'Thanks — reviewing tomorrow morning. One question on the test coverage threshold.',
-      timestamp: '2026-05-07 17:05',
-    },
-    {
-      id: 'msg3',
-      sender: 'NorthTech Staffing Ltd',
-      text: 'The threshold is 80% minimum per the SOW. We hit 84% — happy to jump on a call if needed.',
-      timestamp: '2026-05-08 09:15',
-    },
-  ],
-  documents: [
-    { id: 'd1', name: 'Statement_of_Work_v2.pdf', type: 'SOW', size: '312 KB' },
-    { id: 'd2', name: 'NDA_NorthTech_Paytrace.pdf', type: 'NDA', size: '94 KB' },
-    { id: 'd3', name: 'IR35_SDS_NorthTech.pdf', type: 'IR35 SDS', size: '78 KB' },
-  ],
-  activityLog: [
-    { id: 'al1', timestamp: '2026-04-01 09:00', actor: 'System', action: 'Contract signed by both parties' },
-    {
-      id: 'al2',
-      timestamp: '2026-04-01 09:05',
-      actor: 'Paytrace Financial',
-      action: 'Escrow funded — £12,000 deposited',
-    },
-    {
-      id: 'al3',
-      timestamp: '2026-04-14 17:00',
-      actor: 'NorthTech Staffing Ltd',
-      action: 'Milestone 1 submitted for review',
-    },
-    {
-      id: 'al4',
-      timestamp: '2026-04-15 10:30',
-      actor: 'Paytrace Financial',
-      action: 'Milestone 1 approved — £2,000 released',
-    },
-    {
-      id: 'al5',
-      timestamp: '2026-05-07 16:30',
-      actor: 'NorthTech Staffing Ltd',
-      action: 'Sprint 1 evidence submitted (3 files)',
-    },
-    {
-      id: 'al6',
-      timestamp: '2026-05-09 11:00',
-      actor: 'Paytrace Financial',
-      action: 'Sprint 2 milestone disputed — reason: scope mismatch',
-    },
-  ],
-  replacementSlaDeadline: '2026-06-17',
-  replacementSlaTriggered: false,
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number): string {
@@ -268,7 +111,7 @@ function formatDate(dateStr: string): string {
 }
 
 function businessDaysRemaining(deadlineStr: string): number {
-  const today = new Date('2026-06-11');
+  const today = new Date();
   const deadline = new Date(deadlineStr);
   let count = 0;
   const current = new Date(today);
@@ -312,6 +155,50 @@ const MILESTONE_CIRCLE_COLOURS: Record<MilestoneStatus, string> = {
   approved: 'bg-green-500',
   disputed: 'bg-[#C0392B]',
 };
+
+// ─── DB row types (minimal) ───────────────────────────────────────────────────
+
+interface ProjectRow {
+  id: string;
+  title: string;
+  description: string | null;
+  budget: number | null;
+  progress: number | null;
+  status: string | null;
+  start_date: string | null;
+  deadline: string | null;
+  customer_id: string | null;
+  contractor_id: string | null;
+  vendor_id: string | null;
+  created_at: string;
+}
+
+interface MilestoneRow {
+  id: string;
+  title: string;
+  description: string | null;
+  amount: number | null;
+  due_date: string | null;
+  completed: boolean | null;
+  display_order: number | null;
+  created_at: string;
+}
+
+interface MessageRow {
+  id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  profiles: { full_name: string | null } | null;
+}
+
+interface ContractRow {
+  id: string;
+  contract_number: string | null;
+  status: string | null;
+  total_value: number | null;
+  start_date: string | null;
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -389,13 +276,29 @@ const MSP_CHECKLIST_ITEMS: { key: string; label: string }[] = [
   { key: 'security_scan', label: 'Security scan completed with no critical findings' },
 ];
 
+// ─── Map DB project status to Engagement status ───────────────────────────────
+
+function mapProjectStatus(dbStatus: string | null): Engagement['status'] {
+  if (!dbStatus) return 'active';
+  if (dbStatus === 'completed') return 'completed';
+  if (dbStatus === 'terminated') return 'terminated';
+  if (dbStatus === 'notice_served') return 'notice_served';
+  return 'active';
+}
+
+function mapMilestoneStatus(row: MilestoneRow): MilestoneStatus {
+  if (row.completed) return 'approved';
+  return 'pending';
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ProjectDetailPage() {
   const { engagementId } = useParams<{ engagementId: string }>();
-  void engagementId; // will be used to fetch from API in production
 
-  const [engagement, setEngagement] = useState<Engagement>(MOCK_ENGAGEMENT);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [engagement, setEngagement] = useState<Engagement | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Milestone actions
@@ -409,18 +312,10 @@ export default function ProjectDetailPage() {
   const [showStripeModal, setShowStripeModal] = useState(false);
 
   // Evidence items
-  const [evidenceStatuses, setEvidenceStatuses] = useState<Record<string, EvidenceItemStatus>>(() => {
-    const init: Record<string, EvidenceItemStatus> = {};
-    MOCK_ENGAGEMENT.milestones.forEach((m) => {
-      (m.evidence ?? []).forEach((ev) => {
-        init[ev.id] = ev.status;
-      });
-    });
-    return init;
-  });
+  const [evidenceStatuses, setEvidenceStatuses] = useState<Record<string, EvidenceItemStatus>>({});
 
   // Staff Aug: replacement SLA
-  const [slaTriggered, setSlaTriggered] = useState(MOCK_ENGAGEMENT.replacementSlaTriggered);
+  const [slaTriggered, setSlaTriggered] = useState(false);
 
   // MSP check-in
   const [showMspCheckin, setShowMspCheckin] = useState(false);
@@ -437,11 +332,191 @@ export default function ProjectDetailPage() {
 
   const showToast = (msg: string) => setToast(msg);
 
+  // ── Data fetching ───────────────────────────────────────────────────────────
+
+  const fetchData = useCallback(async () => {
+    if (!engagementId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. Fetch project
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', engagementId)
+        .maybeSingle();
+
+      if (projectError) throw projectError;
+      if (!projectData) {
+        setNotFound(true);
+        return;
+      }
+
+      const project = projectData as ProjectRow;
+
+      // 2. Fetch milestones
+      const { data: milestonesData } = await supabase
+        .from('project_milestones')
+        .select('*')
+        .eq('project_id', engagementId)
+        .order('display_order', { ascending: true });
+
+      const milestones: Milestone[] = (milestonesData ?? []).map((row: MilestoneRow) => ({
+        id: row.id,
+        name: row.title,
+        dueDate: row.due_date ?? '',
+        amount: row.amount ?? 0,
+        status: mapMilestoneStatus(row),
+      }));
+
+      // 3. Fetch last 3 messages with sender profile
+      const { data: messagesData } = await supabase
+        .from('messages')
+        .select('id, sender_id, content, created_at, profiles(full_name)')
+        .eq('project_id', engagementId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      const messages: Message[] = ((messagesData ?? []) as unknown as MessageRow[]).map((row) => ({
+        id: row.id,
+        sender: row.profiles?.full_name ?? 'Unknown',
+        text: row.content,
+        timestamp: new Date(row.created_at).toLocaleString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      })).reverse();
+
+      // 4. Fetch contracts
+      const { data: contractsData } = await supabase
+        .from('contracts')
+        .select('id, contract_number, status, total_value, start_date')
+        .eq('project_id', engagementId);
+
+      const contracts = (contractsData ?? []) as ContractRow[];
+
+      // 5. Sprint 3 tables — try, fallback to []
+      let weeklyLogs: WeeklyLog[] = [];
+      try {
+        const { data: wlData, error: wlError } = await supabase
+          .from('weekly_status_log')
+          .select('*')
+          .eq('project_id', engagementId)
+          .order('created_at', { ascending: false });
+        if (!wlError && wlData) {
+          weeklyLogs = wlData.map((row: Record<string, unknown>, idx: number) => ({
+            id: String(row.id ?? idx),
+            week: String(row.week_label ?? row.week ?? ''),
+            hours: Number(row.hours ?? 0),
+            tasksCompleted: String(row.tasks_completed ?? row.tasksCompleted ?? ''),
+            vendorNotes: String(row.vendor_notes ?? row.vendorNotes ?? ''),
+          }));
+        }
+      } catch {
+        // Sprint 3 table not yet available
+      }
+
+      // Build engagement object
+      const nextMilestone = milestones.find((m) => m.status === 'pending');
+      const firstContract = contracts[0];
+
+      const eng: Engagement = {
+        id: project.id,
+        projectName: project.title,
+        vendorName: 'Vendor',
+        type: 'itagency',
+        status: mapProjectStatus(project.status),
+        startDate: project.start_date ?? project.created_at,
+        budget: project.budget ?? (firstContract?.total_value ?? 0),
+        escrowBalance: 0,
+        nextMilestoneAmount: nextMilestone?.amount ?? 0,
+        milestones,
+        weeklyLogs,
+        messages,
+        documents: firstContract
+          ? [
+              {
+                id: firstContract.id,
+                name: `Contract_${firstContract.contract_number ?? firstContract.id}.pdf`,
+                type: 'Contract',
+                size: '—',
+              },
+            ]
+          : [],
+        activityLog: [],
+        replacementSlaDeadline: project.deadline ?? new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        replacementSlaTriggered: false,
+      };
+
+      setEngagement(eng);
+
+      // Init evidence statuses
+      const evInit: Record<string, EvidenceItemStatus> = {};
+      milestones.forEach((m) => {
+        (m.evidence ?? []).forEach((ev) => { evInit[ev.id] = ev.status; });
+      });
+      setEvidenceStatuses(evInit);
+    } catch (err) {
+      console.error('ProjectDetailPage fetch error:', err);
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [engagementId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // ── Loading ─────────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    );
+  }
+
+  // ── Not found ───────────────────────────────────────────────────────────────
+
+  if (notFound || !engagement) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
+          <AlertTriangle size={40} className="text-[#B06000] mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-[#0B2D59] mb-2">Project not found</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            The project you're looking for doesn't exist or you don't have access to it.
+          </p>
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-1.5 text-sm text-[#0070F3] font-medium hover:underline"
+          >
+            <ChevronLeft size={16} />
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Derived values ──────────────────────────────────────────────────────────
+
   const updateMilestoneStatus = (milestoneId: string, status: MilestoneStatus) => {
-    setEngagement((prev) => ({
-      ...prev,
-      milestones: prev.milestones.map((m) => (m.id === milestoneId ? { ...m, status } : m)),
-    }));
+    setEngagement((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        milestones: prev.milestones.map((m) => (m.id === milestoneId ? { ...m, status } : m)),
+      };
+    });
   };
 
   const inReviewMilestone = engagement.milestones.find((m) => m.status === 'in_review') ?? null;
@@ -517,106 +592,110 @@ export default function ProjectDetailPage() {
         <Activity size={20} className="text-[#0070F3]" />
         Milestone Tracker
       </h2>
-      <div className="relative">
-        {engagement.milestones.map((milestone, idx) => {
-          const isLast = idx === engagement.milestones.length - 1;
-          return (
-            <div key={milestone.id} className="flex gap-4">
-              {/* Stepper circle + connector */}
-              <div className="flex flex-col items-center flex-shrink-0">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${MILESTONE_CIRCLE_COLOURS[milestone.status]}`}
-                >
-                  {milestone.status === 'approved' ? (
-                    <Check size={18} />
-                  ) : milestone.status === 'disputed' ? (
-                    <AlertTriangle size={16} />
-                  ) : milestone.status === 'in_review' ? (
-                    <Clock size={16} />
-                  ) : (
-                    <span>{idx + 1}</span>
+      {engagement.milestones.length === 0 ? (
+        <p className="text-sm text-gray-400 italic">No milestones yet.</p>
+      ) : (
+        <div className="relative">
+          {engagement.milestones.map((milestone, idx) => {
+            const isLast = idx === engagement.milestones.length - 1;
+            return (
+              <div key={milestone.id} className="flex gap-4">
+                {/* Stepper circle + connector */}
+                <div className="flex flex-col items-center flex-shrink-0">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${MILESTONE_CIRCLE_COLOURS[milestone.status]}`}
+                  >
+                    {milestone.status === 'approved' ? (
+                      <Check size={18} />
+                    ) : milestone.status === 'disputed' ? (
+                      <AlertTriangle size={16} />
+                    ) : milestone.status === 'in_review' ? (
+                      <Clock size={16} />
+                    ) : (
+                      <span>{idx + 1}</span>
+                    )}
+                  </div>
+                  {!isLast && (
+                    <div
+                      className={`w-0.5 flex-1 my-1 ${
+                        milestone.status === 'approved' ? 'bg-green-300' : 'bg-gray-200'
+                      }`}
+                      style={{ minHeight: '24px' }}
+                    />
                   )}
                 </div>
-                {!isLast && (
-                  <div
-                    className={`w-0.5 flex-1 my-1 ${
-                      milestone.status === 'approved' ? 'bg-green-300' : 'bg-gray-200'
-                    }`}
-                    style={{ minHeight: '24px' }}
-                  />
-                )}
-              </div>
 
-              {/* Content */}
-              <div className="flex-1 pb-6">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="font-semibold text-[#0B2D59] text-sm">{milestone.name}</span>
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${MILESTONE_STATUS_COLOURS[milestone.status]}`}
-                  >
-                    {MILESTONE_STATUS_LABELS[milestone.status]}
-                  </span>
-                </div>
-                <div className="flex gap-4 text-xs text-gray-500 mb-2">
-                  <span>Due {formatDate(milestone.dueDate)}</span>
-                  <span className="font-semibold text-gray-700">{formatCurrency(milestone.amount)}</span>
-                </div>
-
-                {/* Disputed amber banner */}
-                {milestone.status === 'disputed' && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-start gap-2 mb-3"
-                  >
-                    <AlertTriangle size={16} className="text-[#B06000] flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-[#B06000]">Milestone under dispute</p>
-                      <p className="text-xs text-amber-700 mt-0.5">
-                        Escrow is frozen pending resolution. Both parties have 72 hours to resolve
-                        bilaterally before Collabov mediation begins.
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* In review action buttons */}
-                {milestone.status === 'in_review' && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <button
-                      onClick={() => setAcceptMilestoneId(milestone.id)}
-                      className="flex items-center gap-1.5 bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-green-700 transition-colors"
+                {/* Content */}
+                <div className="flex-1 pb-6">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="font-semibold text-[#0B2D59] text-sm">{milestone.name}</span>
+                    <span
+                      className={`text-xs font-medium px-2 py-0.5 rounded-full ${MILESTONE_STATUS_COLOURS[milestone.status]}`}
                     >
-                      <Check size={14} />
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => {
-                        setFlagMilestoneId(milestone.id);
-                        setFlagText('');
-                      }}
-                      className="flex items-center gap-1.5 border border-[#B06000] text-[#B06000] rounded-lg px-4 py-2 text-sm font-semibold hover:bg-amber-50 transition-colors"
-                    >
-                      <Flag size={14} />
-                      Flag
-                    </button>
-                    <button
-                      onClick={() => {
-                        setDisputeMilestoneId(milestone.id);
-                        setDisputeReason('');
-                      }}
-                      className="flex items-center gap-1.5 border border-[#C0392B] text-[#C0392B] rounded-lg px-4 py-2 text-sm font-semibold hover:bg-red-50 transition-colors"
-                    >
-                      <AlertTriangle size={14} />
-                      Dispute
-                    </button>
+                      {MILESTONE_STATUS_LABELS[milestone.status]}
+                    </span>
                   </div>
-                )}
+                  <div className="flex gap-4 text-xs text-gray-500 mb-2">
+                    {milestone.dueDate && <span>Due {formatDate(milestone.dueDate)}</span>}
+                    <span className="font-semibold text-gray-700">{formatCurrency(milestone.amount)}</span>
+                  </div>
+
+                  {/* Disputed amber banner */}
+                  {milestone.status === 'disputed' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-start gap-2 mb-3"
+                    >
+                      <AlertTriangle size={16} className="text-[#B06000] flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#B06000]">Milestone under dispute</p>
+                        <p className="text-xs text-amber-700 mt-0.5">
+                          Escrow is frozen pending resolution. Both parties have 72 hours to resolve
+                          bilaterally before Collabov mediation begins.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* In review action buttons */}
+                  {milestone.status === 'in_review' && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <button
+                        onClick={() => setAcceptMilestoneId(milestone.id)}
+                        className="flex items-center gap-1.5 bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-green-700 transition-colors"
+                      >
+                        <Check size={14} />
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFlagMilestoneId(milestone.id);
+                          setFlagText('');
+                        }}
+                        className="flex items-center gap-1.5 border border-[#B06000] text-[#B06000] rounded-lg px-4 py-2 text-sm font-semibold hover:bg-amber-50 transition-colors"
+                      >
+                        <Flag size={14} />
+                        Flag
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDisputeMilestoneId(milestone.id);
+                          setDisputeReason('');
+                        }}
+                        className="flex items-center gap-1.5 border border-[#C0392B] text-[#C0392B] rounded-lg px-4 py-2 text-sm font-semibold hover:bg-red-50 transition-colors"
+                      >
+                        <AlertTriangle size={14} />
+                        Dispute
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
@@ -767,49 +846,53 @@ export default function ProjectDetailPage() {
           <Users size={20} className="text-[#0E7C6A]" />
           Weekly Status Log
         </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left border-b border-gray-100">
-                <th className="pb-3 pr-4 font-semibold text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">
-                  Week
-                </th>
-                <th className="pb-3 pr-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">
-                  Hours
-                </th>
-                <th className="pb-3 pr-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">
-                  Tasks Completed
-                </th>
-                <th className="pb-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">
-                  Vendor Notes
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {engagement.weeklyLogs.map((log, idx) => (
-                <tr
-                  key={log.id}
-                  className={idx % 2 === 0 ? 'bg-gray-50/60' : ''}
-                >
-                  <td className="py-3 pr-4 text-[#0B2D59] font-medium whitespace-nowrap">
-                    {log.week}
-                  </td>
-                  <td className="py-3 pr-4">
-                    <span
-                      className={`font-semibold ${
-                        log.hours < 40 ? 'text-[#B06000]' : 'text-green-700'
-                      }`}
-                    >
-                      {log.hours}h
-                    </span>
-                  </td>
-                  <td className="py-3 pr-4 text-gray-600 max-w-xs">{log.tasksCompleted}</td>
-                  <td className="py-3 text-gray-500 italic max-w-xs">{log.vendorNotes}</td>
+        {engagement.weeklyLogs.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No weekly logs yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-100">
+                  <th className="pb-3 pr-4 font-semibold text-gray-500 text-xs uppercase tracking-wide whitespace-nowrap">
+                    Week
+                  </th>
+                  <th className="pb-3 pr-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                    Hours
+                  </th>
+                  <th className="pb-3 pr-4 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                    Tasks Completed
+                  </th>
+                  <th className="pb-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                    Vendor Notes
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {engagement.weeklyLogs.map((log, idx) => (
+                  <tr
+                    key={log.id}
+                    className={idx % 2 === 0 ? 'bg-gray-50/60' : ''}
+                  >
+                    <td className="py-3 pr-4 text-[#0B2D59] font-medium whitespace-nowrap">
+                      {log.week}
+                    </td>
+                    <td className="py-3 pr-4">
+                      <span
+                        className={`font-semibold ${
+                          log.hours < 40 ? 'text-[#B06000]' : 'text-green-700'
+                        }`}
+                      >
+                        {log.hours}h
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4 text-gray-600 max-w-xs">{log.tasksCompleted}</td>
+                    <td className="py-3 text-gray-500 italic max-w-xs">{log.vendorNotes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     );
   };
@@ -905,17 +988,21 @@ export default function ProjectDetailPage() {
           View All Messages →
         </Link>
       </div>
-      <div className="space-y-3">
-        {engagement.messages.slice(0, 3).map((msg) => (
-          <div key={msg.id} className="bg-gray-50 rounded-xl px-4 py-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-[#0B2D59]">{msg.sender}</span>
-              <span className="text-xs text-gray-400">{msg.timestamp}</span>
+      {engagement.messages.length === 0 ? (
+        <p className="text-sm text-gray-400 italic">No messages yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {engagement.messages.map((msg) => (
+            <div key={msg.id} className="bg-gray-50 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-[#0B2D59]">{msg.sender}</span>
+                <span className="text-xs text-gray-400">{msg.timestamp}</span>
+              </div>
+              <p className="text-sm text-gray-700">{msg.text}</p>
             </div>
-            <p className="text-sm text-gray-700">{msg.text}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -927,42 +1014,46 @@ export default function ProjectDetailPage() {
         <FileText size={20} className="text-[#0070F3]" />
         Documents
       </h2>
-      <div className="space-y-3">
-        {engagement.documents.map((doc) => (
-          <div
-            key={doc.id}
-            className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <FileText size={18} className="text-gray-400 flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">{doc.name}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span
-                    className={`text-xs font-semibold px-1.5 py-0.5 rounded uppercase ${
-                      doc.type === 'IR35 SDS'
-                        ? 'bg-teal-100 text-[#0E7C6A]'
-                        : doc.type === 'NDA'
-                        ? 'bg-gray-200 text-gray-700'
-                        : 'bg-blue-100 text-[#0070F3]'
-                    }`}
-                  >
-                    {doc.type}
-                  </span>
-                  <span className="text-xs text-gray-400">{doc.size}</span>
+      {engagement.documents.length === 0 ? (
+        <p className="text-sm text-gray-400 italic">No documents attached.</p>
+      ) : (
+        <div className="space-y-3">
+          {engagement.documents.map((doc) => (
+            <div
+              key={doc.id}
+              className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText size={18} className="text-gray-400 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{doc.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span
+                      className={`text-xs font-semibold px-1.5 py-0.5 rounded uppercase ${
+                        doc.type === 'IR35 SDS'
+                          ? 'bg-teal-100 text-[#0E7C6A]'
+                          : doc.type === 'NDA'
+                          ? 'bg-gray-200 text-gray-700'
+                          : 'bg-blue-100 text-[#0070F3]'
+                      }`}
+                    >
+                      {doc.type}
+                    </span>
+                    {doc.size !== '—' && <span className="text-xs text-gray-400">{doc.size}</span>}
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={() => showToast(`Downloading ${doc.name}…`)}
+                className="flex items-center gap-1.5 border border-blue-200 text-[#0070F3] rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-blue-50 transition-colors flex-shrink-0"
+              >
+                <Download size={12} />
+                Download
+              </button>
             </div>
-            <button
-              onClick={() => showToast(`Downloading ${doc.name}…`)}
-              className="flex items-center gap-1.5 border border-blue-200 text-[#0070F3] rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-blue-50 transition-colors flex-shrink-0"
-            >
-              <Download size={12} />
-              Download
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -974,23 +1065,27 @@ export default function ProjectDetailPage() {
         <Activity size={20} className="text-[#0070F3]" />
         Activity Log
       </h2>
-      <div className="space-y-1">
-        {engagement.activityLog.map((entry, idx) => (
-          <div
-            key={entry.id}
-            className={`flex items-start gap-3 rounded-lg px-3 py-2.5 ${idx % 2 === 0 ? 'bg-gray-50' : ''}`}
-          >
-            <div className="w-2 h-2 rounded-full bg-[#0070F3] flex-shrink-0 mt-2" />
-            <span className="text-xs text-gray-400 w-36 flex-shrink-0 pt-0.5 leading-relaxed">
-              {entry.timestamp}
-            </span>
-            <div className="flex-1 min-w-0">
-              <span className="font-semibold text-[#0B2D59] text-sm">{entry.actor}</span>
-              <span className="text-sm text-gray-600"> — {entry.action}</span>
+      {engagement.activityLog.length === 0 ? (
+        <p className="text-sm text-gray-400 italic">No activity yet.</p>
+      ) : (
+        <div className="space-y-1">
+          {engagement.activityLog.map((entry, idx) => (
+            <div
+              key={entry.id}
+              className={`flex items-start gap-3 rounded-lg px-3 py-2.5 ${idx % 2 === 0 ? 'bg-gray-50' : ''}`}
+            >
+              <div className="w-2 h-2 rounded-full bg-[#0070F3] flex-shrink-0 mt-2" />
+              <span className="text-xs text-gray-400 w-36 flex-shrink-0 pt-0.5 leading-relaxed">
+                {entry.timestamp}
+              </span>
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-[#0B2D59] text-sm">{entry.actor}</span>
+                <span className="text-sm text-gray-600"> — {entry.action}</span>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -1014,10 +1109,13 @@ export default function ProjectDetailPage() {
       <div className="flex gap-3">
         <button
           onClick={() => {
-            setEngagement((prev) => ({
-              ...prev,
-              escrowBalance: prev.escrowBalance + prev.nextMilestoneAmount,
-            }));
+            setEngagement((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                escrowBalance: prev.escrowBalance + prev.nextMilestoneAmount,
+              };
+            });
             showToast(
               `Milestone funded — ${formatCurrency(engagement.nextMilestoneAmount)} added to escrow.`
             );
@@ -1249,7 +1347,10 @@ export default function ProjectDetailPage() {
           <button
             disabled={!terminationReason || !terminationAck}
             onClick={() => {
-              setEngagement((prev) => ({ ...prev, status: 'notice_served' }));
+              setEngagement((prev) => {
+                if (!prev) return prev;
+                return { ...prev, status: 'notice_served' };
+              });
               showToast('Termination notice served.');
               setShowTerminationModal(false);
             }}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Store, FolderOpen, DollarSign, Inbox, ShieldCheck,
@@ -6,6 +6,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,9 @@ function V2Placeholder({ label }: { label: string }) {
 
 // ─── Module 1: MARKETPLACE ─────────────────────────────────────────────────────
 
-function MarketplaceModule() {
+interface MarketplaceModuleProps { jobs: any[]; }
+function MarketplaceModule({ jobs }: MarketplaceModuleProps) {
+  const displayJobs = jobs.length > 0 ? jobs : mockJobs;
   const matchColor = (m: string) =>
     m === 'High' ? 'bg-green-100 text-green-700' :
     m === 'Medium' ? 'bg-amber-100 text-amber-700' :
@@ -106,25 +109,27 @@ function MarketplaceModule() {
     >
       <div className="flex items-center gap-2 mb-4">
         <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-          [3] new jobs match your profile
+          [{displayJobs.length}] new jobs match your profile
         </span>
       </div>
       <div className="space-y-3">
-        {mockJobs.map(job => (
+        {displayJobs.map((job: any) => (
           <div key={job.id} className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <p className="text-sm font-medium text-gray-900 truncate">{job.title}</p>
-                <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${job.type === 'Job' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
-                  {job.type}
+                <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${(job.type || 'Job') === 'Job' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                  {job.type || 'Job'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${matchColor(job.match)}`}>
-                  {job.match} match
-                </span>
-                <span className="text-xs text-gray-500">{job.budget}</span>
-                <span className="text-xs text-gray-400">{job.posted}</span>
+                {job.match && (
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${matchColor(job.match)}`}>
+                    {job.match} match
+                  </span>
+                )}
+                <span className="text-xs text-gray-500">{job.budget ? (typeof job.budget === 'number' ? `£${job.budget.toLocaleString()}` : job.budget) : ''}</span>
+                <span className="text-xs text-gray-400">{job.posted || (job.created_at ? new Date(job.created_at).toLocaleDateString('en-GB') : '')}</span>
                 <Link to="/vendor/dashboard/jobs" className="text-xs text-[#0070F3] font-medium ml-auto">Apply</Link>
               </div>
             </div>
@@ -212,7 +217,9 @@ function RevenueModule() {
 
 // ─── Module 4: ENQUIRIES ───────────────────────────────────────────────────────
 
-function EnquiriesModule() {
+interface EnquiriesModuleProps { enquiries: any[]; }
+function EnquiriesModule({ enquiries }: EnquiriesModuleProps) {
+  const displayEnquiries = enquiries.length > 0 ? enquiries : mockEnquiries;
   const paymentLabel = (badge: string) =>
     badge === 'green' ? { label: 'Reliable payer', cls: 'bg-green-100 text-green-700' } :
     badge === 'amber' ? { label: 'Average payer', cls: 'bg-amber-100 text-amber-700' } :
@@ -225,31 +232,31 @@ function EnquiriesModule() {
       expandHref="/vendor/dashboard/enquiries"
     >
       <div className="space-y-4 mb-4">
-        {mockEnquiries.slice(0, 2).map(enq => {
-          const badge = paymentLabel(enq.payment_badge);
+        {displayEnquiries.slice(0, 2).map((enq: any) => {
+          const badge = paymentLabel(enq.payment_badge || 'green');
           return (
             <div key={enq.id} className="border border-gray-100 rounded-xl p-3">
               <div className="flex items-start justify-between gap-2 mb-1">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{enq.buyer_type}</p>
-                  <p className="text-xs text-gray-400">{enq.location} · {enq.service}</p>
+                  <p className="text-sm font-medium text-gray-900">{enq.buyer_type || enq.subject || enq.profiles?.full_name || 'Enquiry'}</p>
+                  <p className="text-xs text-gray-400">{enq.location ? `${enq.location} · ` : ''}{enq.service || enq.status || ''}</p>
                 </div>
                 <Link to="/vendor/dashboard/enquiries" className="text-xs text-[#0070F3] font-medium flex-shrink-0">
                   Respond
                 </Link>
               </div>
               <div className="flex items-center gap-2 mt-2">
-                <span className="text-xs text-gray-700 font-medium">{enq.budget}</span>
+                <span className="text-xs text-gray-700 font-medium">{enq.budget || ''}</span>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${badge.cls}`}>
                   {badge.label}
                 </span>
-                <span className="text-[10px] text-gray-400 ml-auto">{enq.received}</span>
+                <span className="text-[10px] text-gray-400 ml-auto">{enq.received || (enq.created_at ? new Date(enq.created_at).toLocaleDateString('en-GB') : '')}</span>
               </div>
             </div>
           );
         })}
       </div>
-      <p className="text-xs text-gray-500">3 enquiries this month · 1 proposal pending</p>
+      <p className="text-xs text-gray-500">{displayEnquiries.length} enquiries · 1 proposal pending</p>
     </ModuleCard>
   );
 }
@@ -341,7 +348,30 @@ function IntelligenceModule() {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 const DashboardHome: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const [vendor, setVendor] = useState<any>(null);
+  const [recentEnquiries, setRecentEnquiries] = useState<any[]>([]);
+  const [recentJobs, setRecentJobs] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  useEffect(() => {
+    if (!user) return;
+    async function load() {
+      try {
+        const [vendorRes, enquiryRes, jobRes] = await Promise.all([
+          supabase.from('vendors').select('*').eq('id', user!.id).single(),
+          supabase.from('enquiries').select('*, profiles(full_name)').eq('vendor_id', user!.id).order('created_at', { ascending: false }).limit(5),
+          supabase.from('jobs').select('id, title, budget, status, created_at').eq('status', 'open').order('created_at', { ascending: false }).limit(5),
+        ]);
+        setVendor(vendorRes.data);
+        setRecentEnquiries(enquiryRes.data || []);
+        setRecentJobs(jobRes.data || []);
+      } finally {
+        setLoadingData(false);
+      }
+    }
+    load();
+  }, [user]);
 
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set(['company_info', 'services']));
   const [submittedForVerification, setSubmittedForVerification] = useState(false);
@@ -357,8 +387,8 @@ const DashboardHome: React.FC = () => {
   const allComplete = checklistItems.every(item => completedItems.has(item.id));
   const completionPercent = Math.round((completedItems.size / checklistItems.length) * 100);
 
-  const isVerified = profile?.verified ?? false;
-  const companyName = profile?.full_name ?? 'Your Company';
+  const isVerified = vendor?.is_verified ?? (profile as any)?.verified ?? false;
+  const companyName = vendor?.company_name ?? profile?.full_name ?? 'Your Company';
 
   return (
     <div className="p-6">
@@ -444,10 +474,10 @@ const DashboardHome: React.FC = () => {
 
       {/* 6 Module Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <MarketplaceModule />
+        <MarketplaceModule jobs={recentJobs} />
         <WorkspaceModule />
         <RevenueModule />
-        <EnquiriesModule />
+        <EnquiriesModule enquiries={recentEnquiries} />
         <GovernanceModule isVerified={isVerified} />
         <IntelligenceModule />
       </div>

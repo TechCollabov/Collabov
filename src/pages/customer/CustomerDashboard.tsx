@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import {
   LayoutDashboard, Plus, FileText, Bot, Bookmark,
   FolderOpen, FileCheck, CreditCard, MessageSquare,
@@ -170,7 +171,8 @@ const FindWithAIModule: React.FC = () => {
 
 // ─── Module 2 — WORKSPACE ─────────────────────────────────────────────────────
 
-const WorkspaceModule: React.FC = () => {
+interface WorkspaceModuleProps { activeProjects: number; }
+const WorkspaceModule: React.FC<WorkspaceModuleProps> = ({ activeProjects }) => {
   const hasOverdue = mockEngagements.some((e) => e.milestone_due_overdue);
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
@@ -179,6 +181,11 @@ const WorkspaceModule: React.FC = () => {
           <FolderOpen className="h-5 w-5 text-teal-300" />
         </div>
         <span className="text-xs font-bold tracking-[0.15em] uppercase text-gray-900">Workspace</span>
+        {activeProjects > 0 && (
+          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium ml-auto">
+            {activeProjects} active
+          </span>
+        )}
       </div>
 
       {hasOverdue && (
@@ -381,7 +388,8 @@ const IntelligenceModule: React.FC = () => (
 
 // ─── Module 7 — MESSAGES (spans 2 cols) ───────────────────────────────────────
 
-const MessagesModule: React.FC = () => (
+interface MessagesModuleProps { unreadMessages: number; }
+const MessagesModule: React.FC<MessagesModuleProps> = ({ unreadMessages }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col lg:col-span-2">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
@@ -391,6 +399,11 @@ const MessagesModule: React.FC = () => (
       <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium ml-1">
         LIVE FEED
       </span>
+      {unreadMessages > 0 && (
+        <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium ml-auto">
+          {unreadMessages} unread
+        </span>
+      )}
     </div>
 
     <div className="space-y-3 flex-1">
@@ -427,6 +440,30 @@ const CustomerDashboard: React.FC = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
+  const [stats, setStats] = useState({ activeProjects: 0, pendingMilestones: 0, totalSpent: 0, unreadMessages: 0, openJobs: 0 });
+  const [loadingStats, setLoadingStats] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  useEffect(() => {
+    if (!user) return;
+    async function load() {
+      try {
+        const [projRes, msgRes, jobRes, contractRes] = await Promise.all([
+          supabase.from('projects').select('id, status').eq('customer_id', user!.id),
+          supabase.from('messages').select('id').eq('recipient_id', user!.id).eq('is_read', false),
+          supabase.from('jobs').select('id, status').eq('customer_id', user!.id).eq('status', 'open'),
+          supabase.from('contracts').select('total_value').eq('customer_id', user!.id).eq('status', 'active'),
+        ]);
+        const active = projRes.data?.filter(p => p.status === 'in-progress').length || 0;
+        const unread = msgRes.data?.length || 0;
+        const openJobs = jobRes.data?.length || 0;
+        const totalSpent = contractRes.data?.reduce((s, c) => s + (c.total_value || 0), 0) || 0;
+        setStats({ activeProjects: active, pendingMilestones: 0, totalSpent, unreadMessages: unread, openJobs });
+      } finally {
+        setLoadingStats(false);
+      }
+    }
+    load();
+  }, [user]);
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
 
@@ -613,12 +650,12 @@ const CustomerDashboard: React.FC = () => {
         {/* 7-module grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <FindWithAIModule />
-          <WorkspaceModule />
+          <WorkspaceModule activeProjects={stats.activeProjects} />
           <MilestonePaymentsModule />
           <RiskDashboardModule />
           <GovernanceModule />
           <IntelligenceModule />
-          <MessagesModule />
+          <MessagesModule unreadMessages={stats.unreadMessages} />
         </div>
       </main>
 

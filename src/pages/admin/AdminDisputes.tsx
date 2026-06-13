@@ -11,6 +11,7 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -208,12 +209,23 @@ const ResolutionPanel: React.FC<ResolutionPanelProps> = ({ dispute, onResolve })
 
   const confirmResolution = async () => {
     setIsProcessing(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setIsProcessing(false);
-    setShowModal(false);
-    setToast(true);
-    setTimeout(() => setToast(false), 3000);
-    onResolve(dispute.id);
+    try {
+      const resolution = resType === 'split'
+        ? `Split: ${vendorPct}% vendor / ${buyerPct}% buyer`
+        : resType === 'vendor'
+        ? 'Full release to vendor'
+        : 'Full refund to buyer';
+      const { error } = await supabase.from('disputes').update({ status: 'resolved', resolution_notes: notes, resolution }).eq('id', dispute.id);
+      if (error) console.error('Dispute update error:', error);
+    } catch (e) {
+      console.error('Dispute update failed:', e);
+    } finally {
+      setIsProcessing(false);
+      setShowModal(false);
+      setToast(true);
+      setTimeout(() => setToast(false), 3000);
+      onResolve(dispute.id);
+    }
   };
 
   return (
@@ -359,6 +371,43 @@ const AdminDisputes: React.FC = () => {
   const [disputes, setDisputes] = useState<Dispute[]>(MOCK_DISPUTES);
   const [selectedId, setSelectedId] = useState<string | null>(MOCK_DISPUTES[0]?.id ?? null);
   const [activeTab, setActiveTab] = useState<Tab>('all');
+  const [loading, setLoading] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data, error } = await supabase.from('disputes').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setDisputes(data as unknown as Dispute[]);
+          setSelectedId((data[0] as any).id ?? null);
+        }
+      } catch {
+        // disputes table may not exist yet — use mock data
+        setDisputes(MOCK_DISPUTES);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+  const [tableMissing, setTableMissing] = useState(false);
+
+  useEffect(() => {
+    const fetchDisputes = async () => {
+      try {
+        const { data, error } = await supabase.from('disputes').select('*').order('opened_at', { ascending: false });
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setDisputes(data as Dispute[]);
+          setSelectedId(data[0]?.id ?? null);
+        }
+      } catch {
+        setTableMissing(true);
+      }
+    };
+    fetchDisputes();
+  }, []);
 
   const selectedDispute = disputes.find(d => d.id === selectedId) ?? null;
 
@@ -381,6 +430,12 @@ const AdminDisputes: React.FC = () => {
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Disputes</h1>
+
+      {tableMissing && disputes === MOCK_DISPUTES && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-sm text-blue-700">
+          No disputes yet — dispute table will be populated once engagements are live.
+        </div>
+      )}
 
       {/* Escrow frozen notice */}
       <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2 mb-5">

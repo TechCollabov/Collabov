@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ChevronUp, ChevronDown, Download, ExternalLink } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 const gmvMonthly = [
   { month: 'Jan', gmv: 42000, fees: 2100 },
@@ -77,6 +78,29 @@ function exportCSV(data: Record<string, unknown>[], filename: string) {
 const AdminAnalytics: React.FC = () => {
   const [vendorSort, setVendorSort] = useState<{ key: keyof typeof vendorPerformance[0]; dir: SortDir }>({ key: 'completed', dir: 'desc' });
   const [paySort, setPaySort] = useState<{ key: keyof typeof paymentReputation[0]; dir: SortDir }>({ key: 'on_time_rate', dir: 'desc' });
+  const [stats, setStats] = useState({ totalVendors: 0, verifiedVendors: 0, totalContracts: 0, activeValue: 0, totalProposals: 0 });
+  const [topVendors, setTopVendors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [vendorRes, verRes, contractRes, proposalRes, topVRes] = await Promise.all([
+          supabase.from('vendors').select('id', { count: 'exact', head: true }),
+          supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
+          supabase.from('contracts').select('id, total_value, status', { count: 'exact' }),
+          supabase.from('proposals').select('id', { count: 'exact', head: true }),
+          supabase.from('vendors').select('id, company_name, rating, review_count, projects_completed, total_revenue, is_verified').order('projects_completed', { ascending: false }).limit(10),
+        ]);
+        const activeValue = contractRes.data?.filter(c => c.status === 'active').reduce((s, c) => s + (c.total_value || 0), 0) || 0;
+        setStats({ totalVendors: vendorRes.count || 0, verifiedVendors: verRes.count || 0, totalContracts: contractRes.count || 0, activeValue, totalProposals: proposalRes.count || 0 });
+        setTopVendors(topVRes.data || []);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   function sortVendor(key: keyof typeof vendorPerformance[0]) {
     setVendorSort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
@@ -108,24 +132,24 @@ const AdminAnalytics: React.FC = () => {
         <h2 className="text-lg font-bold text-white mb-4">GMV Dashboard</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-[#0B2D59] rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-blue-300 uppercase tracking-wide">GMV This Month</span>
-            <span className="text-4xl font-black text-white">£127,000</span>
-            <span className="text-xs text-blue-300">June 2024</span>
+            <span className="text-xs font-semibold text-blue-300 uppercase tracking-wide">Active Contract Value</span>
+            <span className="text-4xl font-black text-white">£{stats.activeValue.toLocaleString()}</span>
+            <span className="text-xs text-blue-300">Active contracts</span>
           </div>
           <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">All-time GMV</span>
-            <span className="text-4xl font-black text-white">£491,000</span>
-            <span className="text-xs text-slate-500">Since launch</span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Vendors</span>
+            <span className="text-4xl font-black text-white">{stats.totalVendors}</span>
+            <span className="text-xs text-slate-500">{stats.verifiedVendors} verified</span>
           </div>
           <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Platform Fees (Jun)</span>
-            <span className="text-4xl font-black text-white">£6,350</span>
-            <span className="text-xs text-slate-500">5% of GMV</span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Contracts</span>
+            <span className="text-4xl font-black text-white">{stats.totalContracts}</span>
+            <span className="text-xs text-slate-500">All time</span>
           </div>
           <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Outstanding Escrow</span>
-            <span className="text-4xl font-black text-white">£84,200</span>
-            <span className="text-xs text-slate-500">Held in escrow</span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Proposals</span>
+            <span className="text-4xl font-black text-white">{stats.totalProposals}</span>
+            <span className="text-xs text-slate-500">All time</span>
           </div>
         </div>
 
@@ -204,16 +228,16 @@ const AdminAnalytics: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {sortedVendors.map(v => (
-                <tr key={v.company} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-white">{v.company}</td>
+              {(topVendors.length > 0 ? topVendors : sortedVendors).map((v: any) => (
+                <tr key={v.company || v.company_name} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-white">{v.company || v.company_name}</td>
                   <td className="px-5 py-3.5">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/40 text-blue-300 border border-blue-700/40">{v.type}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/40 text-blue-300 border border-blue-700/40">{v.type || (v.is_verified ? 'Verified' : 'Unverified')}</span>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-300">{v.completed}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{v.dispute_rate}</td>
-                  <td className="px-5 py-3.5"><StarRating rating={v.avg_rating} /></td>
-                  <td className="px-5 py-3.5 text-slate-400">{v.verified}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{v.completed ?? v.projects_completed ?? 0}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{v.dispute_rate ?? '—'}</td>
+                  <td className="px-5 py-3.5"><StarRating rating={v.avg_rating ?? v.rating ?? 0} /></td>
+                  <td className="px-5 py-3.5 text-slate-400">{v.verified ?? (v.is_verified ? 'Verified' : 'Pending')}</td>
                   <td className="px-5 py-3.5">
                     <a href="#" className="flex items-center gap-1 text-[#0070F3] hover:text-blue-300 text-xs font-medium">
                       View profile <ExternalLink className="h-3 w-3" />

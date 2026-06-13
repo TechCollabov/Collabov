@@ -4,7 +4,7 @@ import {
   Star, ShieldCheck, Bookmark, BookmarkCheck, Share2, Flag, X, Upload,
   ChevronDown, Users, Briefcase, Globe, Clock, CheckCircle, Calendar,
   Code, Cloud, Database, Smartphone, Server, UserCheck, TrendingUp,
-  MessageSquare, Phone, Video, MapPin,
+  MessageSquare, Phone, Video, MapPin, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -251,12 +251,93 @@ const TABS = [
   'Calendar & Availability',
 ];
 
-type VendorData = typeof DEMO_VENDOR;
+type VendorData = any;
+
+// ─── DB Types ─────────────────────────────────────────────────────────────────
+
+interface DBVendor {
+  id: string;
+  company_name: string;
+  tagline: string | null;
+  description: string | null;
+  city: string | null;
+  country: string | null;
+  rating: number | null;
+  review_count: number | null;
+  projects_completed: number | null;
+  response_time: string | null;
+  monthly_rate: number | null;
+  hourly_rate: number | null;
+  is_verified: boolean;
+  employee_count: number | null;
+  years_in_business: number | null;
+  created_at: string;
+}
+
+interface DBEmployee {
+  id: string;
+  vendor_id: string;
+  name: string;
+  title: string | null;
+  bio: string | null;
+  profile_picture_url: string | null;
+}
+
+interface DBPackage {
+  id: string;
+  vendor_id: string;
+  name: string;
+  description: string | null;
+  price: number | null;
+  delivery_days: number | null;
+}
+
+interface DBPortfolioItem {
+  id: string;
+  vendor_id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  project_url: string | null;
+}
+
+interface DBReview {
+  id: string;
+  vendor_id: string;
+  customer_id: string;
+  rating: number;
+  comment: string | null;
+  would_recommend: boolean | null;
+  created_at: string;
+  profiles?: { full_name: string | null } | null;
+}
+
+interface DBCaseStudy {
+  id: string;
+  vendor_id: string;
+  title: string;
+  challenge: string | null;
+  solution: string | null;
+  outcome: string | null;
+  tech_stack: string[] | null;
+  created_at: string;
+}
+
+interface DBReferral {
+  id: string;
+  vendor_id: string;
+  referee_name: string;
+  referee_title: string | null;
+  referee_company: string | null;
+  statement: string | null;
+  verified: boolean;
+  created_at: string;
+}
 
 // ─── Interview Modal ──────────────────────────────────────────────────────────
 
 interface InterviewModalProps {
-  member: (typeof DEMO_TEAM)[0];
+  member: any;
   onClose: () => void;
 }
 
@@ -447,8 +528,19 @@ const PaymentBadge = ({ rate }: { rate: number }) => {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
-  const avail = vendor.availability_status;
+function Sidebar({ vendor, onRFP }: { vendor: any; onRFP: () => void }) {
+  const monthlyRate = vendor.monthly_rate ?? vendor.monthly_rate_min ?? 0;
+  const hourlyRate = vendor.hourly_rate ?? vendor.hourly_rate_min ?? 0;
+  const teamSize = vendor.team_size_band ?? (vendor.employee_count ? `${vendor.employee_count} employees` : 'N/A');
+  const timezone = vendor.timezone ?? 'N/A';
+  const languages = vendor.languages ?? ['English'];
+  const responseTime = vendor.response_time_hours ?? vendor.response_time ?? 'N/A';
+  const minProjectValue = vendor.minimum_project_value ?? 0;
+  const ir35 = vendor.ir35_compliant ?? false;
+  const gdpr = vendor.gdpr_ready ?? false;
+  const avail = vendor.availability_status ?? 'available';
+  const paymentRate = vendor.payment_reputation_rate ?? 97;
+
   const availEl =
     avail === 'available' ? (
       <span className="flex items-center gap-2 text-sm"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-green-700 font-medium">Available now</span></span>
@@ -460,15 +552,15 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-20 space-y-3">
-      <div className="text-3xl font-black text-[#0B2D59]">From £{vendor.monthly_rate_min.toLocaleString()}/month</div>
-      <div className="text-sm text-gray-500">From £{vendor.hourly_rate_min}/hour</div>
+      <div className="text-3xl font-black text-[#0B2D59]">From £{monthlyRate.toLocaleString()}/month</div>
+      <div className="text-sm text-gray-500">From £{hourlyRate}/hour</div>
       <hr className="border-gray-100" />
       {[
-        { label: 'Team size', value: vendor.team_size_band },
-        { label: 'Timezone', value: vendor.timezone },
-        { label: 'Languages', value: vendor.languages.join(', ') },
-        { label: 'Response time', value: `Within ${vendor.response_time_hours}h` },
-        { label: 'Min. project value', value: `£${vendor.minimum_project_value.toLocaleString()}` },
+        { label: 'Team size', value: teamSize },
+        { label: 'Timezone', value: timezone },
+        { label: 'Languages', value: Array.isArray(languages) ? languages.join(', ') : languages },
+        { label: 'Response time', value: typeof responseTime === 'number' ? `Within ${responseTime}h` : responseTime },
+        { label: 'Min. project value', value: `£${minProjectValue.toLocaleString()}` },
       ].map(({ label, value }) => (
         <div key={label} className="flex justify-between text-sm">
           <span className="text-gray-400">{label}</span>
@@ -476,12 +568,12 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
         </div>
       ))}
       <div className="flex flex-wrap gap-2">
-        {vendor.ir35_compliant && (
+        {ir35 && (
           <span className="text-xs bg-green-50 text-green-700 border border-green-100 px-2 py-1 rounded-full font-medium">
             IR35 Compliant
           </span>
         )}
-        {vendor.gdpr_ready && (
+        {gdpr && (
           <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded-full font-medium">
             GDPR-Ready
           </span>
@@ -490,7 +582,7 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
       {availEl}
       <div>
         <div className="text-xs text-gray-500 mb-1">Buyer payment history</div>
-        <PaymentBadge rate={(vendor as typeof DEMO_VENDOR).payment_reputation_rate || 97} />
+        <PaymentBadge rate={paymentRate} />
       </div>
       <hr className="border-gray-100" />
       <button
@@ -518,7 +610,16 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
 
 // ─── Tab: Overview ────────────────────────────────────────────────────────────
 
-function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
+function OverviewTab({ vendor, onRFP, serviceCategories, industries }: { vendor: any; onRFP: () => void; serviceCategories: string[]; industries: string[] }) {
+  const displayServices = serviceCategories.length > 0 ? serviceCategories : (vendor.service_categories || []);
+  const displayIndustries = industries.length > 0 ? industries : (vendor.industry_focus || []);
+  const facts = [
+    vendor.years_in_business || vendor.founded_year ? `Founded ${vendor.founded_year ?? new Date().getFullYear() - (vendor.years_in_business ?? 0)}` : null,
+    vendor.team_size_band || vendor.employee_count ? `${vendor.team_size_band ?? vendor.employee_count + ' employees'}` : null,
+    (vendor.city || vendor.country) ? `${vendor.city ?? ''}, ${vendor.country ?? ''}`.replace(/^, |, $/, '') : null,
+    `${vendor.engagement_count ?? vendor.projects_completed ?? 0} engagements`,
+  ].filter(Boolean) as string[];
+
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       <div className="flex-[2] space-y-8">
@@ -526,12 +627,7 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">About {vendor.company_name}</h2>
           <div className="flex flex-wrap gap-3 mb-5">
-            {[
-              `Founded ${vendor.founded_year}`,
-              `${vendor.team_size_band} employees`,
-              `${vendor.city}, ${vendor.country}`,
-              `${vendor.engagement_count} engagements`,
-            ].map(f => (
+            {facts.map(f => (
               <span key={f} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full">{f}</span>
             ))}
           </div>
@@ -542,7 +638,7 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Core Services</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {vendor.service_categories.map(s => (
+            {displayServices.map((s: string) => (
               <div key={s} className="bg-white rounded-xl p-4 border border-gray-100 text-center">
                 <div className="text-[#0070F3] mb-2 flex justify-center">
                   {SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}
@@ -554,6 +650,7 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
         </section>
 
         {/* Tech Stack */}
+        {vendor.tech_stack && Object.keys(vendor.tech_stack).length > 0 && (
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Technology Stack</h2>
           <div className="space-y-4">
@@ -571,16 +668,19 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
             ))}
           </div>
         </section>
+        )}
 
         {/* Industries */}
+        {displayIndustries.length > 0 && (
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Industries We Serve</h2>
           <div className="flex flex-wrap gap-2">
-            {vendor.industry_focus.map(i => (
+            {displayIndustries.map((i: string) => (
               <span key={i} className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-sm font-medium text-gray-700">{i}</span>
             ))}
           </div>
         </section>
+        )}
 
         {/* How We Work */}
         <section>
@@ -619,15 +719,39 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
 
 // ─── Tab: Team Members ────────────────────────────────────────────────────────
 
-function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_TEAM)[0]) => void }) {
+type TeamMember = {
+  id: string;
+  name: string;
+  title: string;
+  seniority?: string;
+  domain?: string;
+  skills?: string[];
+  rate_monthly?: number;
+  availability?: string;
+  available_from?: string | null;
+  engaged_until?: string | null;
+  bio?: string | null;
+  profile_picture_url?: string | null;
+};
+
+function TeamTab({ onInterviewRequest, employees }: { onInterviewRequest: (m: any) => void; employees: DBEmployee[] }) {
   const [domainFilter, setDomainFilter] = useState('All');
   const [seniorityFilter, setSeniorityFilter] = useState('All');
   const [availableOnly, setAvailableOnly] = useState(false);
 
-  const domains = ['All', ...Array.from(new Set(DEMO_TEAM.map(m => m.domain)))];
-  const seniorities = ['All', ...Array.from(new Set(DEMO_TEAM.map(m => m.seniority)))];
+  // Map DBEmployee to TeamMember shape
+  const team: TeamMember[] = employees.map(e => ({
+    id: e.id,
+    name: e.name,
+    title: e.title || '',
+    bio: e.bio,
+    profile_picture_url: e.profile_picture_url,
+  }));
 
-  const filtered = DEMO_TEAM.filter(m => {
+  const domains = ['All', ...Array.from(new Set(team.map(m => m.domain).filter(Boolean) as string[]))];
+  const seniorities = ['All', ...Array.from(new Set(team.map(m => m.seniority).filter(Boolean) as string[]))];
+
+  const filtered = team.filter(m => {
     if (domainFilter !== 'All' && m.domain !== domainFilter) return false;
     if (seniorityFilter !== 'All' && m.seniority !== seniorityFilter) return false;
     if (availableOnly && m.availability !== 'available') return false;
@@ -696,6 +820,8 @@ function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_
               ? 'text-amber-600'
               : 'text-gray-500';
 
+            const skills = m.skills || [];
+
             return (
               <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-3">
                 <div className="flex items-center gap-3">
@@ -708,22 +834,30 @@ function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SENIORITY_COLOURS[m.seniority] || 'bg-gray-100 text-gray-600'}`}>
-                    {m.seniority}
-                  </span>
-                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{m.domain}</span>
+                  {m.seniority && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SENIORITY_COLOURS[m.seniority] || 'bg-gray-100 text-gray-600'}`}>
+                      {m.seniority}
+                    </span>
+                  )}
+                  {m.domain && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{m.domain}</span>}
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {m.skills.slice(0, 5).map(s => (
-                    <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{s}</span>
-                  ))}
-                </div>
+                {skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {skills.slice(0, 5).map(s => (
+                      <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{s}</span>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm mt-auto">
-                  <span className="font-bold text-[#0B2D59]">£{m.rate_monthly.toLocaleString()}/mo</span>
-                  <span className={`flex items-center gap-1 text-xs ${availColor}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${availDot}`} />
-                    {availLabel}
-                  </span>
+                  {m.rate_monthly ? (
+                    <span className="font-bold text-[#0B2D59]">£{m.rate_monthly.toLocaleString()}/mo</span>
+                  ) : <span />}
+                  {m.availability && (
+                    <span className={`flex items-center gap-1 text-xs ${availColor}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${availDot}`} />
+                      {availLabel}
+                    </span>
+                  )}
                 </div>
                 {isEngaged ? (
                   <button className="w-full py-2 border border-gray-200 text-xs font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
@@ -748,7 +882,8 @@ function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_
 
 // ─── Tab: Services & Packages ─────────────────────────────────────────────────
 
-function ServicesTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
+function ServicesTab({ vendor, onRFP, packages, serviceCategories }: { vendor: any; onRFP: () => void; packages: DBPackage[]; serviceCategories: string[] }) {
+  const displayServices = serviceCategories.length > 0 ? serviceCategories : (vendor.service_categories || []);
   const serviceDescriptions: Record<string, string> = {
     'Software Development': 'Full-cycle web application development: discovery, architecture, build, QA, and deployment. We work in React, Node.js, Go, and Python.',
     'Cloud & Infrastructure': 'Cloud architecture, migration, and ongoing management across AWS and GCP. Infrastructure-as-Code with Terraform.',
@@ -760,34 +895,56 @@ function ServicesTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Services</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {vendor.service_categories.map(s => (
-            <div key={s} className="bg-white rounded-xl border border-gray-100 p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="text-[#0070F3]">{SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}</div>
-                <h3 className="font-bold text-gray-800 text-sm">{s}</h3>
+        {displayServices.length === 0 ? (
+          <p className="text-gray-400 text-sm">No services listed yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {displayServices.map((s: string) => (
+              <div key={s} className="bg-white rounded-xl border border-gray-100 p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-[#0070F3]">{SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}</div>
+                  <h3 className="font-bold text-gray-800 text-sm">{s}</h3>
+                </div>
+                <p className="text-gray-500 text-xs leading-relaxed mb-4">
+                  {serviceDescriptions[s] || 'Service description coming soon.'}
+                </p>
+                <button
+                  onClick={onRFP}
+                  className="px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Request Quote
+                </button>
               </div>
-              <p className="text-gray-500 text-xs leading-relaxed mb-4">
-                {serviceDescriptions[s] || 'Service description coming soon.'}
-              </p>
-              <button
-                onClick={onRFP}
-                className="px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                Request Quote
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
         <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Packages</h2>
-        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
-          <Briefcase className="h-8 w-8 mx-auto mb-3 text-gray-200" />
-          <p className="text-sm">No packages listed yet.</p>
-          <p className="text-xs mt-1">This vendor operates on a bespoke project basis. Use "Request Quote" above.</p>
-        </div>
+        {packages.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
+            <Briefcase className="h-8 w-8 mx-auto mb-3 text-gray-200" />
+            <p className="text-sm">No packages listed yet.</p>
+            <p className="text-xs mt-1">This vendor operates on a bespoke project basis. Use "Request Quote" above.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {packages.map(pkg => (
+              <div key={pkg.id} className="bg-white rounded-xl border border-gray-100 p-5">
+                <h3 className="font-bold text-gray-800 text-sm mb-1">{pkg.name}</h3>
+                {pkg.description && <p className="text-gray-500 text-xs leading-relaxed mb-3">{pkg.description}</p>}
+                <div className="flex items-center justify-between mt-2">
+                  {pkg.price != null && <span className="font-bold text-[#0B2D59]">£{pkg.price.toLocaleString()}</span>}
+                  {pkg.delivery_days != null && <span className="text-xs text-gray-400">{pkg.delivery_days} days delivery</span>}
+                </div>
+                <button onClick={onRFP} className="mt-3 w-full px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors">
+                  Request Quote
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -795,29 +952,53 @@ function ServicesTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
 
 // ─── Tab: Case Studies ────────────────────────────────────────────────────────
 
-function CaseStudiesTab() {
+type CaseStudy = {
+  id: string;
+  title: string;
+  challenge?: string | null;
+  solution?: string | null;
+  outcome?: string | null;
+  tech_stack?: string[] | null;
+  created_at?: string | null;
+  // demo shape fields
+  industry?: string;
+  tech?: string[];
+  duration?: string;
+  team_size?: number;
+  services?: string[];
+  outcomes?: { metric: string; description: string }[];
+  client_quote?: string | null;
+};
+
+function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const items = caseStudies.length > 0 ? caseStudies : DEMO_CASE_STUDIES;
 
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Case Studies</h2>
-      {DEMO_CASE_STUDIES.map(cs => {
+      {items.length === 0 ? (
+        <p className="text-gray-400 text-sm">No case studies available yet.</p>
+      ) : items.map(cs => {
         const isExpanded = expanded[cs.id];
+        // Support both DB shape (challenge/solution/outcome/tech_stack) and demo shape
+        const tech = cs.tech_stack || cs.tech || [];
+        const outcomes = cs.outcomes || (cs.outcome ? [{ metric: 'Outcome', description: cs.outcome }] : []);
         return (
           <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <h3 className="font-bold text-gray-800">{cs.title}</h3>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>
+                  {cs.industry && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>}
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {cs.tech.map(t => (
+                  {tech.map(t => (
                     <span key={t} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t}</span>
                   ))}
                 </div>
                 <ul className="space-y-1">
-                  {cs.outcomes.slice(0, 2).map(o => (
+                  {outcomes.slice(0, 2).map(o => (
                     <li key={o.metric} className="flex items-center gap-2 text-sm text-green-600 font-medium">
                       <TrendingUp className="h-4 w-4 flex-shrink-0" />
                       <span>{o.metric}</span>
@@ -836,33 +1017,41 @@ function CaseStudiesTab() {
 
             {isExpanded && (
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-2">
-                  <span><span className="font-semibold text-gray-700">Duration:</span> {cs.duration}</span>
-                  <span><span className="font-semibold text-gray-700">Team size:</span> {cs.team_size} people</span>
-                  <span><span className="font-semibold text-gray-700">Services:</span> {cs.services.join(', ')}</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-700 mb-1 text-sm">The Challenge</div>
-                  <p className="text-gray-500 text-sm">{cs.challenge}</p>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-700 mb-1 text-sm">Our Solution</div>
-                  <p className="text-gray-500 text-sm">{cs.solution}</p>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-700 mb-2 text-sm">Outcomes</div>
-                  <ul className="space-y-2">
-                    {cs.outcomes.map(o => (
-                      <li key={o.metric} className="flex items-start gap-2 text-sm">
-                        <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span>
-                          <span className="font-semibold text-gray-700">{o.metric}</span>
-                          <span className="text-gray-500"> — {o.description}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {(cs.duration || cs.team_size || cs.services) && (
+                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-2">
+                    {cs.duration && <span><span className="font-semibold text-gray-700">Duration:</span> {cs.duration}</span>}
+                    {cs.team_size && <span><span className="font-semibold text-gray-700">Team size:</span> {cs.team_size} people</span>}
+                    {cs.services && <span><span className="font-semibold text-gray-700">Services:</span> {cs.services.join(', ')}</span>}
+                  </div>
+                )}
+                {cs.challenge && (
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 text-sm">The Challenge</div>
+                    <p className="text-gray-500 text-sm">{cs.challenge}</p>
+                  </div>
+                )}
+                {cs.solution && (
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 text-sm">Our Solution</div>
+                    <p className="text-gray-500 text-sm">{cs.solution}</p>
+                  </div>
+                )}
+                {outcomes.length > 0 && (
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-2 text-sm">Outcomes</div>
+                    <ul className="space-y-2">
+                      {outcomes.map(o => (
+                        <li key={o.metric} className="flex items-start gap-2 text-sm">
+                          <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <span className="font-semibold text-gray-700">{o.metric}</span>
+                            <span className="text-gray-500"> — {o.description}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {cs.client_quote && (
                   <div className="border-l-4 border-blue-300 pl-4 py-1 bg-blue-50 rounded-r-lg">
                     <p className="text-sm text-blue-800 italic">"{cs.client_quote}"</p>
@@ -879,29 +1068,59 @@ function CaseStudiesTab() {
 
 // ─── Tab: Referrals ───────────────────────────────────────────────────────────
 
-function ReferralsTab() {
+type Referral = {
+  id: string;
+  contact_name?: string | null;
+  referee_name?: string | null;
+  job_title?: string | null;
+  referee_title?: string | null;
+  company?: string | null;
+  referee_company?: string | null;
+  relationship_type?: string | null;
+  project_vouched_for?: string | null;
+  project_duration?: string | null;
+  project_value_band?: string | null;
+  specific_outcome?: string | null;
+  written_statement?: string | null;
+  statement?: string | null;
+  confirmed?: boolean | null;
+  verified?: boolean | null;
+  confirmed_at?: string | null;
+  created_at?: string | null;
+};
+
+function ReferralsTab({ referrals }: { referrals: Referral[] }) {
+  const items = referrals.length > 0 ? referrals : DEMO_REFERRALS;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-[#0B2D59]">Referrals</h2>
         <p className="text-xs text-gray-400">Referee email addresses are never shared with buyers.</p>
       </div>
-      {DEMO_REFERRALS.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-gray-400 text-sm">No referrals confirmed yet.</p>
       ) : (
-        DEMO_REFERRALS.map(r => (
+        items.map(r => {
+          // Normalise field names between DB shape and demo shape
+          const contactName = r.contact_name || r.referee_name || '';
+          const jobTitle = r.job_title || r.referee_title || '';
+          const company = r.company || r.referee_company || '';
+          const statement = r.written_statement || r.statement || null;
+          const confirmed = r.confirmed ?? r.verified ?? false;
+          const confirmedAt = r.confirmed_at || (r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : null);
+          return (
           <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="font-semibold text-gray-800">{r.contact_name}</div>
-                <div className="text-sm text-gray-500">{r.job_title} · {r.company}</div>
-                <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{r.relationship_type}</span>
+                <div className="font-semibold text-gray-800">{contactName}</div>
+                <div className="text-sm text-gray-500">{jobTitle} · {company}</div>
+                {r.relationship_type && <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{r.relationship_type}</span>}
               </div>
-              {r.confirmed ? (
+              {confirmed ? (
                 <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium whitespace-nowrap">
                   <CheckCircle className="h-4 w-4" />
-                  Confirmed {r.confirmed_at}
+                  Confirmed {confirmedAt}
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium whitespace-nowrap">
@@ -913,12 +1132,14 @@ function ReferralsTab() {
 
             {/* Project details */}
             <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-              <div className="text-xs text-gray-500">
-                <span className="font-semibold text-gray-700">Project:</span> {r.project_vouched_for}
-              </div>
+              {r.project_vouched_for && (
+                <div className="text-xs text-gray-500">
+                  <span className="font-semibold text-gray-700">Project:</span> {r.project_vouched_for}
+                </div>
+              )}
               <div className="flex gap-4 text-xs text-gray-500">
-                <span><span className="font-semibold text-gray-700">Duration:</span> {r.project_duration}</span>
-                <span><span className="font-semibold text-gray-700">Value:</span> {r.project_value_band}</span>
+                {r.project_duration && <span><span className="font-semibold text-gray-700">Duration:</span> {r.project_duration}</span>}
+                {r.project_value_band && <span><span className="font-semibold text-gray-700">Value:</span> {r.project_value_band}</span>}
               </div>
               {r.specific_outcome && (
                 <div className="text-xs text-gray-600 mt-1">{r.specific_outcome}</div>
@@ -926,13 +1147,14 @@ function ReferralsTab() {
             </div>
 
             {/* Written statement */}
-            {r.written_statement && (
+            {statement && (
               <div className="border-l-4 border-teal-300 pl-4 py-1 bg-teal-50 rounded-r-lg">
-                <p className="text-sm text-teal-800 italic">"{r.written_statement}"</p>
+                <p className="text-sm text-teal-800 italic">"{statement}"</p>
               </div>
             )}
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );
@@ -940,78 +1162,90 @@ function ReferralsTab() {
 
 // ─── Tab: Reviews ─────────────────────────────────────────────────────────────
 
-function ReviewsTab({ vendor }: { vendor: VendorData }) {
-  const categories = [
-    { label: 'Quality', key: 'quality' as const },
-    { label: 'Communication', key: 'communication' as const },
-    { label: 'Timeliness', key: 'timeliness' as const },
-    { label: 'Professionalism', key: 'professionalism' as const },
-    { label: 'Overall', key: 'overall' as const },
-  ];
+type Review = {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  would_recommend?: boolean | null;
+  created_at?: string | null;
+  profiles?: { full_name: string | null } | null;
+  // demo shape fields
+  company_type?: string;
+  location?: string;
+  project_type?: string;
+  budget_range?: string;
+  date?: string;
+  overall?: number;
+  quality?: number;
+  communication?: number;
+  timeliness?: number;
+  professionalism?: number;
+  text?: string;
+  vendor_response?: string | null;
+};
 
-  const avgByCategory = (key: keyof (typeof DEMO_REVIEWS)[0]) => {
-    const vals = DEMO_REVIEWS.map(r => r[key] as number);
-    return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
-  };
+function ReviewsTab({ vendor, reviews }: { vendor: VendorData; reviews: Review[] }) {
+  const items = reviews.length > 0 ? reviews : DEMO_REVIEWS;
+
+  const avgRating = items.length > 0
+    ? (items.reduce((sum, r) => sum + (r.overall ?? r.rating ?? 0), 0) / items.length).toFixed(1)
+    : String(vendor.rating);
 
   return (
     <div>
       {/* Summary */}
       <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6 flex flex-col md:flex-row gap-8">
         <div className="text-center flex-shrink-0">
-          <div className="text-5xl font-bold text-[#0B2D59] mb-1">{vendor.rating}</div>
-          <Stars rating={vendor.rating} size="md" />
+          <div className="text-5xl font-bold text-[#0B2D59] mb-1">{avgRating}</div>
+          <Stars rating={parseFloat(avgRating)} size="md" />
           <div className="text-sm text-gray-400 mt-1">out of 5</div>
         </div>
-        <div className="flex-1 space-y-2">
-          {categories.map(({ label, key }) => (
-            <div key={label} className="flex items-center gap-3">
-              <span className="text-sm text-gray-500 w-32">{label}</span>
-              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-yellow-400 rounded-full"
-                  style={{ width: `${(parseFloat(avgByCategory(key)) / 5) * 100}%` }}
-                />
-              </div>
-              <span className="text-sm font-medium text-gray-700 w-8">{avgByCategory(key)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="text-center flex-shrink-0">
-          <div className="text-2xl font-bold text-gray-700">{vendor.review_count}</div>
+        <div className="text-center flex-shrink-0 self-center">
+          <div className="text-2xl font-bold text-gray-700">{items.length || vendor.review_count}</div>
           <div className="text-sm text-gray-400">reviews</div>
         </div>
       </div>
 
       {/* Individual reviews */}
       <div className="space-y-4">
-        {DEMO_REVIEWS.map(r => (
-          <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5">
-            <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
-              <div>
-                <div className="font-semibold text-gray-700 text-sm">{r.company_type}</div>
-                <div className="text-xs text-gray-400 flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />{r.location} · {r.project_type} · {r.budget_range} · {r.date}
+        {items.map(r => {
+          const overallRating = r.overall ?? r.rating ?? 0;
+          const reviewDate = r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+          const reviewerName = r.profiles?.full_name || r.company_type || 'Anonymous';
+          const reviewText = r.text || r.comment || '';
+          return (
+            <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5">
+              <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+                <div>
+                  <div className="font-semibold text-gray-700 text-sm">{reviewerName}</div>
+                  <div className="text-xs text-gray-400 flex items-center gap-1">
+                    {r.location && <><MapPin className="h-3 w-3" />{r.location} · </>}
+                    {r.project_type && <>{r.project_type} · </>}
+                    {r.budget_range && <>{r.budget_range} · </>}
+                    {reviewDate}
+                  </div>
                 </div>
+                <Stars rating={overallRating} />
               </div>
-              <Stars rating={r.overall} />
+              {(r.quality || r.communication || r.timeliness || r.professionalism) && (
+                <div className="flex gap-4 mb-3 flex-wrap text-xs text-gray-500">
+                  {(['quality', 'communication', 'timeliness', 'professionalism'] as const).map(k => r[k] ? (
+                    <span key={k} className="capitalize">
+                      <span className="font-medium text-gray-600">{k.charAt(0).toUpperCase() + k.slice(1)}:</span> {r[k]}/5
+                    </span>
+                  ) : null)}
+                </div>
+              )}
+              {reviewText && <p className="text-gray-600 text-sm">{reviewText}</p>}
+              {r.vendor_response && (
+                <div className="mt-3 border-l-4 border-blue-200 pl-4 py-2 bg-blue-50 rounded-r-lg">
+                  <div className="text-xs font-semibold text-blue-700 mb-1">Vendor response</div>
+                  <p className="text-sm text-blue-800">{r.vendor_response}</p>
+                </div>
+              )}
             </div>
-            <div className="flex gap-4 mb-3 flex-wrap text-xs text-gray-500">
-              {(['quality', 'communication', 'timeliness', 'professionalism'] as const).map(k => (
-                <span key={k} className="capitalize">
-                  <span className="font-medium text-gray-600">{k.charAt(0).toUpperCase() + k.slice(1)}:</span> {r[k]}/5
-                </span>
-              ))}
-            </div>
-            <p className="text-gray-600 text-sm">{r.text}</p>
-            {r.vendor_response && (
-              <div className="mt-3 border-l-4 border-blue-200 pl-4 py-2 bg-blue-50 rounded-r-lg">
-                <div className="text-xs font-semibold text-blue-700 mb-1">Vendor response</div>
-                <p className="text-sm text-blue-800">{r.vendor_response}</p>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1153,36 +1387,82 @@ const VendorProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
+  const [dbEmployees, setDbEmployees] = useState<DBEmployee[]>([]);
+  const [dbPackages, setDbPackages] = useState<DBPackage[]>([]);
+  const [dbPortfolio, setDbPortfolio] = useState<DBPortfolioItem[]>([]);
+  const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
+  const [dbCaseStudies, setDbCaseStudies] = useState<DBCaseStudy[]>([]);
+  const [dbReferrals, setDbReferrals] = useState<DBReferral[]>([]);
+  const [dbServiceCategories, setDbServiceCategories] = useState<string[]>([]);
+  const [dbIndustries, setDbIndustries] = useState<string[]>([]);
+
   const [activeTab, setActiveTab] = useState('Overview');
   const [sticky, setSticky] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showRFP, setShowRFP] = useState(false);
   const [showDiscovery, setShowDiscovery] = useState(false);
-  const [interviewTarget, setInterviewTarget] = useState<(typeof DEMO_TEAM)[0] | null>(null);
+  const [interviewTarget, setInterviewTarget] = useState<any>(null);
 
   const headerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch from Supabase, fall back to mock
+  // Fetch from Supabase
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
       if (vendorId === 'demo') {
-        if (!cancelled) { setVendor(DEMO_VENDOR); setLoading(false); }
+        if (!cancelled) { setVendor(DEMO_VENDOR as any); setLoading(false); }
         return;
       }
       try {
-        const { data, error } = await supabase
+        // Fetch vendor
+        const { data: vendorData, error: vendorError } = await supabase
           .from('vendors')
           .select('*')
           .eq('id', vendorId)
           .single();
         if (cancelled) return;
-        if (error || !data) {
-          // Not found in DB — show not found unless it's the demo
-          setNotFound(true);
-        } else {
-          setVendor(data as VendorData);
+        if (vendorError || !vendorData) { setNotFound(true); setLoading(false); return; }
+        setVendor(vendorData as any);
+
+        // Fetch related data in parallel
+        const [
+          { data: employeesData },
+          { data: packagesData },
+          { data: portfolioData },
+          { data: reviewsData },
+          { data: servicesData },
+          { data: industriesData },
+        ] = await Promise.all([
+          supabase.from('vendor_employees').select('*').eq('vendor_id', vendorId),
+          supabase.from('vendor_packages').select('*').eq('vendor_id', vendorId),
+          supabase.from('portfolio_items').select('*').eq('vendor_id', vendorId),
+          supabase.from('reviews').select('*, profiles(full_name)').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
+          supabase.from('vendor_services').select('service_categories(name)').eq('vendor_id', vendorId),
+          supabase.from('vendor_industries').select('industries(name)').eq('vendor_id', vendorId),
+        ]);
+
+        if (!cancelled) {
+          setDbEmployees((employeesData || []) as DBEmployee[]);
+          setDbPackages((packagesData || []) as DBPackage[]);
+          setDbPortfolio((portfolioData || []) as DBPortfolioItem[]);
+          setDbReviews((reviewsData || []) as DBReview[]);
+          setDbServiceCategories(((servicesData || []) as any[]).map((s: any) => s.service_categories?.name).filter(Boolean));
+          setDbIndustries(((industriesData || []) as any[]).map((i: any) => i.industries?.name).filter(Boolean));
+        }
+
+        // Try sprint-3 tables — graceful fallback
+        try {
+          const [{ data: csData }, { data: refData }] = await Promise.all([
+            supabase.from('case_studies').select('*').eq('vendor_id', vendorId),
+            supabase.from('vendor_referrals').select('*').eq('vendor_id', vendorId),
+          ]);
+          if (!cancelled) {
+            setDbCaseStudies((csData || []) as DBCaseStudy[]);
+            setDbReferrals((refData || []) as DBReferral[]);
+          }
+        } catch {
+          // tables don't exist yet — leave as []
         }
       } catch {
         if (!cancelled) setNotFound(true);
@@ -1190,7 +1470,7 @@ const VendorProfilePage: React.FC = () => {
         if (!cancelled) setLoading(false);
       }
 
-      // Log profile view (fire and forget — never breaks the page)
+      // Log profile view (fire and forget)
       const logProfileView = async () => {
         try {
           const { supabase: sb } = await import('../lib/supabase');
@@ -1202,13 +1482,10 @@ const VendorProfilePage: React.FC = () => {
             entity_id: vendorId || 'demo',
             payload: { page: 'vendor_profile', vendor_id: vendorId },
           });
-          // Also increment profile_view_count
           if (vendorId && vendorId !== 'demo') {
             await sb.rpc('increment_profile_views', { vendor_id: vendorId });
           }
-        } catch {
-          // Silent fail — tracking should never break the page
-        }
+        } catch { /* silent */ }
       };
       if (!cancelled) logProfileView();
     }
@@ -1229,7 +1506,7 @@ const VendorProfilePage: React.FC = () => {
     setShowRFP(true);
   };
 
-  const handleInterviewRequest = (m: (typeof DEMO_TEAM)[0]) => {
+  const handleInterviewRequest = (m: any) => {
     if (!user) { navigate(`/signin?returnUrl=/vendor/profile/${vendorId}`); return; }
     setInterviewTarget(m);
   };
@@ -1237,9 +1514,8 @@ const VendorProfilePage: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-[#0070F3] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-gray-500">Loading vendor profile…</p>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-blue-600" size={32} />
         </div>
       </div>
     );
@@ -1296,14 +1572,16 @@ const VendorProfilePage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-2xl font-bold text-[#0B2D59]">{vendor.company_name}</h1>
-                  {vendor.verification_status === 'verified' && (
+                  {(vendor.is_verified || vendor.verification_status === 'verified') && (
                     <span className="flex items-center gap-1 text-sm text-[#0070F3] font-medium bg-blue-50 px-2 py-0.5 rounded-full">
                       <ShieldCheck className="h-4 w-4" /> Verified
                     </span>
                   )}
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 capitalize">
-                    {vendor.business_type}
-                  </span>
+                  {vendor.business_type && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 capitalize">
+                      {vendor.business_type}
+                    </span>
+                  )}
                 </div>
                 {vendor.tagline && (
                   <p className="text-sm text-gray-500 mt-1 max-w-xl">{vendor.tagline}</p>
@@ -1313,9 +1591,9 @@ const VendorProfilePage: React.FC = () => {
                   <span className="font-bold text-gray-700">{vendor.rating}</span>
                   <span>({vendor.review_count} reviews)</span>
                   <span>·</span>
-                  <span>{vendor.engagement_count} engagements</span>
+                  <span>{vendor.projects_completed ?? vendor.engagement_count ?? 0} engagements</span>
                   <span>·</span>
-                  {vendor.referral_count > 0 && (
+                  {(vendor.referral_count ?? 0) > 0 && (
                     <>
                       <span className="flex items-center gap-1 text-teal-600 font-medium">
                         <UserCheck className="h-4 w-4" />{vendor.referral_count} referrals verified
@@ -1323,9 +1601,8 @@ const VendorProfilePage: React.FC = () => {
                       <span>·</span>
                     </>
                   )}
-                  <span>{vendor.city}, {vendor.country}</span>
-                  <span>·</span>
-                  <span>Member since {vendor.member_since}</span>
+                  {(vendor.city || vendor.country) && <><span>{[vendor.city, vendor.country].filter(Boolean).join(', ')}</span><span>·</span></>}
+                  <span>Member since {vendor.member_since ?? (vendor.created_at ? new Date(vendor.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'N/A')}</span>
                 </div>
               </div>
             </div>
@@ -1372,12 +1649,12 @@ const VendorProfilePage: React.FC = () => {
 
       {/* Tab content */}
       <div className="container mx-auto px-6 py-8">
-        {activeTab === 'Overview' && <OverviewTab vendor={vendor} onRFP={openRFP} />}
-        {activeTab === 'Team Members' && <TeamTab onInterviewRequest={handleInterviewRequest} />}
-        {activeTab === 'Services & Packages' && <ServicesTab vendor={vendor} onRFP={openRFP} />}
-        {activeTab === 'Case Studies' && <CaseStudiesTab />}
-        {activeTab === 'Referrals' && <ReferralsTab />}
-        {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} />}
+        {activeTab === 'Overview' && <OverviewTab vendor={vendor} onRFP={openRFP} serviceCategories={dbServiceCategories} industries={dbIndustries} />}
+        {activeTab === 'Team Members' && <TeamTab onInterviewRequest={handleInterviewRequest} employees={dbEmployees} />}
+        {activeTab === 'Services & Packages' && <ServicesTab vendor={vendor} onRFP={openRFP} packages={dbPackages} serviceCategories={dbServiceCategories} />}
+        {activeTab === 'Case Studies' && <CaseStudiesTab caseStudies={dbCaseStudies} />}
+        {activeTab === 'Referrals' && <ReferralsTab referrals={dbReferrals} />}
+        {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} reviews={dbReviews} />}
         {activeTab === 'Calendar & Availability' && <CalendarTab onDiscovery={() => setShowDiscovery(true)} />}
       </div>
 

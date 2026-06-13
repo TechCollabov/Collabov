@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Star, RefreshCw, MessageSquare, ExternalLink, X, CheckCircle2 } from 'lucide-react';
+import { Star, RefreshCw, MessageSquare, ExternalLink, X, CheckCircle2, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,66 +30,27 @@ interface Vendor {
   employees: Employee[];
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── DB row types ─────────────────────────────────────────────────────────────
 
-const MY_VENDORS: Vendor[] = [
-  {
-    id: 'v1',
-    company_name: 'TechForge Solutions',
-    business_type: 'agency',
-    country: 'Poland',
-    rating: 4.8,
-    reviews: 23,
-    last_engagement: 'Payment Gateway Rebuild',
-    last_engagement_status: 'active',
-    last_engagement_value: 32000,
-    engagement_count: 2,
-    available: true,
-    rehire_eligible: true,
-    termination_reason: null,
-    employees: [
-      { name: 'Aleksei Nowak', title: 'Senior Full-Stack Developer', available: true },
-      {
-        name: 'Karolina Wiśniewska',
-        title: 'Lead DevOps Engineer',
-        available: false,
-        note: 'On another engagement until Aug 2026',
-      },
-    ],
-  },
-  {
-    id: 'v2',
-    company_name: 'CloudNorth MSP',
-    business_type: 'msp',
-    country: 'UK',
-    rating: 4.6,
-    reviews: 11,
-    last_engagement: 'Infrastructure Management',
-    last_engagement_status: 'active',
-    last_engagement_value: 21600,
-    engagement_count: 1,
-    available: true,
-    rehire_eligible: true,
-    termination_reason: null,
-    employees: [],
-  },
-  {
-    id: 'v3',
-    company_name: 'DevStream Ltd',
-    business_type: 'agency',
-    country: 'UK',
-    rating: 4.3,
-    reviews: 7,
-    last_engagement: 'E-commerce Platform Redesign',
-    last_engagement_status: 'completed',
-    last_engagement_value: 18500,
-    engagement_count: 1,
-    available: true,
-    rehire_eligible: true,
-    termination_reason: null,
-    employees: [],
-  },
-];
+interface SavedVendorRow {
+  id: string;
+  vendor_id: string | null;
+  contractor_id: string | null;
+  vendors: {
+    id: string;
+    company_name: string | null;
+    logo_url: string | null;
+    rating: number | null;
+  } | null;
+}
+
+interface ProjectRow {
+  id: string;
+  title: string;
+  status: string | null;
+  budget: number | null;
+  vendor_id: string | null;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -273,12 +236,14 @@ function VendorCard({ vendor, onRehire }: VendorCardProps) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-gray-900">{vendor.company_name}</span>
             {typePill(vendor.business_type)}
-            <span className="text-xs text-gray-400">{vendor.country}</span>
+            {vendor.country && <span className="text-xs text-gray-400">{vendor.country}</span>}
           </div>
           <div className="flex items-center gap-1 mt-0.5">
             <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
-            <span className="text-sm font-medium text-gray-700">{vendor.rating}</span>
-            <span className="text-xs text-gray-400">({vendor.reviews} reviews)</span>
+            <span className="text-sm font-medium text-gray-700">{vendor.rating.toFixed(1)}</span>
+            {vendor.reviews > 0 && (
+              <span className="text-xs text-gray-400">({vendor.reviews} reviews)</span>
+            )}
           </div>
         </div>
       </div>
@@ -287,8 +252,12 @@ function VendorCard({ vendor, onRehire }: VendorCardProps) {
       <div className="flex flex-wrap items-center gap-2 mb-4 text-sm text-gray-600">
         <span className="font-medium text-gray-800">{vendor.last_engagement}</span>
         {statusBadge(vendor.last_engagement_status)}
-        <span className="text-gray-400">·</span>
-        <span>£{vendor.last_engagement_value.toLocaleString()}</span>
+        {vendor.last_engagement_value > 0 && (
+          <>
+            <span className="text-gray-400">·</span>
+            <span>£{vendor.last_engagement_value.toLocaleString()}</span>
+          </>
+        )}
         <span className="text-gray-400">·</span>
         <span>
           {vendor.engagement_count} engagement{vendor.engagement_count !== 1 ? 's' : ''}
@@ -359,8 +328,141 @@ type FilterTab = 'all' | 'active' | 'completed' | 'invited';
 
 export default function MyVendorsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [rehireVendor, setRehireVendor] = useState<Vendor | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    async function fetchVendors() {
+      setLoading(true);
+      try {
+        // 1. Fetch saved_vendors joined with vendors table
+        const { data: savedData, error: savedError } = await supabase
+          .from('saved_vendors')
+          .select('id, vendor_id, contractor_id, vendors(id, company_name, logo_url, rating)')
+          .eq('customer_id', user!.id);
+
+        if (savedError) throw savedError;
+
+        const saved = (savedData ?? []) as unknown as SavedVendorRow[];
+
+        // Collect vendor IDs
+        const vendorIds = saved
+          .map((s) => s.vendor_id)
+          .filter((id): id is string => !!id);
+
+        // 2. Fetch projects for this customer with a vendor assigned
+        const { data: projectsData } = await supabase
+          .from('projects')
+          .select('id, title, status, budget, vendor_id')
+          .eq('customer_id', user!.id)
+          .not('vendor_id', 'is', null);
+
+        const projects = (projectsData ?? []) as ProjectRow[];
+
+        // Build a map: vendor_id -> most recent project
+        const projectByVendor = new Map<string, ProjectRow>();
+        for (const p of projects) {
+          if (p.vendor_id && !projectByVendor.has(p.vendor_id)) {
+            projectByVendor.set(p.vendor_id, p);
+          }
+        }
+
+        // Count engagements per vendor
+        const engagementCount = new Map<string, number>();
+        for (const p of projects) {
+          if (p.vendor_id) {
+            engagementCount.set(p.vendor_id, (engagementCount.get(p.vendor_id) ?? 0) + 1);
+          }
+        }
+
+        // Build Vendor objects from saved_vendors
+        const built: Vendor[] = saved
+          .filter((s) => s.vendors)
+          .map((s) => {
+            const v = s.vendors!;
+            const vendorId = v.id;
+            const project = projectByVendor.get(vendorId);
+
+            const dbStatus = project?.status ?? 'invited';
+            let engStatus: 'active' | 'completed' | 'invited' = 'invited';
+            if (dbStatus === 'active' || dbStatus === 'in_progress') engStatus = 'active';
+            else if (dbStatus === 'completed') engStatus = 'completed';
+
+            return {
+              id: vendorId,
+              company_name: v.company_name ?? 'Unknown Vendor',
+              business_type: 'agency' as const,
+              country: '',
+              rating: v.rating ?? 0,
+              reviews: 0,
+              last_engagement: project?.title ?? 'No engagement yet',
+              last_engagement_status: engStatus,
+              last_engagement_value: project?.budget ?? 0,
+              engagement_count: engagementCount.get(vendorId) ?? 0,
+              available: true,
+              rehire_eligible: engStatus === 'completed',
+              termination_reason: null,
+              employees: [],
+            };
+          });
+
+        // Also include vendors from projects that aren't in saved_vendors
+        for (const p of projects) {
+          if (!p.vendor_id) continue;
+          if (vendorIds.includes(p.vendor_id)) continue;
+
+          // Fetch vendor details
+          const { data: vData } = await supabase
+            .from('vendors')
+            .select('id, company_name, logo_url, rating')
+            .eq('id', p.vendor_id)
+            .maybeSingle();
+
+          if (!vData) continue;
+
+          const dbStatus = p.status ?? 'active';
+          let engStatus: 'active' | 'completed' | 'invited' = 'invited';
+          if (dbStatus === 'active' || dbStatus === 'in_progress') engStatus = 'active';
+          else if (dbStatus === 'completed') engStatus = 'completed';
+
+          built.push({
+            id: vData.id,
+            company_name: vData.company_name ?? 'Unknown Vendor',
+            business_type: 'agency',
+            country: '',
+            rating: vData.rating ?? 0,
+            reviews: 0,
+            last_engagement: p.title,
+            last_engagement_status: engStatus,
+            last_engagement_value: p.budget ?? 0,
+            engagement_count: engagementCount.get(p.vendor_id) ?? 1,
+            available: true,
+            rehire_eligible: engStatus === 'completed',
+            termination_reason: null,
+            employees: [],
+          });
+        }
+
+        setVendors(built);
+      } catch (err) {
+        console.error('MyVendorsPage fetch error:', err);
+        setVendors([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchVendors();
+  }, [user]);
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -371,13 +473,20 @@ export default function MyVendorsPage() {
 
   const filtered =
     activeTab === 'all'
-      ? MY_VENDORS
-      : MY_VENDORS.filter((v) => v.last_engagement_status === activeTab);
+      ? vendors
+      : vendors.filter((v) => v.last_engagement_status === activeTab);
 
-  // Vendors with completed engagements within 30 days (mock: DevStream)
-  const rehirePromptVendors = MY_VENDORS.filter(
+  const rehirePromptVendors = vendors.filter(
     (v) => v.last_engagement_status === 'completed' && v.rehire_eligible
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -428,7 +537,7 @@ export default function MyVendorsPage() {
         </div>
 
         {/* Vendor list */}
-        {filtered.length === 0 ? (
+        {vendors.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
             <CheckCircle2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-600 font-medium mb-1">
@@ -441,8 +550,12 @@ export default function MyVendorsPage() {
               onClick={() => navigate('/results')}
               className="bg-[#0070F3] text-white rounded-xl px-6 py-2.5 text-sm font-medium hover:bg-blue-600 transition-colors"
             >
-              Search Vendors
+              Find Vendors
             </button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
+            <p className="text-gray-500 text-sm">No vendors in this category.</p>
           </div>
         ) : (
           filtered.map((vendor) => (
