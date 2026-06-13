@@ -1,52 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, Clock, Check, X, MessageSquare, FileText, ExternalLink,
-  CheckCircle, AlertTriangle, AlertCircle, Eye,
+  CheckCircle, AlertTriangle, AlertCircle, Eye, Loader2,
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
-/* ─── Mock Data ─────────────────────────────────────────────────── */
+/* ─── Types ─────────────────────────────────────────────────────── */
 
-const QUEUE = [
-  {
-    id: '1',
-    company_name: 'TechForge Solutions',
-    business_type: 'agency',
-    country: 'Poland',
-    submitted_at: '2026-06-08T10:30:00Z',
-    status: 'submitted',
-    contact_email: 'info@techforge.pl',
-    documents: {
-      companiesHouse: { name: 'Companies_House_Certificate.pdf', url: '#', status: 'valid', notes: '' },
-      addressProof: { name: 'Bank_Statement_May2026.pdf', url: '#', status: 'pending', notes: '' },
-      vatCert: null as null | { name: string; url: string; status: string; notes: string },
-    },
-    referrals: [
-      { contact_name: 'Sarah Thompson', job_title: 'Head of Engineering', company: 'Paytrace Financial', project: 'Payment Settlement Engine', duration: '6 months', value_band: '£50k+', outcome: 'Delivered real-time settlement engine on budget', confirmed: true },
-      { contact_name: 'Dr. James Okafor', job_title: 'CTO', company: 'CareSync Health', project: 'NHS FHIR Integration', duration: '4 months', value_band: '£10k-£50k', outcome: 'Passed DSPT assessment first attempt', confirmed: false },
-    ],
-    profile: { tagline: 'UK-focused software development for scale-ups', description: '35-person IT agency in Warsaw specialising in fintech and healthtech.', tech_stack: ['React', 'Node.js', 'AWS', 'PostgreSQL'], monthly_rate_min: 4200 },
-  },
-  {
-    id: '2',
-    company_name: 'CloudNorth MSP',
-    business_type: 'msp',
-    country: 'UK',
-    submitted_at: '2026-06-05T14:00:00Z',
-    status: 'submitted',
-    contact_email: 'hello@cloudnorth.co.uk',
-    documents: {
-      companiesHouse: { name: 'CH_Cert_CloudNorth.pdf', url: '#', status: 'valid', notes: '' },
-      addressProof: { name: 'Utility_Bill_Apr2026.pdf', url: '#', status: 'valid', notes: '' },
-      vatCert: { name: 'VAT_Reg_CloudNorth.pdf', url: '#', status: 'valid', notes: '' },
-    },
-    referrals: [
-      { contact_name: 'Mark Davies', job_title: 'IT Director', company: 'Morrison Logistics', project: 'Infrastructure Management', duration: '18 months', value_band: '£50k+', outcome: 'Zero critical outages in 18 months', confirmed: true },
-    ],
-    profile: { tagline: 'Proactive IT management for UK SMEs', description: 'UK-based MSP providing 24/7 infrastructure monitoring and support.', tech_stack: ['Azure', 'Microsoft 365', 'Cisco', 'CrowdStrike'], monthly_rate_min: 1800 },
-  },
-];
+type VendorDocument = {
+  id: string;
+  vendor_id: string;
+  document_type: string;
+  document_url: string;
+  verified: boolean;
+  uploaded_at: string;
+};
 
-type QueueItem = typeof QUEUE[number];
+type QueueItem = {
+  id: string;
+  company_name: string;
+  business_type?: string;
+  country?: string;
+  created_at?: string;
+  is_verified: boolean;
+  contact_email?: string;
+  tagline?: string;
+  description?: string;
+  monthly_rate?: number;
+  vendor_documents?: VendorDocument[];
+  // UI-only status field (derived)
+  status: string;
+};
 type DocKey = 'companiesHouse' | 'addressProof' | 'vatCert';
 type DocAdminStatus = 'valid' | 'invalid' | 'cannot_verify' | '';
 
