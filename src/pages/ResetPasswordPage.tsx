@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Globe, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Globe, Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 
@@ -14,19 +14,49 @@ const ResetPasswordPage: React.FC = () => {
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [tokenError, setTokenError] = useState('');
 
   useEffect(() => {
-    // Supabase fires PASSWORD_RECOVERY on auth state change when the hash
-    // contains type=recovery. We listen for it to confirm the token is valid.
+    // Supabase sends the recovery token in the URL hash as:
+    // #access_token=...&type=recovery
+    // We need to detect this and let the Supabase client exchange it for a session.
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.replace('#', ''));
+    const type = params.get('type');
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (type === 'recovery' && accessToken) {
+      // Exchange the recovery token for a session
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken || '',
+      }).then(({ error }) => {
+        if (error) {
+          setTokenError('This reset link has expired or is invalid. Please request a new one.');
+        } else {
+          setSessionReady(true);
+          // Clean the hash from the URL without triggering a reload
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      });
+    } else {
+      // No hash — check for an existing session (page refresh case)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setSessionReady(true);
+        } else {
+          setTokenError('No valid reset token found. Please use the link from your email or request a new reset link.');
+        }
+      });
+    }
+
+    // Also listen for PASSWORD_RECOVERY event as a fallback
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setSessionReady(true);
+        setTokenError('');
       }
-    });
-
-    // Also check for an existing session (token may already be exchanged)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setSessionReady(true);
     });
 
     return () => subscription.unsubscribe();
@@ -92,6 +122,20 @@ const ResetPasswordPage: React.FC = () => {
                 Your password has been changed. Redirecting you to sign in…
               </p>
             </div>
+          ) : tokenError ? (
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-8 w-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-[#0B2D59] mb-2">Link invalid or expired</h3>
+              <p className="text-gray-600 text-sm mb-6">{tokenError}</p>
+              <Link
+                to="/forgot-password"
+                className="inline-block bg-[#0070F3] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+              >
+                Request new reset link
+              </Link>
+            </div>
           ) : (
             <>
               {error && (
@@ -100,8 +144,9 @@ const ResetPasswordPage: React.FC = () => {
                 </div>
               )}
 
-              {!sessionReady && (
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              {!sessionReady && !tokenError && (
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-amber-500 border-t-transparent rounded-full flex-shrink-0" />
                   <p className="text-amber-700 text-sm">Verifying your reset link…</p>
                 </div>
               )}
