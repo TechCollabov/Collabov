@@ -4,7 +4,7 @@ import {
   Star, ShieldCheck, Bookmark, BookmarkCheck, Share2, Flag, X, Upload,
   ChevronDown, Users, Briefcase, Globe, Clock, CheckCircle, Calendar,
   Code, Cloud, Database, Smartphone, Server, UserCheck, TrendingUp,
-  MessageSquare, Phone, Video, MapPin,
+  MessageSquare, Phone, Video, MapPin, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -619,15 +619,30 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
 
 // ─── Tab: Team Members ────────────────────────────────────────────────────────
 
-function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_TEAM)[0]) => void }) {
+type TeamMember = {
+  id: string;
+  name: string;
+  title: string;
+  seniority?: string;
+  domain?: string;
+  skills?: string[];
+  rate_monthly?: number;
+  availability?: string;
+  available_from?: string | null;
+  engaged_until?: string | null;
+  bio?: string | null;
+  profile_picture_url?: string | null;
+};
+
+function TeamTab({ team, onInterviewRequest }: { team: TeamMember[]; onInterviewRequest: (m: TeamMember) => void }) {
   const [domainFilter, setDomainFilter] = useState('All');
   const [seniorityFilter, setSeniorityFilter] = useState('All');
   const [availableOnly, setAvailableOnly] = useState(false);
 
-  const domains = ['All', ...Array.from(new Set(DEMO_TEAM.map(m => m.domain)))];
-  const seniorities = ['All', ...Array.from(new Set(DEMO_TEAM.map(m => m.seniority)))];
+  const domains = ['All', ...Array.from(new Set(team.map(m => m.domain).filter(Boolean) as string[]))];
+  const seniorities = ['All', ...Array.from(new Set(team.map(m => m.seniority).filter(Boolean) as string[]))];
 
-  const filtered = DEMO_TEAM.filter(m => {
+  const filtered = team.filter(m => {
     if (domainFilter !== 'All' && m.domain !== domainFilter) return false;
     if (seniorityFilter !== 'All' && m.seniority !== seniorityFilter) return false;
     if (availableOnly && m.availability !== 'available') return false;
@@ -696,6 +711,8 @@ function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_
               ? 'text-amber-600'
               : 'text-gray-500';
 
+            const skills = m.skills || [];
+
             return (
               <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-5 flex flex-col gap-3">
                 <div className="flex items-center gap-3">
@@ -708,22 +725,30 @@ function TeamTab({ onInterviewRequest }: { onInterviewRequest: (m: (typeof DEMO_
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SENIORITY_COLOURS[m.seniority] || 'bg-gray-100 text-gray-600'}`}>
-                    {m.seniority}
-                  </span>
-                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{m.domain}</span>
+                  {m.seniority && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SENIORITY_COLOURS[m.seniority] || 'bg-gray-100 text-gray-600'}`}>
+                      {m.seniority}
+                    </span>
+                  )}
+                  {m.domain && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{m.domain}</span>}
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {m.skills.slice(0, 5).map(s => (
-                    <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{s}</span>
-                  ))}
-                </div>
+                {skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {skills.slice(0, 5).map(s => (
+                      <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{s}</span>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm mt-auto">
-                  <span className="font-bold text-[#0B2D59]">£{m.rate_monthly.toLocaleString()}/mo</span>
-                  <span className={`flex items-center gap-1 text-xs ${availColor}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${availDot}`} />
-                    {availLabel}
-                  </span>
+                  {m.rate_monthly ? (
+                    <span className="font-bold text-[#0B2D59]">£{m.rate_monthly.toLocaleString()}/mo</span>
+                  ) : <span />}
+                  {m.availability && (
+                    <span className={`flex items-center gap-1 text-xs ${availColor}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${availDot}`} />
+                      {availLabel}
+                    </span>
+                  )}
                 </div>
                 {isEngaged ? (
                   <button className="w-full py-2 border border-gray-200 text-xs font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
@@ -795,29 +820,53 @@ function ServicesTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
 
 // ─── Tab: Case Studies ────────────────────────────────────────────────────────
 
-function CaseStudiesTab() {
+type CaseStudy = {
+  id: string;
+  title: string;
+  challenge?: string | null;
+  solution?: string | null;
+  outcome?: string | null;
+  tech_stack?: string[] | null;
+  created_at?: string | null;
+  // demo shape fields
+  industry?: string;
+  tech?: string[];
+  duration?: string;
+  team_size?: number;
+  services?: string[];
+  outcomes?: { metric: string; description: string }[];
+  client_quote?: string | null;
+};
+
+function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const items = caseStudies.length > 0 ? caseStudies : DEMO_CASE_STUDIES;
 
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Case Studies</h2>
-      {DEMO_CASE_STUDIES.map(cs => {
+      {items.length === 0 ? (
+        <p className="text-gray-400 text-sm">No case studies available yet.</p>
+      ) : items.map(cs => {
         const isExpanded = expanded[cs.id];
+        // Support both DB shape (challenge/solution/outcome/tech_stack) and demo shape
+        const tech = cs.tech_stack || cs.tech || [];
+        const outcomes = cs.outcomes || (cs.outcome ? [{ metric: 'Outcome', description: cs.outcome }] : []);
         return (
           <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <h3 className="font-bold text-gray-800">{cs.title}</h3>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>
+                  {cs.industry && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>}
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {cs.tech.map(t => (
+                  {tech.map(t => (
                     <span key={t} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t}</span>
                   ))}
                 </div>
                 <ul className="space-y-1">
-                  {cs.outcomes.slice(0, 2).map(o => (
+                  {outcomes.slice(0, 2).map(o => (
                     <li key={o.metric} className="flex items-center gap-2 text-sm text-green-600 font-medium">
                       <TrendingUp className="h-4 w-4 flex-shrink-0" />
                       <span>{o.metric}</span>
@@ -836,33 +885,41 @@ function CaseStudiesTab() {
 
             {isExpanded && (
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-4">
-                <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-2">
-                  <span><span className="font-semibold text-gray-700">Duration:</span> {cs.duration}</span>
-                  <span><span className="font-semibold text-gray-700">Team size:</span> {cs.team_size} people</span>
-                  <span><span className="font-semibold text-gray-700">Services:</span> {cs.services.join(', ')}</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-700 mb-1 text-sm">The Challenge</div>
-                  <p className="text-gray-500 text-sm">{cs.challenge}</p>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-700 mb-1 text-sm">Our Solution</div>
-                  <p className="text-gray-500 text-sm">{cs.solution}</p>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-700 mb-2 text-sm">Outcomes</div>
-                  <ul className="space-y-2">
-                    {cs.outcomes.map(o => (
-                      <li key={o.metric} className="flex items-start gap-2 text-sm">
-                        <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span>
-                          <span className="font-semibold text-gray-700">{o.metric}</span>
-                          <span className="text-gray-500"> — {o.description}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {(cs.duration || cs.team_size || cs.services) && (
+                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-2">
+                    {cs.duration && <span><span className="font-semibold text-gray-700">Duration:</span> {cs.duration}</span>}
+                    {cs.team_size && <span><span className="font-semibold text-gray-700">Team size:</span> {cs.team_size} people</span>}
+                    {cs.services && <span><span className="font-semibold text-gray-700">Services:</span> {cs.services.join(', ')}</span>}
+                  </div>
+                )}
+                {cs.challenge && (
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 text-sm">The Challenge</div>
+                    <p className="text-gray-500 text-sm">{cs.challenge}</p>
+                  </div>
+                )}
+                {cs.solution && (
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 text-sm">Our Solution</div>
+                    <p className="text-gray-500 text-sm">{cs.solution}</p>
+                  </div>
+                )}
+                {outcomes.length > 0 && (
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-2 text-sm">Outcomes</div>
+                    <ul className="space-y-2">
+                      {outcomes.map(o => (
+                        <li key={o.metric} className="flex items-start gap-2 text-sm">
+                          <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span>
+                            <span className="font-semibold text-gray-700">{o.metric}</span>
+                            <span className="text-gray-500"> — {o.description}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {cs.client_quote && (
                   <div className="border-l-4 border-blue-300 pl-4 py-1 bg-blue-50 rounded-r-lg">
                     <p className="text-sm text-blue-800 italic">"{cs.client_quote}"</p>
@@ -879,29 +936,59 @@ function CaseStudiesTab() {
 
 // ─── Tab: Referrals ───────────────────────────────────────────────────────────
 
-function ReferralsTab() {
+type Referral = {
+  id: string;
+  contact_name?: string | null;
+  referee_name?: string | null;
+  job_title?: string | null;
+  referee_title?: string | null;
+  company?: string | null;
+  referee_company?: string | null;
+  relationship_type?: string | null;
+  project_vouched_for?: string | null;
+  project_duration?: string | null;
+  project_value_band?: string | null;
+  specific_outcome?: string | null;
+  written_statement?: string | null;
+  statement?: string | null;
+  confirmed?: boolean | null;
+  verified?: boolean | null;
+  confirmed_at?: string | null;
+  created_at?: string | null;
+};
+
+function ReferralsTab({ referrals }: { referrals: Referral[] }) {
+  const items = referrals.length > 0 ? referrals : DEMO_REFERRALS;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-[#0B2D59]">Referrals</h2>
         <p className="text-xs text-gray-400">Referee email addresses are never shared with buyers.</p>
       </div>
-      {DEMO_REFERRALS.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-gray-400 text-sm">No referrals confirmed yet.</p>
       ) : (
-        DEMO_REFERRALS.map(r => (
+        items.map(r => {
+          // Normalise field names between DB shape and demo shape
+          const contactName = r.contact_name || r.referee_name || '';
+          const jobTitle = r.job_title || r.referee_title || '';
+          const company = r.company || r.referee_company || '';
+          const statement = r.written_statement || r.statement || null;
+          const confirmed = r.confirmed ?? r.verified ?? false;
+          const confirmedAt = r.confirmed_at || (r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : null);
+          return (
           <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5 space-y-3">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="font-semibold text-gray-800">{r.contact_name}</div>
-                <div className="text-sm text-gray-500">{r.job_title} · {r.company}</div>
-                <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{r.relationship_type}</span>
+                <div className="font-semibold text-gray-800">{contactName}</div>
+                <div className="text-sm text-gray-500">{jobTitle} · {company}</div>
+                {r.relationship_type && <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{r.relationship_type}</span>}
               </div>
-              {r.confirmed ? (
+              {confirmed ? (
                 <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium whitespace-nowrap">
                   <CheckCircle className="h-4 w-4" />
-                  Confirmed {r.confirmed_at}
+                  Confirmed {confirmedAt}
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium whitespace-nowrap">
@@ -913,12 +1000,14 @@ function ReferralsTab() {
 
             {/* Project details */}
             <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-              <div className="text-xs text-gray-500">
-                <span className="font-semibold text-gray-700">Project:</span> {r.project_vouched_for}
-              </div>
+              {r.project_vouched_for && (
+                <div className="text-xs text-gray-500">
+                  <span className="font-semibold text-gray-700">Project:</span> {r.project_vouched_for}
+                </div>
+              )}
               <div className="flex gap-4 text-xs text-gray-500">
-                <span><span className="font-semibold text-gray-700">Duration:</span> {r.project_duration}</span>
-                <span><span className="font-semibold text-gray-700">Value:</span> {r.project_value_band}</span>
+                {r.project_duration && <span><span className="font-semibold text-gray-700">Duration:</span> {r.project_duration}</span>}
+                {r.project_value_band && <span><span className="font-semibold text-gray-700">Value:</span> {r.project_value_band}</span>}
               </div>
               {r.specific_outcome && (
                 <div className="text-xs text-gray-600 mt-1">{r.specific_outcome}</div>
@@ -926,13 +1015,14 @@ function ReferralsTab() {
             </div>
 
             {/* Written statement */}
-            {r.written_statement && (
+            {statement && (
               <div className="border-l-4 border-teal-300 pl-4 py-1 bg-teal-50 rounded-r-lg">
-                <p className="text-sm text-teal-800 italic">"{r.written_statement}"</p>
+                <p className="text-sm text-teal-800 italic">"{statement}"</p>
               </div>
             )}
           </div>
-        ))
+          );
+        })
       )}
     </div>
   );

@@ -441,7 +441,7 @@ const CustomerDashboard: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [stats, setStats] = useState({ activeProjects: 0, pendingMilestones: 0, totalSpent: 0, unreadMessages: 0, openJobs: 0 });
-  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
 
   useEffect(() => {
     if (!user) return;
