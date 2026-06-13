@@ -51,9 +51,9 @@ const AdminLogin: React.FC = () => {
           <Globe className="h-8 w-8 text-[#0070F3]" />
           <span className="text-2xl font-bold text-[#0B2D59]">Collabov</span>
         </Link>
-        <h2 className="text-center text-2xl font-bold text-gray-900">Admin sign in</h2>
+        <h2 className="text-center text-2xl font-bold text-gray-900">Internal sign in</h2>
         <p className="mt-2 text-center text-sm text-gray-500">
-          Admin accounts are provisioned by the system administrator
+          Authorised personnel only
         </p>
       </div>
 

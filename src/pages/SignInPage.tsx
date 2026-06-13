@@ -272,11 +272,6 @@ const SignInPage: React.FC = () => {
                   Sign up
                 </Link>
               </p>
-              <p className="text-xs text-gray-400">
-                <Link to="/admin/login" className="hover:text-gray-600 transition-colors">
-                  Sign in as Admin
-                </Link>
-              </p>
             </div>
           </motion.div>
         </div>
