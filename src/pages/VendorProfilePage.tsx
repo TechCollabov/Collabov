@@ -251,12 +251,93 @@ const TABS = [
   'Calendar & Availability',
 ];
 
-type VendorData = typeof DEMO_VENDOR;
+type VendorData = any;
+
+// ─── DB Types ─────────────────────────────────────────────────────────────────
+
+interface DBVendor {
+  id: string;
+  company_name: string;
+  tagline: string | null;
+  description: string | null;
+  city: string | null;
+  country: string | null;
+  rating: number | null;
+  review_count: number | null;
+  projects_completed: number | null;
+  response_time: string | null;
+  monthly_rate: number | null;
+  hourly_rate: number | null;
+  is_verified: boolean;
+  employee_count: number | null;
+  years_in_business: number | null;
+  created_at: string;
+}
+
+interface DBEmployee {
+  id: string;
+  vendor_id: string;
+  name: string;
+  title: string | null;
+  bio: string | null;
+  profile_picture_url: string | null;
+}
+
+interface DBPackage {
+  id: string;
+  vendor_id: string;
+  name: string;
+  description: string | null;
+  price: number | null;
+  delivery_days: number | null;
+}
+
+interface DBPortfolioItem {
+  id: string;
+  vendor_id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  project_url: string | null;
+}
+
+interface DBReview {
+  id: string;
+  vendor_id: string;
+  customer_id: string;
+  rating: number;
+  comment: string | null;
+  would_recommend: boolean | null;
+  created_at: string;
+  profiles?: { full_name: string | null } | null;
+}
+
+interface DBCaseStudy {
+  id: string;
+  vendor_id: string;
+  title: string;
+  challenge: string | null;
+  solution: string | null;
+  outcome: string | null;
+  tech_stack: string[] | null;
+  created_at: string;
+}
+
+interface DBReferral {
+  id: string;
+  vendor_id: string;
+  referee_name: string;
+  referee_title: string | null;
+  referee_company: string | null;
+  statement: string | null;
+  verified: boolean;
+  created_at: string;
+}
 
 // ─── Interview Modal ──────────────────────────────────────────────────────────
 
 interface InterviewModalProps {
-  member: (typeof DEMO_TEAM)[0];
+  member: any;
   onClose: () => void;
 }
 
@@ -447,8 +528,19 @@ const PaymentBadge = ({ rate }: { rate: number }) => {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
-  const avail = vendor.availability_status;
+function Sidebar({ vendor, onRFP }: { vendor: any; onRFP: () => void }) {
+  const monthlyRate = vendor.monthly_rate ?? vendor.monthly_rate_min ?? 0;
+  const hourlyRate = vendor.hourly_rate ?? vendor.hourly_rate_min ?? 0;
+  const teamSize = vendor.team_size_band ?? (vendor.employee_count ? `${vendor.employee_count} employees` : 'N/A');
+  const timezone = vendor.timezone ?? 'N/A';
+  const languages = vendor.languages ?? ['English'];
+  const responseTime = vendor.response_time_hours ?? vendor.response_time ?? 'N/A';
+  const minProjectValue = vendor.minimum_project_value ?? 0;
+  const ir35 = vendor.ir35_compliant ?? false;
+  const gdpr = vendor.gdpr_ready ?? false;
+  const avail = vendor.availability_status ?? 'available';
+  const paymentRate = vendor.payment_reputation_rate ?? 97;
+
   const availEl =
     avail === 'available' ? (
       <span className="flex items-center gap-2 text-sm"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-green-700 font-medium">Available now</span></span>
@@ -460,15 +552,15 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-20 space-y-3">
-      <div className="text-3xl font-black text-[#0B2D59]">From £{vendor.monthly_rate_min.toLocaleString()}/month</div>
-      <div className="text-sm text-gray-500">From £{vendor.hourly_rate_min}/hour</div>
+      <div className="text-3xl font-black text-[#0B2D59]">From £{monthlyRate.toLocaleString()}/month</div>
+      <div className="text-sm text-gray-500">From £{hourlyRate}/hour</div>
       <hr className="border-gray-100" />
       {[
-        { label: 'Team size', value: vendor.team_size_band },
-        { label: 'Timezone', value: vendor.timezone },
-        { label: 'Languages', value: vendor.languages.join(', ') },
-        { label: 'Response time', value: `Within ${vendor.response_time_hours}h` },
-        { label: 'Min. project value', value: `£${vendor.minimum_project_value.toLocaleString()}` },
+        { label: 'Team size', value: teamSize },
+        { label: 'Timezone', value: timezone },
+        { label: 'Languages', value: Array.isArray(languages) ? languages.join(', ') : languages },
+        { label: 'Response time', value: typeof responseTime === 'number' ? `Within ${responseTime}h` : responseTime },
+        { label: 'Min. project value', value: `£${minProjectValue.toLocaleString()}` },
       ].map(({ label, value }) => (
         <div key={label} className="flex justify-between text-sm">
           <span className="text-gray-400">{label}</span>
@@ -476,12 +568,12 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
         </div>
       ))}
       <div className="flex flex-wrap gap-2">
-        {vendor.ir35_compliant && (
+        {ir35 && (
           <span className="text-xs bg-green-50 text-green-700 border border-green-100 px-2 py-1 rounded-full font-medium">
             IR35 Compliant
           </span>
         )}
-        {vendor.gdpr_ready && (
+        {gdpr && (
           <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-1 rounded-full font-medium">
             GDPR-Ready
           </span>
@@ -490,7 +582,7 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
       {availEl}
       <div>
         <div className="text-xs text-gray-500 mb-1">Buyer payment history</div>
-        <PaymentBadge rate={(vendor as typeof DEMO_VENDOR).payment_reputation_rate || 97} />
+        <PaymentBadge rate={paymentRate} />
       </div>
       <hr className="border-gray-100" />
       <button
@@ -518,7 +610,16 @@ function Sidebar({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
 
 // ─── Tab: Overview ────────────────────────────────────────────────────────────
 
-function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
+function OverviewTab({ vendor, onRFP, serviceCategories, industries }: { vendor: any; onRFP: () => void; serviceCategories: string[]; industries: string[] }) {
+  const displayServices = serviceCategories.length > 0 ? serviceCategories : (vendor.service_categories || []);
+  const displayIndustries = industries.length > 0 ? industries : (vendor.industry_focus || []);
+  const facts = [
+    vendor.years_in_business || vendor.founded_year ? `Founded ${vendor.founded_year ?? new Date().getFullYear() - (vendor.years_in_business ?? 0)}` : null,
+    vendor.team_size_band || vendor.employee_count ? `${vendor.team_size_band ?? vendor.employee_count + ' employees'}` : null,
+    (vendor.city || vendor.country) ? `${vendor.city ?? ''}, ${vendor.country ?? ''}`.replace(/^, |, $/, '') : null,
+    `${vendor.engagement_count ?? vendor.projects_completed ?? 0} engagements`,
+  ].filter(Boolean) as string[];
+
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       <div className="flex-[2] space-y-8">
@@ -526,12 +627,7 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">About {vendor.company_name}</h2>
           <div className="flex flex-wrap gap-3 mb-5">
-            {[
-              `Founded ${vendor.founded_year}`,
-              `${vendor.team_size_band} employees`,
-              `${vendor.city}, ${vendor.country}`,
-              `${vendor.engagement_count} engagements`,
-            ].map(f => (
+            {facts.map(f => (
               <span key={f} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full">{f}</span>
             ))}
           </div>
@@ -542,7 +638,7 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Core Services</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {vendor.service_categories.map(s => (
+            {displayServices.map((s: string) => (
               <div key={s} className="bg-white rounded-xl p-4 border border-gray-100 text-center">
                 <div className="text-[#0070F3] mb-2 flex justify-center">
                   {SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}
@@ -554,6 +650,7 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
         </section>
 
         {/* Tech Stack */}
+        {vendor.tech_stack && Object.keys(vendor.tech_stack).length > 0 && (
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Technology Stack</h2>
           <div className="space-y-4">
@@ -571,16 +668,19 @@ function OverviewTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
             ))}
           </div>
         </section>
+        )}
 
         {/* Industries */}
+        {displayIndustries.length > 0 && (
         <section>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Industries We Serve</h2>
           <div className="flex flex-wrap gap-2">
-            {vendor.industry_focus.map(i => (
+            {displayIndustries.map((i: string) => (
               <span key={i} className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-sm font-medium text-gray-700">{i}</span>
             ))}
           </div>
         </section>
+        )}
 
         {/* How We Work */}
         <section>
@@ -634,10 +734,19 @@ type TeamMember = {
   profile_picture_url?: string | null;
 };
 
-function TeamTab({ team, onInterviewRequest }: { team: TeamMember[]; onInterviewRequest: (m: TeamMember) => void }) {
+function TeamTab({ onInterviewRequest, employees }: { onInterviewRequest: (m: any) => void; employees: DBEmployee[] }) {
   const [domainFilter, setDomainFilter] = useState('All');
   const [seniorityFilter, setSeniorityFilter] = useState('All');
   const [availableOnly, setAvailableOnly] = useState(false);
+
+  // Map DBEmployee to TeamMember shape
+  const team: TeamMember[] = employees.map(e => ({
+    id: e.id,
+    name: e.name,
+    title: e.title || '',
+    bio: e.bio,
+    profile_picture_url: e.profile_picture_url,
+  }));
 
   const domains = ['All', ...Array.from(new Set(team.map(m => m.domain).filter(Boolean) as string[]))];
   const seniorities = ['All', ...Array.from(new Set(team.map(m => m.seniority).filter(Boolean) as string[]))];
@@ -1030,78 +1139,90 @@ function ReferralsTab({ referrals }: { referrals: Referral[] }) {
 
 // ─── Tab: Reviews ─────────────────────────────────────────────────────────────
 
-function ReviewsTab({ vendor }: { vendor: VendorData }) {
-  const categories = [
-    { label: 'Quality', key: 'quality' as const },
-    { label: 'Communication', key: 'communication' as const },
-    { label: 'Timeliness', key: 'timeliness' as const },
-    { label: 'Professionalism', key: 'professionalism' as const },
-    { label: 'Overall', key: 'overall' as const },
-  ];
+type Review = {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  would_recommend?: boolean | null;
+  created_at?: string | null;
+  profiles?: { full_name: string | null } | null;
+  // demo shape fields
+  company_type?: string;
+  location?: string;
+  project_type?: string;
+  budget_range?: string;
+  date?: string;
+  overall?: number;
+  quality?: number;
+  communication?: number;
+  timeliness?: number;
+  professionalism?: number;
+  text?: string;
+  vendor_response?: string | null;
+};
 
-  const avgByCategory = (key: keyof (typeof DEMO_REVIEWS)[0]) => {
-    const vals = DEMO_REVIEWS.map(r => r[key] as number);
-    return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
-  };
+function ReviewsTab({ vendor, reviews }: { vendor: VendorData; reviews: Review[] }) {
+  const items = reviews.length > 0 ? reviews : DEMO_REVIEWS;
+
+  const avgRating = items.length > 0
+    ? (items.reduce((sum, r) => sum + (r.overall ?? r.rating ?? 0), 0) / items.length).toFixed(1)
+    : String(vendor.rating);
 
   return (
     <div>
       {/* Summary */}
       <div className="bg-white rounded-xl border border-gray-100 p-6 mb-6 flex flex-col md:flex-row gap-8">
         <div className="text-center flex-shrink-0">
-          <div className="text-5xl font-bold text-[#0B2D59] mb-1">{vendor.rating}</div>
-          <Stars rating={vendor.rating} size="md" />
+          <div className="text-5xl font-bold text-[#0B2D59] mb-1">{avgRating}</div>
+          <Stars rating={parseFloat(avgRating)} size="md" />
           <div className="text-sm text-gray-400 mt-1">out of 5</div>
         </div>
-        <div className="flex-1 space-y-2">
-          {categories.map(({ label, key }) => (
-            <div key={label} className="flex items-center gap-3">
-              <span className="text-sm text-gray-500 w-32">{label}</span>
-              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-yellow-400 rounded-full"
-                  style={{ width: `${(parseFloat(avgByCategory(key)) / 5) * 100}%` }}
-                />
-              </div>
-              <span className="text-sm font-medium text-gray-700 w-8">{avgByCategory(key)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="text-center flex-shrink-0">
-          <div className="text-2xl font-bold text-gray-700">{vendor.review_count}</div>
+        <div className="text-center flex-shrink-0 self-center">
+          <div className="text-2xl font-bold text-gray-700">{items.length || vendor.review_count}</div>
           <div className="text-sm text-gray-400">reviews</div>
         </div>
       </div>
 
       {/* Individual reviews */}
       <div className="space-y-4">
-        {DEMO_REVIEWS.map(r => (
-          <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5">
-            <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
-              <div>
-                <div className="font-semibold text-gray-700 text-sm">{r.company_type}</div>
-                <div className="text-xs text-gray-400 flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />{r.location} · {r.project_type} · {r.budget_range} · {r.date}
+        {items.map(r => {
+          const overallRating = r.overall ?? r.rating ?? 0;
+          const reviewDate = r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+          const reviewerName = r.profiles?.full_name || r.company_type || 'Anonymous';
+          const reviewText = r.text || r.comment || '';
+          return (
+            <div key={r.id} className="bg-white rounded-xl border border-gray-100 p-5">
+              <div className="flex items-start justify-between mb-3 flex-wrap gap-2">
+                <div>
+                  <div className="font-semibold text-gray-700 text-sm">{reviewerName}</div>
+                  <div className="text-xs text-gray-400 flex items-center gap-1">
+                    {r.location && <><MapPin className="h-3 w-3" />{r.location} · </>}
+                    {r.project_type && <>{r.project_type} · </>}
+                    {r.budget_range && <>{r.budget_range} · </>}
+                    {reviewDate}
+                  </div>
                 </div>
+                <Stars rating={overallRating} />
               </div>
-              <Stars rating={r.overall} />
+              {(r.quality || r.communication || r.timeliness || r.professionalism) && (
+                <div className="flex gap-4 mb-3 flex-wrap text-xs text-gray-500">
+                  {(['quality', 'communication', 'timeliness', 'professionalism'] as const).map(k => r[k] ? (
+                    <span key={k} className="capitalize">
+                      <span className="font-medium text-gray-600">{k.charAt(0).toUpperCase() + k.slice(1)}:</span> {r[k]}/5
+                    </span>
+                  ) : null)}
+                </div>
+              )}
+              {reviewText && <p className="text-gray-600 text-sm">{reviewText}</p>}
+              {r.vendor_response && (
+                <div className="mt-3 border-l-4 border-blue-200 pl-4 py-2 bg-blue-50 rounded-r-lg">
+                  <div className="text-xs font-semibold text-blue-700 mb-1">Vendor response</div>
+                  <p className="text-sm text-blue-800">{r.vendor_response}</p>
+                </div>
+              )}
             </div>
-            <div className="flex gap-4 mb-3 flex-wrap text-xs text-gray-500">
-              {(['quality', 'communication', 'timeliness', 'professionalism'] as const).map(k => (
-                <span key={k} className="capitalize">
-                  <span className="font-medium text-gray-600">{k.charAt(0).toUpperCase() + k.slice(1)}:</span> {r[k]}/5
-                </span>
-              ))}
-            </div>
-            <p className="text-gray-600 text-sm">{r.text}</p>
-            {r.vendor_response && (
-              <div className="mt-3 border-l-4 border-blue-200 pl-4 py-2 bg-blue-50 rounded-r-lg">
-                <div className="text-xs font-semibold text-blue-700 mb-1">Vendor response</div>
-                <p className="text-sm text-blue-800">{r.vendor_response}</p>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1243,12 +1364,21 @@ const VendorProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
+  const [dbEmployees, setDbEmployees] = useState<DBEmployee[]>([]);
+  const [dbPackages, setDbPackages] = useState<DBPackage[]>([]);
+  const [dbPortfolio, setDbPortfolio] = useState<DBPortfolioItem[]>([]);
+  const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
+  const [dbCaseStudies, setDbCaseStudies] = useState<DBCaseStudy[]>([]);
+  const [dbReferrals, setDbReferrals] = useState<DBReferral[]>([]);
+  const [dbServiceCategories, setDbServiceCategories] = useState<string[]>([]);
+  const [dbIndustries, setDbIndustries] = useState<string[]>([]);
+
   const [activeTab, setActiveTab] = useState('Overview');
   const [sticky, setSticky] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showRFP, setShowRFP] = useState(false);
   const [showDiscovery, setShowDiscovery] = useState(false);
-  const [interviewTarget, setInterviewTarget] = useState<(typeof DEMO_TEAM)[0] | null>(null);
+  const [interviewTarget, setInterviewTarget] = useState<any>(null);
 
   const headerRef = useRef<HTMLDivElement>(null);
 
@@ -1258,22 +1388,105 @@ const VendorProfilePage: React.FC = () => {
     async function load() {
       setLoading(true);
       if (vendorId === 'demo') {
-        if (!cancelled) { setVendor(DEMO_VENDOR); setLoading(false); }
+        if (!cancelled) {
+          setVendor(DEMO_VENDOR);
+          setTeamMembers(DEMO_TEAM);
+          setLoading(false);
+        }
         return;
       }
       try {
         const { data, error } = await supabase
           .from('vendors')
-          .select('*')
+          .select(`
+            *,
+            vendor_services(service_categories(name)),
+            vendor_industries(industries(name)),
+            vendor_employees(*),
+            vendor_packages(*),
+            portfolio_items(*)
+          `)
           .eq('id', vendorId)
           .single();
         if (cancelled) return;
         if (error || !data) {
-          // Not found in DB — show not found unless it's the demo
           setNotFound(true);
         } else {
-          setVendor(data as VendorData);
+          const d = data as any;
+          const serviceCategories = (d.vendor_services || [])
+            .map((vs: any) => vs.service_categories?.name)
+            .filter(Boolean);
+          const industryFocus = (d.vendor_industries || [])
+            .map((vi: any) => vi.industries?.name)
+            .filter(Boolean);
+
+          const mapped: VendorData = {
+            ...DEMO_VENDOR,
+            ...d,
+            service_categories: serviceCategories.length > 0 ? serviceCategories : DEMO_VENDOR.service_categories,
+            industry_focus: industryFocus.length > 0 ? industryFocus : DEMO_VENDOR.industry_focus,
+            tech_stack: d.tech_stack || DEMO_VENDOR.tech_stack,
+            founded_year: d.year_founded || d.founded_year || DEMO_VENDOR.founded_year,
+            team_size_band: d.employee_count ? `${d.employee_count}` : (d.company_size || DEMO_VENDOR.team_size_band),
+            rating: d.rating ?? DEMO_VENDOR.rating,
+            review_count: d.review_count ?? DEMO_VENDOR.review_count,
+            monthly_rate_min: d.monthly_rate || d.monthly_rate_min || DEMO_VENDOR.monthly_rate_min,
+            monthly_rate_max: d.monthly_rate_max || DEMO_VENDOR.monthly_rate_max,
+            hourly_rate_min: d.hourly_rate || d.hourly_rate_min || DEMO_VENDOR.hourly_rate_min,
+            hourly_rate_max: d.hourly_rate_max || DEMO_VENDOR.hourly_rate_max,
+            availability_status: d.availability_status || DEMO_VENDOR.availability_status,
+            response_time_hours: d.response_time || d.response_time_hours || DEMO_VENDOR.response_time_hours,
+            verification_status: d.is_verified ? 'verified' : 'pending',
+            engagement_count: d.projects_completed || d.engagement_count || DEMO_VENDOR.engagement_count,
+            referral_count: d.referral_count || DEMO_VENDOR.referral_count,
+            member_since: d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : DEMO_VENDOR.member_since,
+            languages: d.languages || DEMO_VENDOR.languages,
+            timezone: d.timezone || DEMO_VENDOR.timezone,
+            ir35_compliant: d.ir35_compliant ?? DEMO_VENDOR.ir35_compliant,
+            gdpr_ready: d.gdpr_ready ?? DEMO_VENDOR.gdpr_ready,
+            minimum_project_value: d.minimum_project_value || DEMO_VENDOR.minimum_project_value,
+            engagement_models: d.engagement_models || DEMO_VENDOR.engagement_models,
+          };
+          setVendor(mapped);
+
+          const employees: TeamMember[] = (d.vendor_employees || []).map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            title: e.title,
+            bio: e.bio,
+            profile_picture_url: e.profile_picture_url,
+          }));
+          setTeamMembers(employees);
         }
+
+        // Fetch reviews separately
+        const { data: reviewData } = await supabase
+          .from('reviews')
+          .select('*, profiles(full_name)')
+          .eq('vendor_id', vendorId);
+        if (!cancelled && reviewData) setReviews(reviewData as Review[]);
+
+        // Sprint 3 tables — try/catch fallback to []
+        try {
+          const { data: csData } = await supabase
+            .from('case_studies')
+            .select('*')
+            .eq('vendor_id', vendorId);
+          if (!cancelled && csData) setCaseStudies(csData as CaseStudy[]);
+        } catch {
+          // table may not exist yet
+        }
+
+        try {
+          const { data: refData } = await supabase
+            .from('vendor_referrals')
+            .select('*')
+            .eq('vendor_id', vendorId);
+          if (!cancelled && refData) setReferrals(refData as Referral[]);
+        } catch {
+          // table may not exist yet
+        }
+
       } catch {
         if (!cancelled) setNotFound(true);
       } finally {
@@ -1292,7 +1505,6 @@ const VendorProfilePage: React.FC = () => {
             entity_id: vendorId || 'demo',
             payload: { page: 'vendor_profile', vendor_id: vendorId },
           });
-          // Also increment profile_view_count
           if (vendorId && vendorId !== 'demo') {
             await sb.rpc('increment_profile_views', { vendor_id: vendorId });
           }
@@ -1319,7 +1531,7 @@ const VendorProfilePage: React.FC = () => {
     setShowRFP(true);
   };
 
-  const handleInterviewRequest = (m: (typeof DEMO_TEAM)[0]) => {
+  const handleInterviewRequest = (m: TeamMember) => {
     if (!user) { navigate(`/signin?returnUrl=/vendor/profile/${vendorId}`); return; }
     setInterviewTarget(m);
   };
@@ -1463,11 +1675,11 @@ const VendorProfilePage: React.FC = () => {
       {/* Tab content */}
       <div className="container mx-auto px-6 py-8">
         {activeTab === 'Overview' && <OverviewTab vendor={vendor} onRFP={openRFP} />}
-        {activeTab === 'Team Members' && <TeamTab onInterviewRequest={handleInterviewRequest} />}
+        {activeTab === 'Team Members' && <TeamTab team={teamMembers} onInterviewRequest={handleInterviewRequest} />}
         {activeTab === 'Services & Packages' && <ServicesTab vendor={vendor} onRFP={openRFP} />}
-        {activeTab === 'Case Studies' && <CaseStudiesTab />}
-        {activeTab === 'Referrals' && <ReferralsTab />}
-        {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} />}
+        {activeTab === 'Case Studies' && <CaseStudiesTab caseStudies={caseStudies} />}
+        {activeTab === 'Referrals' && <ReferralsTab referrals={referrals} />}
+        {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} reviews={reviews} />}
         {activeTab === 'Calendar & Availability' && <CalendarTab onDiscovery={() => setShowDiscovery(true)} />}
       </div>
 
