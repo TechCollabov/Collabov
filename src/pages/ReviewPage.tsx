@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Clock, Star, CheckCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,7 +64,10 @@ const VENDOR_CRITERIA = [
 export default function ReviewPage() {
   const [searchParams] = useSearchParams();
   const role = searchParams.get('role') ?? 'buyer';
+  const engagement = searchParams.get('engagement') ?? '';
   const counterparty = searchParams.get('counterparty') ?? 'the counterparty';
+
+  const { user } = useAuth();
 
   const criteriaKeys =
     role === 'buyer'
@@ -72,14 +77,49 @@ export default function ReviewPage() {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [reviewText, setReviewText] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const allRated = criteriaKeys.every((k) => (ratings[k] ?? 0) > 0);
-  const canSubmit = allRated && reviewText.trim().length >= 50;
+  const canSubmit = allRated && reviewText.trim().length >= 50 && !submitting;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
-    setSubmitted(true);
+    if (!canSubmit || !user) return;
+
+    setSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      const ratingValues = criteriaKeys.map((k) => ratings[k] ?? 0);
+      const avgRating = ratingValues.reduce((a, b) => a + b, 0) / ratingValues.length;
+
+      const reviewRecord: Record<string, unknown> = {
+        rating: Math.round(avgRating * 10) / 10,
+        comment: reviewText,
+        would_recommend: true,
+        project_id: engagement || null,
+      };
+
+      if (role === 'buyer') {
+        reviewRecord.customer_id = user.id;
+        reviewRecord.vendor_id = counterparty || null;
+      } else {
+        reviewRecord.vendor_id = user.id;
+        reviewRecord.customer_id = counterparty || null;
+      }
+
+      const { error } = await supabase.from('reviews').insert(reviewRecord);
+
+      if (error) throw error;
+
+      setSubmitted(true);
+    } catch (err) {
+      console.error('ReviewPage submit error:', err);
+      setErrorMsg('Failed to submit your review. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // ── Success state ────────────────────────────────────────────────────────────
@@ -111,7 +151,7 @@ export default function ReviewPage() {
         {/* Header */}
         <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Leave a Review</h1>
         <p className="text-sm text-gray-500 mb-4">
-          Payment Gateway Rebuild — TechForge Solutions
+          {counterparty}
         </p>
 
         {/* 14-day window notice */}
@@ -122,6 +162,13 @@ export default function ReviewPage() {
             automatically.
           </p>
         </div>
+
+        {/* Error toast */}
+        {errorMsg && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5 text-sm text-red-700">
+            {errorMsg}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           {/* Star criteria */}
@@ -194,7 +241,7 @@ export default function ReviewPage() {
             disabled={!canSubmit}
             className="w-full bg-[#0070F3] text-white rounded-xl py-3.5 font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
           >
-            Submit Review →
+            {submitting ? 'Submitting…' : 'Submit Review →'}
           </button>
         </form>
 

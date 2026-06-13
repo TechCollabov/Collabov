@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search, Star, ShieldCheck, Bookmark, BookmarkCheck, X, Filter,
-  ChevronDown, ChevronUp, ArrowRight, CheckSquare, Square, TrendingUp, UserCheck
+  ChevronDown, ChevronUp, ArrowRight, CheckSquare, Square, TrendingUp, UserCheck, Loader2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 /* ── Market Insight Data ── */
 const MARKET_INSIGHT_DATA: Record<string, { rate: string; demand: string; tip: string }> = {
@@ -240,6 +241,56 @@ const ResultsPage: React.FC = () => {
   const [saved, setSaved] = useState<string[]>([]);
   const [insightDismissed, setInsightDismissed] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [dbVendors, setDbVendors] = useState<Vendor[]>([]);
+  const [loadingVendors, setLoadingVendors] = useState(true);
+
+  useEffect(() => {
+    async function fetchVendors() {
+      try {
+        const { data, error } = await supabase
+          .from('vendors')
+          .select(`
+            id, company_name, tagline, city, country, rating, review_count,
+            projects_completed, response_time, hourly_rate, monthly_rate,
+            employee_count, is_verified,
+            vendor_services ( service_categories ( name ) ),
+            vendor_industries ( industries ( name ) )
+          `)
+          .order('rating', { ascending: false });
+
+        if (error) throw error;
+
+        const mapped: Vendor[] = (data || []).map((v: any) => ({
+          id: v.id,
+          name: v.company_name,
+          city: v.city || '',
+          country: v.country || 'UK',
+          type: 'MSP' as VendorType, // default; real type stored in vendor_services
+          verified: v.is_verified,
+          rating: v.rating || 0,
+          reviewCount: v.review_count || 0,
+          engagements: v.projects_completed || 0,
+          responseTime: v.response_time || '24hrs',
+          tagline: v.tagline || '',
+          techStack: [],
+          monthlyRate: v.monthly_rate || v.hourly_rate || 0,
+          availability: 'available' as const,
+          ir35: false,
+          referrals: 0,
+          service_categories: (v.vendor_services || []).map((s: any) => s.service_categories?.name).filter(Boolean),
+          tech_stack: [],
+          industry_focus: (v.vendor_industries || []).map((i: any) => i.industries?.name).filter(Boolean),
+        }));
+
+        setDbVendors(mapped);
+      } catch {
+        setDbVendors([]);
+      } finally {
+        setLoadingVendors(false);
+      }
+    }
+    fetchVendors();
+  }, []);
 
   /* Apply filters */
   const applyFilters = () => {
@@ -264,7 +315,7 @@ const ResultsPage: React.FC = () => {
   };
 
   /* Compute results */
-  let results = MOCK_VENDORS.map(v => ({
+  let results = dbVendors.map(v => ({
     ...v,
     match_score: calculateMatchScore(v, query, typeParam),
   })).filter(v => {
@@ -440,8 +491,15 @@ const ResultsPage: React.FC = () => {
               );
             })()}
 
+            {/* Loading state */}
+            {loadingVendors && (
+              <div className="flex items-center justify-center h-64">
+                <Loader2 className="animate-spin text-[#0070F3]" size={32} />
+              </div>
+            )}
+
             {/* Results header */}
-            <div className="flex items-center justify-between mb-4">
+            {!loadingVendors && <div className="flex items-center justify-between mb-4">
               <h1 className="font-bold text-gray-900">
                 <span className="text-[#0070F3]">{results.length}</span> verified vendors
                 {query ? <span> for "<span className="italic">{query}</span>"</span> : ''}
@@ -458,9 +516,10 @@ const ResultsPage: React.FC = () => {
                   <option value="recent">Recently Joined</option>
                 </select>
               </div>
-            </div>
+            </div>}
 
             {/* Cards grid */}
+            {!loadingVendors && <>
             {results.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-xl border border-gray-100">
                 <div className="text-4xl mb-4">🔍</div>
@@ -596,6 +655,7 @@ const ResultsPage: React.FC = () => {
                 <button className="px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">Next</button>
               </div>
             )}
+            </>}
           </div>
         </div>
       </div>
@@ -605,7 +665,7 @@ const ResultsPage: React.FC = () => {
         <div className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-lg z-40 px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {compareIds.map(id => {
-              const v = MOCK_VENDORS.find(x => x.id === id);
+              const v = dbVendors.find(x => x.id === id);
               if (!v) return null;
               const { initials, colour } = initialsAvatar(v.name);
               return (

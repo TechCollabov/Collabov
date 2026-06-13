@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Store, FolderOpen, DollarSign, Inbox, ShieldCheck,
@@ -6,6 +6,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
