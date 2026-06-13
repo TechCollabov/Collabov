@@ -882,7 +882,8 @@ function TeamTab({ onInterviewRequest, employees }: { onInterviewRequest: (m: an
 
 // ─── Tab: Services & Packages ─────────────────────────────────────────────────
 
-function ServicesTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void }) {
+function ServicesTab({ vendor, onRFP, packages, serviceCategories }: { vendor: any; onRFP: () => void; packages: DBPackage[]; serviceCategories: string[] }) {
+  const displayServices = serviceCategories.length > 0 ? serviceCategories : (vendor.service_categories || []);
   const serviceDescriptions: Record<string, string> = {
     'Software Development': 'Full-cycle web application development: discovery, architecture, build, QA, and deployment. We work in React, Node.js, Go, and Python.',
     'Cloud & Infrastructure': 'Cloud architecture, migration, and ongoing management across AWS and GCP. Infrastructure-as-Code with Terraform.',
@@ -894,34 +895,56 @@ function ServicesTab({ vendor, onRFP }: { vendor: VendorData; onRFP: () => void 
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Services</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {vendor.service_categories.map(s => (
-            <div key={s} className="bg-white rounded-xl border border-gray-100 p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="text-[#0070F3]">{SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}</div>
-                <h3 className="font-bold text-gray-800 text-sm">{s}</h3>
+        {displayServices.length === 0 ? (
+          <p className="text-gray-400 text-sm">No services listed yet.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {displayServices.map((s: string) => (
+              <div key={s} className="bg-white rounded-xl border border-gray-100 p-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-[#0070F3]">{SERVICE_ICONS[s] || <Briefcase className="h-5 w-5" />}</div>
+                  <h3 className="font-bold text-gray-800 text-sm">{s}</h3>
+                </div>
+                <p className="text-gray-500 text-xs leading-relaxed mb-4">
+                  {serviceDescriptions[s] || 'Service description coming soon.'}
+                </p>
+                <button
+                  onClick={onRFP}
+                  className="px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Request Quote
+                </button>
               </div>
-              <p className="text-gray-500 text-xs leading-relaxed mb-4">
-                {serviceDescriptions[s] || 'Service description coming soon.'}
-              </p>
-              <button
-                onClick={onRFP}
-                className="px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                Request Quote
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
         <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Packages</h2>
-        <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
-          <Briefcase className="h-8 w-8 mx-auto mb-3 text-gray-200" />
-          <p className="text-sm">No packages listed yet.</p>
-          <p className="text-xs mt-1">This vendor operates on a bespoke project basis. Use "Request Quote" above.</p>
-        </div>
+        {packages.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
+            <Briefcase className="h-8 w-8 mx-auto mb-3 text-gray-200" />
+            <p className="text-sm">No packages listed yet.</p>
+            <p className="text-xs mt-1">This vendor operates on a bespoke project basis. Use "Request Quote" above.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {packages.map(pkg => (
+              <div key={pkg.id} className="bg-white rounded-xl border border-gray-100 p-5">
+                <h3 className="font-bold text-gray-800 text-sm mb-1">{pkg.name}</h3>
+                {pkg.description && <p className="text-gray-500 text-xs leading-relaxed mb-3">{pkg.description}</p>}
+                <div className="flex items-center justify-between mt-2">
+                  {pkg.price != null && <span className="font-bold text-[#0B2D59]">£{pkg.price.toLocaleString()}</span>}
+                  {pkg.delivery_days != null && <span className="text-xs text-gray-400">{pkg.delivery_days} days delivery</span>}
+                </div>
+                <button onClick={onRFP} className="mt-3 w-full px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors">
+                  Request Quote
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1382,118 +1405,72 @@ const VendorProfilePage: React.FC = () => {
 
   const headerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch from Supabase, fall back to mock
+  // Fetch from Supabase
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
       if (vendorId === 'demo') {
-        if (!cancelled) {
-          setVendor(DEMO_VENDOR);
-          setTeamMembers(DEMO_TEAM);
-          setLoading(false);
-        }
+        if (!cancelled) { setVendor(DEMO_VENDOR as any); setLoading(false); }
         return;
       }
       try {
-        const { data, error } = await supabase
+        // Fetch vendor
+        const { data: vendorData, error: vendorError } = await supabase
           .from('vendors')
-          .select(`
-            *,
-            vendor_services(service_categories(name)),
-            vendor_industries(industries(name)),
-            vendor_employees(*),
-            vendor_packages(*),
-            portfolio_items(*)
-          `)
+          .select('*')
           .eq('id', vendorId)
           .single();
         if (cancelled) return;
-        if (error || !data) {
-          setNotFound(true);
-        } else {
-          const d = data as any;
-          const serviceCategories = (d.vendor_services || [])
-            .map((vs: any) => vs.service_categories?.name)
-            .filter(Boolean);
-          const industryFocus = (d.vendor_industries || [])
-            .map((vi: any) => vi.industries?.name)
-            .filter(Boolean);
+        if (vendorError || !vendorData) { setNotFound(true); setLoading(false); return; }
+        setVendor(vendorData as any);
 
-          const mapped: VendorData = {
-            ...DEMO_VENDOR,
-            ...d,
-            service_categories: serviceCategories.length > 0 ? serviceCategories : DEMO_VENDOR.service_categories,
-            industry_focus: industryFocus.length > 0 ? industryFocus : DEMO_VENDOR.industry_focus,
-            tech_stack: d.tech_stack || DEMO_VENDOR.tech_stack,
-            founded_year: d.year_founded || d.founded_year || DEMO_VENDOR.founded_year,
-            team_size_band: d.employee_count ? `${d.employee_count}` : (d.company_size || DEMO_VENDOR.team_size_band),
-            rating: d.rating ?? DEMO_VENDOR.rating,
-            review_count: d.review_count ?? DEMO_VENDOR.review_count,
-            monthly_rate_min: d.monthly_rate || d.monthly_rate_min || DEMO_VENDOR.monthly_rate_min,
-            monthly_rate_max: d.monthly_rate_max || DEMO_VENDOR.monthly_rate_max,
-            hourly_rate_min: d.hourly_rate || d.hourly_rate_min || DEMO_VENDOR.hourly_rate_min,
-            hourly_rate_max: d.hourly_rate_max || DEMO_VENDOR.hourly_rate_max,
-            availability_status: d.availability_status || DEMO_VENDOR.availability_status,
-            response_time_hours: d.response_time || d.response_time_hours || DEMO_VENDOR.response_time_hours,
-            verification_status: d.is_verified ? 'verified' : 'pending',
-            engagement_count: d.projects_completed || d.engagement_count || DEMO_VENDOR.engagement_count,
-            referral_count: d.referral_count || DEMO_VENDOR.referral_count,
-            member_since: d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : DEMO_VENDOR.member_since,
-            languages: d.languages || DEMO_VENDOR.languages,
-            timezone: d.timezone || DEMO_VENDOR.timezone,
-            ir35_compliant: d.ir35_compliant ?? DEMO_VENDOR.ir35_compliant,
-            gdpr_ready: d.gdpr_ready ?? DEMO_VENDOR.gdpr_ready,
-            minimum_project_value: d.minimum_project_value || DEMO_VENDOR.minimum_project_value,
-            engagement_models: d.engagement_models || DEMO_VENDOR.engagement_models,
-          };
-          setVendor(mapped);
+        // Fetch related data in parallel
+        const [
+          { data: employeesData },
+          { data: packagesData },
+          { data: portfolioData },
+          { data: reviewsData },
+          { data: servicesData },
+          { data: industriesData },
+        ] = await Promise.all([
+          supabase.from('vendor_employees').select('*').eq('vendor_id', vendorId),
+          supabase.from('vendor_packages').select('*').eq('vendor_id', vendorId),
+          supabase.from('portfolio_items').select('*').eq('vendor_id', vendorId),
+          supabase.from('reviews').select('*, profiles(full_name)').eq('vendor_id', vendorId).order('created_at', { ascending: false }),
+          supabase.from('vendor_services').select('service_categories(name)').eq('vendor_id', vendorId),
+          supabase.from('vendor_industries').select('industries(name)').eq('vendor_id', vendorId),
+        ]);
 
-          const employees: TeamMember[] = (d.vendor_employees || []).map((e: any) => ({
-            id: e.id,
-            name: e.name,
-            title: e.title,
-            bio: e.bio,
-            profile_picture_url: e.profile_picture_url,
-          }));
-          setTeamMembers(employees);
+        if (!cancelled) {
+          setDbEmployees((employeesData || []) as DBEmployee[]);
+          setDbPackages((packagesData || []) as DBPackage[]);
+          setDbPortfolio((portfolioData || []) as DBPortfolioItem[]);
+          setDbReviews((reviewsData || []) as DBReview[]);
+          setDbServiceCategories(((servicesData || []) as any[]).map((s: any) => s.service_categories?.name).filter(Boolean));
+          setDbIndustries(((industriesData || []) as any[]).map((i: any) => i.industries?.name).filter(Boolean));
         }
 
-        // Fetch reviews separately
-        const { data: reviewData } = await supabase
-          .from('reviews')
-          .select('*, profiles(full_name)')
-          .eq('vendor_id', vendorId);
-        if (!cancelled && reviewData) setReviews(reviewData as Review[]);
-
-        // Sprint 3 tables — try/catch fallback to []
+        // Try sprint-3 tables — graceful fallback
         try {
-          const { data: csData } = await supabase
-            .from('case_studies')
-            .select('*')
-            .eq('vendor_id', vendorId);
-          if (!cancelled && csData) setCaseStudies(csData as CaseStudy[]);
+          const [{ data: csData }, { data: refData }] = await Promise.all([
+            supabase.from('case_studies').select('*').eq('vendor_id', vendorId),
+            supabase.from('vendor_referrals').select('*').eq('vendor_id', vendorId),
+          ]);
+          if (!cancelled) {
+            setDbCaseStudies((csData || []) as DBCaseStudy[]);
+            setDbReferrals((refData || []) as DBReferral[]);
+          }
         } catch {
-          // table may not exist yet
+          // tables don't exist yet — leave as []
         }
-
-        try {
-          const { data: refData } = await supabase
-            .from('vendor_referrals')
-            .select('*')
-            .eq('vendor_id', vendorId);
-          if (!cancelled && refData) setReferrals(refData as Referral[]);
-        } catch {
-          // table may not exist yet
-        }
-
       } catch {
         if (!cancelled) setNotFound(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
 
-      // Log profile view (fire and forget — never breaks the page)
+      // Log profile view (fire and forget)
       const logProfileView = async () => {
         try {
           const { supabase: sb } = await import('../lib/supabase');
@@ -1508,9 +1485,7 @@ const VendorProfilePage: React.FC = () => {
           if (vendorId && vendorId !== 'demo') {
             await sb.rpc('increment_profile_views', { vendor_id: vendorId });
           }
-        } catch {
-          // Silent fail — tracking should never break the page
-        }
+        } catch { /* silent */ }
       };
       if (!cancelled) logProfileView();
     }
@@ -1531,7 +1506,7 @@ const VendorProfilePage: React.FC = () => {
     setShowRFP(true);
   };
 
-  const handleInterviewRequest = (m: TeamMember) => {
+  const handleInterviewRequest = (m: any) => {
     if (!user) { navigate(`/signin?returnUrl=/vendor/profile/${vendorId}`); return; }
     setInterviewTarget(m);
   };
@@ -1539,9 +1514,8 @@ const VendorProfilePage: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-[#0070F3] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-gray-500">Loading vendor profile…</p>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="animate-spin text-blue-600" size={32} />
         </div>
       </div>
     );
@@ -1598,14 +1572,16 @@ const VendorProfilePage: React.FC = () => {
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-2xl font-bold text-[#0B2D59]">{vendor.company_name}</h1>
-                  {vendor.verification_status === 'verified' && (
+                  {(vendor.is_verified || vendor.verification_status === 'verified') && (
                     <span className="flex items-center gap-1 text-sm text-[#0070F3] font-medium bg-blue-50 px-2 py-0.5 rounded-full">
                       <ShieldCheck className="h-4 w-4" /> Verified
                     </span>
                   )}
-                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 capitalize">
-                    {vendor.business_type}
-                  </span>
+                  {vendor.business_type && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 capitalize">
+                      {vendor.business_type}
+                    </span>
+                  )}
                 </div>
                 {vendor.tagline && (
                   <p className="text-sm text-gray-500 mt-1 max-w-xl">{vendor.tagline}</p>
@@ -1615,9 +1591,9 @@ const VendorProfilePage: React.FC = () => {
                   <span className="font-bold text-gray-700">{vendor.rating}</span>
                   <span>({vendor.review_count} reviews)</span>
                   <span>·</span>
-                  <span>{vendor.engagement_count} engagements</span>
+                  <span>{vendor.projects_completed ?? vendor.engagement_count ?? 0} engagements</span>
                   <span>·</span>
-                  {vendor.referral_count > 0 && (
+                  {(vendor.referral_count ?? 0) > 0 && (
                     <>
                       <span className="flex items-center gap-1 text-teal-600 font-medium">
                         <UserCheck className="h-4 w-4" />{vendor.referral_count} referrals verified
@@ -1625,9 +1601,8 @@ const VendorProfilePage: React.FC = () => {
                       <span>·</span>
                     </>
                   )}
-                  <span>{vendor.city}, {vendor.country}</span>
-                  <span>·</span>
-                  <span>Member since {vendor.member_since}</span>
+                  {(vendor.city || vendor.country) && <><span>{[vendor.city, vendor.country].filter(Boolean).join(', ')}</span><span>·</span></>}
+                  <span>Member since {vendor.member_since ?? (vendor.created_at ? new Date(vendor.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'N/A')}</span>
                 </div>
               </div>
             </div>
@@ -1674,12 +1649,12 @@ const VendorProfilePage: React.FC = () => {
 
       {/* Tab content */}
       <div className="container mx-auto px-6 py-8">
-        {activeTab === 'Overview' && <OverviewTab vendor={vendor} onRFP={openRFP} />}
-        {activeTab === 'Team Members' && <TeamTab team={teamMembers} onInterviewRequest={handleInterviewRequest} />}
-        {activeTab === 'Services & Packages' && <ServicesTab vendor={vendor} onRFP={openRFP} />}
-        {activeTab === 'Case Studies' && <CaseStudiesTab caseStudies={caseStudies} />}
-        {activeTab === 'Referrals' && <ReferralsTab referrals={referrals} />}
-        {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} reviews={reviews} />}
+        {activeTab === 'Overview' && <OverviewTab vendor={vendor} onRFP={openRFP} serviceCategories={dbServiceCategories} industries={dbIndustries} />}
+        {activeTab === 'Team Members' && <TeamTab onInterviewRequest={handleInterviewRequest} employees={dbEmployees} />}
+        {activeTab === 'Services & Packages' && <ServicesTab vendor={vendor} onRFP={openRFP} packages={dbPackages} serviceCategories={dbServiceCategories} />}
+        {activeTab === 'Case Studies' && <CaseStudiesTab caseStudies={dbCaseStudies} />}
+        {activeTab === 'Referrals' && <ReferralsTab referrals={dbReferrals} />}
+        {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} reviews={dbReviews} />}
         {activeTab === 'Calendar & Availability' && <CalendarTab onDiscovery={() => setShowDiscovery(true)} />}
       </div>
 
