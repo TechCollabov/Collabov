@@ -471,6 +471,27 @@ export async function sweepFlagDeadlines(engagement: EngagementParties) {
   }
 }
 
+// ── Buyer payment reliability ────────────────────────────────────────────────
+
+/** Record a payment event against the buyer's public reliability badge.
+ *  On-time = buyer actively accepted/confirmed; late = auto-release fired on
+ *  silence or a charge was held/disputed. */
+export async function recordPaymentEvent(customerId: string, onTime: boolean) {
+  const { data: c } = await supabase
+    .from('customers')
+    .select('payment_events_count, late_payment_count')
+    .eq('id', customerId)
+    .single();
+  if (!c) return;
+  const total = (c.payment_events_count ?? 0) + 1;
+  const late = (c.late_payment_count ?? 0) + (onTime ? 0 : 1);
+  await supabase.from('customers').update({
+    payment_events_count: total,
+    late_payment_count: late,
+    on_time_payment_rate: Math.round(((total - late) / total) * 10000) / 100,
+  }).eq('id', customerId);
+}
+
 // ── Notifications + audit trail ───────────────────────────────────────────────
 
 export async function notify(

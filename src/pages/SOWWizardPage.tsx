@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { notify, logEvent, NOTICE_PERIOD_DAYS, VENDOR_CONTRACT_TEMPLATE } from '../lib/workflows';
 import {
   Loader2,
   CheckCircle,
@@ -998,7 +1001,10 @@ function Step5({
   onDownload,
   onESignature,
   showESignatureModal,
-  onCloseESignature,
+  onBuyerSign,
+  buyerSigned,
+  signingInProgress,
+  obligations,
 }: {
   formData: FormData;
   vendor: string;
@@ -1009,7 +1015,10 @@ function Step5({
   onDownload: () => void;
   onESignature: () => void;
   showESignatureModal: boolean;
-  onCloseESignature: () => void;
+  onBuyerSign: () => void;
+  buyerSigned: boolean;
+  signingInProgress: boolean;
+  obligations: string;
 }) {
   const navigate = useNavigate();
 
@@ -1122,6 +1131,11 @@ function Step5({
             <span className="font-semibold">SOW document generated</span>
           </div>
 
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <h4 className="text-sm font-semibold text-gray-700 mb-1">Your obligations in plain English</h4>
+            <p className="text-xs text-gray-600 leading-relaxed">{obligations}</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -1143,7 +1157,7 @@ function Step5({
         </div>
       )}
 
-      {/* E-Signature Modal */}
+      {/* E-Signature Modal (simulated in-platform signing) */}
       {showESignatureModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
@@ -1151,33 +1165,53 @@ function Step5({
               <div className="flex justify-center">
                 <Mail className="w-10 h-10 text-blue-500" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">E-signature emails sent</h3>
+              <h3 className="text-lg font-bold text-gray-900">
+                {buyerSigned ? 'You have signed' : 'Sign the contract'}
+              </h3>
               <p className="text-sm text-gray-600">
-                Both parties will receive a DocuSign link. The contract activates once both have signed.
+                {buyerSigned
+                  ? 'Waiting for the vendor to counter-sign. Both parties sign independently — the contract activates once both signatures are in.'
+                  : 'Signing is parallel: you sign here, the vendor signs from their Active Contracts screen. The contract activates when both have signed.'}
               </p>
 
               <div className="space-y-2 mt-4">
                 <div className="flex items-center justify-between bg-white border border-blue-100 rounded-lg px-4 py-2 text-sm">
-                  <span className="text-gray-600">Vendor: <span className="font-semibold text-gray-800">{vendor || 'Vendor'}</span></span>
-                  <span className="text-green-600 font-medium text-xs">Email sent</span>
+                  <span className="text-gray-600">Buyer (you)</span>
+                  {buyerSigned
+                    ? <span className="text-green-600 font-medium text-xs">✓ Signed</span>
+                    : <span className="text-amber-600 font-medium text-xs">Awaiting signature</span>}
                 </div>
                 <div className="flex items-center justify-between bg-white border border-blue-100 rounded-lg px-4 py-2 text-sm">
-                  <span className="text-gray-600">Buyer: <span className="font-semibold text-gray-800">Tech@collabov.com</span></span>
-                  <span className="text-green-600 font-medium text-xs">Email sent</span>
+                  <span className="text-gray-600">Vendor: <span className="font-semibold text-gray-800">{vendor || 'Vendor'}</span></span>
+                  <span className="text-amber-600 font-medium text-xs">{buyerSigned ? 'Notified — awaiting signature' : 'Awaiting signature'}</span>
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 mt-2">
-                E-signature integration (DocuSign/HelloSign) will be connected before launch.
-              </p>
+              {vendorType === 'staffaug' && (
+                <p className="text-xs text-amber-600 mt-2">
+                  Staff augmentation: after both signatures, an admin stamps the IR35 status determination
+                  before the contract becomes active.
+                </p>
+              )}
 
-              <button
-                type="button"
-                onClick={() => navigate('/customer/dashboard')}
-                className="w-full bg-[#0070F3] hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl mt-2 transition-colors"
-              >
-                Return to Dashboard
-              </button>
+              {!buyerSigned ? (
+                <button
+                  type="button"
+                  onClick={onBuyerSign}
+                  disabled={signingInProgress}
+                  className="w-full bg-[#0070F3] hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-xl mt-2 transition-colors"
+                >
+                  {signingInProgress ? 'Signing…' : 'Sign Contract'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/customer/dashboard')}
+                  className="w-full bg-[#0070F3] hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl mt-2 transition-colors"
+                >
+                  Return to Dashboard
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1217,11 +1251,16 @@ function validateStep(step: number, formData: FormData): string | null {
 export default function SOWWizardPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const vendor = searchParams.get('vendor') || '';
   const vendorType = searchParams.get('type') || 'agency';
   const budget = parseFloat(searchParams.get('budget') || '0');
   const project = searchParams.get('project') || '';
+  const vendorId = searchParams.get('vendorId') || '';
+  const proposalId = searchParams.get('proposal') || '';
+  const packageId = searchParams.get('package') || '';
+  const isDiscovery = searchParams.get('discovery') === '1';
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(() =>
@@ -1233,6 +1272,76 @@ export default function SOWWizardPage() {
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
   const [showESignatureModal, setShowESignatureModal] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [buyerSigned, setBuyerSigned] = useState(false);
+  const [persistedIds, setPersistedIds] = useState<{ engagementId: string; contractId: string; sowId: string } | null>(null);
+
+  // Pre-fill from the accepted proposal or purchased package.
+  useEffect(() => {
+    let cancelled = false;
+    async function prefill() {
+      if (proposalId) {
+        const { data: p } = await supabase
+          .from('proposals')
+          .select('milestones, approach_summary, proposed_budget, discovery_fee, spec_structure, proposal_kind')
+          .eq('id', proposalId)
+          .single();
+        if (!p || cancelled) return;
+        if (p.proposal_kind === 'discovery') {
+          // Discovery: simplified 1-step SOW — single milestone equals the fee.
+          setFormData(prev => ({
+            ...prev,
+            budget: p.discovery_fee ?? prev.budget,
+            payment_model: 'Milestone-based',
+            milestones: [{
+              id: uid(),
+              name: 'Discovery: specification document',
+              description: (Array.isArray(p.spec_structure) ? p.spec_structure.map(String).join('; ') : 'Specification document delivery'),
+              amount: p.discovery_fee ?? prev.budget,
+              due_date: '',
+              acceptance_criteria: ['Specification document delivered as PDF', 'Executive summary and approach included'],
+            }],
+          }));
+        } else if (Array.isArray(p.milestones) && p.milestones.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            milestones: (p.milestones as any[]).map((m: any) => ({
+              id: uid(),
+              name: m.name ?? '',
+              description: m.description ?? '',
+              amount: Number(m.amount) || 0,
+              due_date: m.due_date ?? '',
+              acceptance_criteria: ['', ''],
+            })),
+          }));
+        }
+      } else if (packageId) {
+        const { data: pkg } = await supabase
+          .from('vendor_packages')
+          .select('name, description, price, billing_period, features')
+          .eq('id', packageId)
+          .single();
+        if (!pkg || cancelled) return;
+        const features = Array.isArray(pkg.features) ? pkg.features.map(String) : [];
+        setFormData(prev => ({
+          ...prev,
+          project_title: pkg.name,
+          description: pkg.description ?? prev.description,
+          budget: Number(pkg.price) || prev.budget,
+          milestones: [{
+            id: uid(),
+            name: pkg.name,
+            description: features.join('; '),
+            amount: Number(pkg.price) || 0,
+            due_date: '',
+            acceptance_criteria: features.length >= 2 ? features.slice(0, 3) : ['All included items delivered', 'Buyer sign-off received'],
+          }],
+        }));
+      }
+    }
+    prefill();
+    return () => { cancelled = true; };
+  }, [proposalId, packageId]);
 
   const onChange = (patch: Partial<FormData>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
@@ -1253,12 +1362,196 @@ export default function SOWWizardPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleGenerate = () => {
+  /** Plain-English obligations summary (AI-assisted in production; deterministic fallback). */
+  const obligationsSummary = () => {
+    const ms = formData.milestones.length;
+    const model = formData.payment_model;
+    return (
+      `The buyer funds each ${model === 'Monthly Recurring' ? 'monthly period' : 'milestone'} into escrow before work starts, ` +
+      `reviews delivery against ${ms > 0 ? `${ms} milestone(s) with agreed acceptance criteria` : 'the agreed acceptance criteria'}, ` +
+      `and releases payment on acceptance (or automatically after 7 days of silence). ` +
+      `The vendor delivers to the agreed scope, submits evidence for review, and responds to flagged criteria within 5 days. ` +
+      `IP: ${formData.ip_ownership}. Disputes freeze escrow and follow a 72-hour bilateral window before admin resolution. ` +
+      `UK law governs; a 12-month mutual non-solicitation applies.`
+    );
+  };
+
+  /** Persist the full SOW graph: engagement, contract, sow_documents, milestones. */
+  const handleGenerate = async () => {
+    if (!user) { navigate('/signin'); return; }
+    if (!vendorId) { setError('Missing vendor reference — reopen this wizard from the proposal or package.'); return; }
     setGenerating(true);
-    setTimeout(() => {
-      setGenerating(false);
+    setError(null);
+    try {
+      const paymentModel =
+        formData.payment_model === 'Monthly Recurring' ? 'monthly'
+        : formData.payment_model === 'Quarterly' ? 'quarterly'
+        : formData.payment_model === 'Hourly' ? 'hourly' : 'milestone';
+      const startDate = formData.start_date || new Date().toISOString().slice(0, 10);
+
+      // 1. Project record (workspace surface)
+      const { data: proj, error: projErr } = await supabase.from('projects').insert({
+        customer_id: user.id,
+        vendor_id: vendorId,
+        title: formData.project_title,
+        description: formData.description,
+        budget: formData.budget,
+        status: 'in-progress',
+        start_date: startDate,
+        deadline: formData.end_date || null,
+      }).select().single();
+      if (projErr) throw projErr;
+
+      // 2. Engagement (lifecycle spine)
+      const { data: eng, error: engErr } = await supabase.from('engagements').insert({
+        buyer_id: user.id,
+        vendor_id: vendorId,
+        project_title: formData.project_title,
+        status: 'pending_signature',
+        engagement_type: isDiscovery ? 'discovery' : vendorType === 'msp' ? 'managed_service' : vendorType === 'staffaug' ? 'staff_aug' : 'project',
+        source: packageId ? 'package' : isDiscovery ? 'discovery' : 'rfp',
+        proposal_id: proposalId || null,
+        package_id: packageId || null,
+        payment_model: paymentModel,
+        monthly_amount: paymentModel === 'monthly' ? formData.budget : null,
+        total_value: formData.budget,
+        start_date: startDate,
+        end_date: formData.end_date || null,
+        working_location: vendorType === 'staffaug' ? formData.working_location : null,
+        equipment_provider: vendorType === 'staffaug' ? (formData.equipment_provision.startsWith('Buyer') ? 'buyer' : 'vendor') : null,
+        minimum_contract_months: vendorType === 'msp' ? parseInt(formData.msp_onboarding.min_contract_term) || 12 : 12,
+        minimum_engagement_months: vendorType === 'staffaug' ? parseInt(formData.staffaug_min_engagement) || 3 : 3,
+        ir35_status: vendorType === 'staffaug' ? 'pending' : null,
+      }).select().single();
+      if (engErr) throw engErr;
+
+      // 3. Contract (template assigned by vendor type)
+      const contractNumber = `COL-${Date.now().toString(36).toUpperCase()}`;
+      const { data: contract, error: conErr } = await supabase.from('contracts').insert({
+        contract_number: contractNumber,
+        project_id: proj.id,
+        customer_id: user.id,
+        vendor_id: vendorId,
+        title: `${VENDOR_CONTRACT_TEMPLATE[vendorType] ?? 'Service Agreement'} — ${formData.project_title}`,
+        start_date: startDate,
+        end_date: formData.end_date || null,
+        total_value: formData.budget,
+        payment_terms: formData.payment_model,
+        status: 'pending',
+        terms_and_conditions:
+          `${VENDOR_CONTRACT_TEMPLATE[vendorType] ?? 'Service Agreement'}. Mutual NDA, GDPR DPA Schedule 3, ` +
+          `dispute clause, UK governing law, 12-month non-solicitation.`,
+        notice_period_days: NOTICE_PERIOD_DAYS[vendorType] ?? 14,
+        defect_liability_days: vendorType === 'agency' ? 30 : 0,
+      }).select().single();
+      if (conErr) throw conErr;
+
+      // 4. SOW document (full wizard payload)
+      const { data: sow, error: sowErr } = await supabase.from('sow_documents').insert({
+        engagement_id: eng.id,
+        contract_id: contract.id,
+        proposal_id: proposalId || null,
+        buyer_id: user.id,
+        vendor_id: vendorId,
+        vendor_business_type: vendorType,
+        project_title: formData.project_title,
+        service_type: formData.service_type,
+        description: formData.description,
+        start_date: startDate,
+        end_date: formData.end_date || null,
+        total_budget: formData.budget,
+        milestones: formData.milestones.map(m => ({
+          name: m.name, description: m.description, amount: m.amount,
+          due_date: m.due_date, acceptance_criteria: m.acceptance_criteria.filter(Boolean),
+        })),
+        payment_model: paymentModel,
+        msp_onboarding: vendorType === 'msp' ? {
+          fee: formData.msp_onboarding.fee,
+          go_live_date: formData.msp_onboarding.completion_date,
+          deliverables: formData.msp_onboarding.deliverables.filter(d => d.checked).map(d => d.text),
+          min_contract_term: formData.msp_onboarding.min_contract_term,
+        } : null,
+        monthly_amount: paymentModel === 'monthly' ? formData.budget : null,
+        equipment_provider: vendorType === 'staffaug' ? (formData.equipment_provision.startsWith('Buyer') ? 'buyer' : 'vendor') : null,
+        ip_ownership: formData.ip_ownership.startsWith('Buyer') ? 'buyer' : formData.ip_ownership.startsWith('Vendor') ? 'vendor' : 'shared',
+        ip_shared_terms: formData.ip_shared_terms || null,
+        working_location: vendorType === 'staffaug' ? formData.working_location : null,
+        ir35_answers: vendorType === 'staffaug' ? formData.ir35_answers : null,
+        obligations_summary: obligationsSummary(),
+        status: 'generated',
+        generated_at: new Date().toISOString(),
+      }).select().single();
+      if (sowErr) throw sowErr;
+
+      await supabase.from('engagements').update({ contract_id: contract.id, sow_id: sow.id, job_id: null }).eq('id', eng.id);
+
+      // 5. Milestones with escrow state machine (MSP: onboarding milestone first)
+      const milestoneRows: any[] = [];
+      if (vendorType === 'msp') {
+        milestoneRows.push({
+          project_id: proj.id,
+          engagement_id: eng.id,
+          title: 'Onboarding',
+          description: formData.msp_onboarding.deliverables.filter(d => d.checked).map(d => d.text).join('; '),
+          amount: formData.msp_onboarding.fee ?? 0,
+          due_date: formData.msp_onboarding.completion_date || null,
+          acceptance_criteria: formData.msp_onboarding.deliverables.filter(d => d.checked).map(d => d.text),
+          milestone_type: 'onboarding',
+          escrow_status: 'unfunded',
+          display_order: 0,
+        });
+      }
+      formData.milestones.forEach((m, i) => {
+        milestoneRows.push({
+          project_id: proj.id,
+          engagement_id: eng.id,
+          title: m.name,
+          description: m.description,
+          amount: m.amount,
+          due_date: m.due_date || null,
+          acceptance_criteria: m.acceptance_criteria.filter(Boolean),
+          milestone_type: isDiscovery ? 'discovery' : 'standard',
+          escrow_status: 'unfunded',
+          display_order: i + 1,
+        });
+      });
+      if (milestoneRows.length > 0) {
+        const { error: msErr } = await supabase.from('project_milestones').insert(milestoneRows);
+        if (msErr) throw msErr;
+      }
+
+      await logEvent('sow_generated', user.id, 'buyer', 'sow', sow.id, { total: formData.budget });
+      setPersistedIds({ engagementId: eng.id, contractId: contract.id, sowId: sow.id });
       setGenerated(true);
-    }, 2000);
+    } catch (e) {
+      console.error('SOW generation failed:', e);
+      setError('Could not generate the SOW. Please check the form and try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  /** Buyer signs in-app (parallel signing: the vendor signs from Active Contracts). */
+  const handleBuyerSign = async () => {
+    if (!persistedIds || !user) return;
+    setSigning(true);
+    try {
+      const now = new Date().toISOString();
+      await supabase.from('contracts').update({
+        signed_by_customer: true,
+        customer_signature_date: now,
+      }).eq('id', persistedIds.contractId);
+      await supabase.from('sow_documents').update({ buyer_signed_at: now, status: 'signing' }).eq('id', persistedIds.sowId);
+      await notify(vendorId, 'contract', 'Your contract is ready — sign now',
+        `The SOW for "${formData.project_title}" is generated and the buyer has signed. Review and counter-sign from Active Contracts.`,
+        '/vendor/dashboard/contracts');
+      await logEvent('contract_signed', user.id, 'buyer', 'contract', persistedIds.contractId, {});
+      setBuyerSigned(true);
+    } catch (e) {
+      console.error('Signing failed:', e);
+    } finally {
+      setSigning(false);
+    }
   };
 
   const handleDownload = () => {
@@ -1315,7 +1608,10 @@ export default function SOWWizardPage() {
               onDownload={handleDownload}
               onESignature={() => setShowESignatureModal(true)}
               showESignatureModal={showESignatureModal}
-              onCloseESignature={() => setShowESignatureModal(false)}
+              onBuyerSign={handleBuyerSign}
+              buyerSigned={buyerSigned}
+              signingInProgress={signing}
+              obligations={obligationsSummary()}
             />
           )}
 
