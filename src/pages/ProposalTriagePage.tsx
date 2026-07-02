@@ -4,13 +4,16 @@ import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { notify, logEvent, sweepProposalExpiry } from '../lib/workflows';
 
 type Triage = 'keep' | 'maybe' | 'decline' | null;
 
 interface Proposal {
   id: string;
   vendor: string;
+  vendor_id: string;
   vendor_type: string;
+  vendor_business_type: string;
   country: string;
   rating: number;
   reviews: number;
@@ -26,6 +29,10 @@ interface Proposal {
   payment_badge: string;
   budget_ref: number;
   job_title: string;
+  proposal_kind: string;
+  enquiry_id: string | null;
+  job_id: string | null;
+  accepted_at: string | null;
 }
 
 const daysAgo = (dateStr: string) => {
@@ -41,10 +48,11 @@ const timeAgo = (dateStr: string) => {
   return `${ago} days ago`;
 };
 
-// Map DB proposal status → triage UI state
-function statusToTriage(status: string): Triage {
-  if (status === 'interviewing') return 'keep';
-  if (status === 'rejected') return 'decline';
+// Map workflow_state → triage UI state
+function stateToTriage(state: string): Triage {
+  if (state === 'keep') return 'keep';
+  if (state === 'maybe') return 'maybe';
+  if (state === 'declined') return 'decline';
   return null;
 }
 
@@ -80,34 +88,23 @@ const ProposalTriagePage: React.FC = () => {
   const fetchProposals = useCallback(async () => {
     if (!user) return;
     try {
-      // Fetch proposals for jobs owned by the current user (buyer view)
-      // proposals → jobs (customer_id = user.id) → profiles (contractor) → vendors (contractor)
+      // Lazy "cron": expire anything past 30 days before showing the inbox.
+      await sweepProposalExpiry({ customer_id: user.id });
+
+      // Vendor proposals sent to this buyer (direct RFP/discovery) plus any
+      // proposals on this buyer's jobs.
       const { data, error } = await supabase
         .from('proposals')
         .select(`
-          id,
-          proposal_content,
-          cover_letter,
-          proposed_budget,
-          proposed_timeline,
-          proposal_score,
-          status,
-          submitted_at,
-          contractor_id,
-          job_id,
-          jobs!inner (
-            id,
-            title,
-            budget,
-            customer_id
-          ),
-          profiles!proposals_contractor_id_fkey (
-            id,
-            full_name,
-            email
-          )
+          id, proposal_content, approach_summary, proposed_budget, proposed_timeline,
+          workflow_state, proposal_kind, submitted_at, accepted_at, milestones,
+          enquiry_id, job_id, vendor_id, discovery_fee, spec_structure,
+          vendors (id, company_name, business_type, rating, review_count, referral_count, is_verified, country),
+          enquiries (title, budget_to),
+          jobs (title, budget_amount)
         `)
-        .eq('jobs.customer_id', user.id)
+        .eq('customer_id', user.id)
+        .neq('workflow_state', 'draft')
         .order('submitted_at', { ascending: false });
 
       if (error) throw error;
@@ -116,72 +113,51 @@ const ProposalTriagePage: React.FC = () => {
         return;
       }
 
-      // Collect contractor ids to look up vendor records
-      const contractorIds = Array.from(new Set((data as any[]).map((p: any) => p.contractor_id)));
-
-      const { data: vendors } = await supabase
-        .from('vendors')
-        .select('id, company_name, logo_url, rating, is_verified')
-        .in('id', contractorIds);
-
-      const vendorMap = new Map(
-        (vendors ?? []).map((v: any) => [v.id, v])
-      );
-
       const mapped: Proposal[] = (data as any[]).map((p: any) => {
-        const vendor = vendorMap.get(p.contractor_id);
-        const profile = p.profiles as { id: string; full_name: string | null; email: string | null } | null;
-        const job = p.jobs as { id: string; title: string; budget: number | null; customer_id: string } | null;
+        const vendor = Array.isArray(p.vendors) ? p.vendors[0] : p.vendors;
+        const enquiry = Array.isArray(p.enquiries) ? p.enquiries[0] : p.enquiries;
+        const job = Array.isArray(p.jobs) ? p.jobs[0] : p.jobs;
 
-        const vendorName = vendor?.company_name ?? profile?.full_name ?? profile?.email ?? 'Unknown';
-        const rating = vendor?.rating ?? 0;
+        const milestones_detail = (Array.isArray(p.milestones) ? p.milestones : []).map((m: any) => ({
+          name: m.name,
+          amount: Number(m.amount) || 0,
+          date: m.due_date ?? '',
+        }));
+        const approach_full = p.approach_summary ?? p.proposal_content ?? '';
 
-        // Parse proposal content for milestones if present
-        let milestones_detail: { name: string; amount: number; date: string }[] = [];
-        let approach_full = '';
-        let approach_preview = '';
-
-        try {
-          const parsed = typeof p.proposal_content === 'string' ? JSON.parse(p.proposal_content) : p.proposal_content;
-          if (parsed?.milestones && Array.isArray(parsed.milestones)) {
-            milestones_detail = parsed.milestones;
-          }
-          if (parsed?.approach) {
-            approach_full = parsed.approach;
-            approach_preview = approach_full.slice(0, 150);
-          }
-        } catch {
-          // proposal_content is plain text
-        }
-
-        if (!approach_full) {
-          approach_full = p.cover_letter ?? p.proposal_content ?? '';
-          approach_preview = approach_full.slice(0, 150);
-        }
-
+        const businessType = vendor?.business_type ?? 'agency';
         return {
           id: p.id,
-          vendor: vendorName,
-          vendor_type: vendor ? 'Verified Vendor' : 'Contractor',
-          country: '',
-          rating,
-          reviews: 0,
-          referrals: 0,
+          // Full vendor name is revealed to the buyer now that a proposal exists.
+          vendor: vendor?.company_name ?? 'Vendor',
+          vendor_id: p.vendor_id,
+          vendor_type: vendor?.is_verified ? 'Verified Vendor' : 'Vendor',
+          vendor_business_type: businessType,
+          country: vendor?.country ?? '',
+          rating: vendor?.rating ?? 0,
+          reviews: vendor?.review_count ?? 0,
+          referrals: vendor?.referral_count ?? 0,
           submitted_at: p.submitted_at,
           total: p.proposed_budget ?? 0,
           milestones: milestones_detail.length || 1,
-          approach_preview,
+          approach_preview: approach_full.slice(0, 150),
           approach_full,
           milestones_detail,
-          status: p.status,
-          triage: statusToTriage(p.status),
-          payment_badge: rating >= 4.5 ? 'green' : rating >= 3.5 ? 'amber' : 'red',
-          budget_ref: job?.budget ?? 0,
-          job_title: job?.title ?? '',
+          status: p.workflow_state,
+          triage: stateToTriage(p.workflow_state),
+          payment_badge: vendor?.is_verified ? 'green' : 'amber',
+          budget_ref: enquiry?.budget_to ?? job?.budget_amount ?? 0,
+          job_title: p.proposal_kind === 'discovery'
+            ? `Discovery: ${enquiry?.title ?? ''}`
+            : (enquiry?.title ?? job?.title ?? ''),
+          proposal_kind: p.proposal_kind ?? 'standard',
+          enquiry_id: p.enquiry_id,
+          job_id: p.job_id,
+          accepted_at: p.accepted_at,
         };
       });
 
-      setProposals(mapped);
+      setProposals(mapped.filter(p => !['expired', 'unsuccessful', 'withdrawn'].includes(p.status)));
     } finally {
       setLoading(false);
     }
@@ -195,23 +171,72 @@ const ProposalTriagePage: React.FC = () => {
     // Optimistic update
     setProposals(prev => prev.map(p => p.id === id ? { ...p, triage } : p));
 
-    // Map triage → DB status
-    let dbStatus: string;
-    if (triage === 'keep') dbStatus = 'interviewing';
-    else if (triage === 'decline') dbStatus = 'rejected';
-    else dbStatus = 'submitted';
-
+    const state = triage === 'keep' ? 'keep' : triage === 'maybe' ? 'maybe' : triage === 'decline' ? 'declined' : 'sent';
     const { error } = await supabase
       .from('proposals')
-      .update({ status: dbStatus })
+      .update({ workflow_state: state })
       .eq('id', id);
 
     if (error) {
       // Revert on failure
       await fetchProposals();
     } else if (triage === 'decline') {
+      const p = proposals.find(x => x.id === id);
+      if (p) {
+        // Vendor is notified in-app immediately, per the journey spec.
+        await notify(p.vendor_id, 'new_proposal', 'Proposal declined',
+          `Your proposal for "${p.job_title || 'the request'}" was declined by the buyer.`);
+      }
       showToast('Proposal declined. Vendor will be notified.');
     }
+  };
+
+  /** Accept one proposal: commit-to-negotiate. All other live proposals for the
+   *  same request auto-decline with notification, then the SOW wizard opens. */
+  const acceptProposal = async (id: string) => {
+    const chosen = proposals.find(p => p.id === id);
+    if (!chosen || !user) return;
+
+    await supabase.from('proposals')
+      .update({ workflow_state: 'accepted', accepted_at: new Date().toISOString() })
+      .eq('id', id);
+    await notify(chosen.vendor_id, 'new_proposal', 'Your proposal was accepted',
+      'Your proposal was accepted — the buyer is now preparing the SOW. You will receive the contract to sign.',
+      '/vendor/dashboard');
+    await logEvent('proposal_accepted', user.id, 'buyer', 'proposal', id, { total: chosen.total });
+
+    // Auto-archive competing proposals for the same enquiry/job.
+    const rivals = proposals.filter(p =>
+      p.id !== id &&
+      ['sent', 'keep', 'maybe'].includes(p.status) &&
+      ((chosen.enquiry_id && p.enquiry_id === chosen.enquiry_id) ||
+       (chosen.job_id && p.job_id === chosen.job_id))
+    );
+    for (const rival of rivals) {
+      await supabase.from('proposals').update({ workflow_state: 'unsuccessful' }).eq('id', rival.id);
+      await notify(rival.vendor_id, 'new_proposal', 'Proposal not selected',
+        `Your proposal for "${rival.job_title || 'the request'}" was not selected — the buyer chose another vendor.`);
+    }
+
+    navigate(
+      `/sow-wizard?proposal=${id}&vendorId=${chosen.vendor_id}` +
+      `&vendor=${encodeURIComponent(chosen.vendor)}&type=${chosen.vendor_business_type}` +
+      `&budget=${chosen.total}&project=${encodeURIComponent(chosen.job_title)}` +
+      (chosen.proposal_kind === 'discovery' ? '&discovery=1' : '')
+    );
+  };
+
+  /** Vendor silent 7 days after acceptance, before signing: buyer may withdraw. */
+  const withdrawAcceptance = async (p: Proposal) => {
+    await supabase.from('proposals').update({ workflow_state: 'withdrawn' }).eq('id', p.id);
+    // Non-response is logged permanently on the vendor profile.
+    const { data: v } = await supabase.from('vendors').select('non_response_count').eq('id', p.vendor_id).single();
+    await supabase.from('vendors').update({ non_response_count: (v?.non_response_count ?? 0) + 1 }).eq('id', p.vendor_id);
+    await notify(p.vendor_id, 'new_proposal', 'Acceptance withdrawn',
+      'The buyer withdrew acceptance after 7 days without a response. This non-response is logged on your profile.');
+    await logEvent('proposal_withdrawn', user!.id, 'buyer', 'proposal', p.id, { reason: 'vendor_unresponsive' });
+    showToast('Acceptance withdrawn. You can pick another proposal.');
+    fetchProposals();
   };
 
   const toggleExpand = (id: string) => {
@@ -299,11 +324,16 @@ const ProposalTriagePage: React.FC = () => {
               You're about to accept <strong>{confirmModal.vendor}</strong>'s proposal for{' '}
               <strong>£{confirmModal.budget.toLocaleString()}</strong>. This will proceed to SOW creation.
             </p>
+            <p className="text-xs text-gray-400 mb-4">
+              All other proposals still in Keep or Maybe for this request will be automatically declined
+              (their vendors are notified). This is commit-to-negotiate — not yet a signed contract.
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => {
+                  const id = confirmModal.id;
                   setConfirmModal(null);
-                  navigate(`/sow-wizard?vendor=${encodeURIComponent(confirmModal.vendor)}&type=${encodeURIComponent(confirmModal.type)}&budget=${confirmModal.budget}`);
+                  acceptProposal(id);
                 }}
                 className="flex-1 py-2.5 bg-[#0070F3] text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors text-sm"
               >
@@ -494,13 +524,33 @@ const ProposalTriagePage: React.FC = () => {
                         Compare
                       </label>
 
-                      {proposal.triage === 'keep' && (
+                      {proposal.triage === 'keep' && proposal.status !== 'accepted' && (
                         <button
                           onClick={() => setConfirmModal({ id: proposal.id, vendor: proposal.vendor, type: proposal.vendor_type, budget: proposal.total })}
                           className="px-4 py-1.5 text-sm font-semibold bg-[#0070F3] text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                           Accept one → SOW
                         </button>
+                      )}
+                      {proposal.status === 'accepted' && (
+                        <div className="flex items-center gap-2 ml-2">
+                          <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-1 rounded-full">Accepted — SOW in progress</span>
+                          <button
+                            onClick={() => navigate(`/sow-wizard?proposal=${proposal.id}&vendorId=${proposal.vendor_id}&vendor=${encodeURIComponent(proposal.vendor)}&type=${proposal.vendor_business_type}&budget=${proposal.total}&project=${encodeURIComponent(proposal.job_title)}`)}
+                            className="px-3 py-1.5 text-xs font-semibold bg-[#0070F3] text-white rounded-lg hover:bg-blue-700"
+                          >
+                            Continue SOW
+                          </button>
+                          {proposal.accepted_at && daysAgo(proposal.accepted_at) >= 7 && (
+                            <button
+                              onClick={() => withdrawAcceptance(proposal)}
+                              className="px-3 py-1.5 text-xs font-semibold border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
+                              title="The vendor has not responded for 7 days — you can withdraw and pick another vendor."
+                            >
+                              Withdraw (vendor unresponsive)
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

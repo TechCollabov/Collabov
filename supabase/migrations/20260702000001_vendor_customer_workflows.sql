@@ -225,8 +225,8 @@ CREATE TABLE IF NOT EXISTS terminations (
 
 CREATE TABLE IF NOT EXISTS interview_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  buyer_id uuid NOT NULL,
-  vendor_id uuid NOT NULL,
+  buyer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
   employee_id uuid NOT NULL REFERENCES vendor_employees(id) ON DELETE CASCADE,
   enquiry_id uuid REFERENCES enquiries(id) ON DELETE SET NULL,
   interview_type text NOT NULL DEFAULT 'interview', -- interview / discovery_call
