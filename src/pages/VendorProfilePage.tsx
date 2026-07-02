@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent } from '../lib/workflows';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -338,14 +339,72 @@ interface DBReferral {
 
 interface InterviewModalProps {
   member: any;
+  vendorId: string;
   onClose: () => void;
 }
 
-function InterviewModal({ member, onClose }: InterviewModalProps) {
+function InterviewModal({ member, vendorId, onClose }: InterviewModalProps) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [interviewType, setInterviewType] = useState<'candidate' | 'discovery'>('candidate');
   const [format, setFormat] = useState<'video' | 'phone' | 'inperson'>('video');
   const [message, setMessage] = useState('');
   const [dates, setDates] = useState(['', '', '']);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    if (!user) { navigate('/signin'); return; }
+    const proposedTimes = dates.filter(Boolean);
+    if (proposedTimes.length === 0) { setError('Add at least one preferred date/time.'); return; }
+    setSending(true);
+    setError('');
+    try {
+      const { error: insErr } = await supabase.from('interview_requests').insert({
+        buyer_id: user.id,
+        vendor_id: vendorId,
+        employee_id: member.id,
+        interview_type: interviewType === 'candidate' ? 'interview' : 'discovery_call',
+        format: format === 'inperson' ? 'in_person' : format,
+        proposed_times: proposedTimes,
+        respond_by: addHours(new Date(), INTERVIEW_RESPONSE_HOURS).toISOString(),
+      });
+      if (insErr) throw insErr;
+      if (message.trim()) {
+        await supabase.from('messages').insert({
+          sender_id: user.id,
+          recipient_id: vendorId,
+          content: message.trim(),
+          thread_type: 'pre_engagement',
+        });
+      }
+      await notify(vendorId, 'enquiry', 'New interview request',
+        `A buyer requested an interview with ${member.name}. Respond within 48 hours.`,
+        '/vendor/dashboard/enquiries');
+      setSent(true);
+    } catch (e) {
+      console.error('Interview request failed:', e);
+      setError('Could not send the interview request. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="bg-white rounded-2xl w-full max-w-md p-8 text-center">
+          <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-[#0B2D59] mb-1">Interview request sent</h2>
+          <p className="text-sm text-gray-500 mb-5">
+            The vendor has 48 hours to confirm one of your times or propose alternatives.
+          </p>
+          <button onClick={onClose} className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">Done</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -445,11 +504,14 @@ function InterviewModal({ member, onClose }: InterviewModalProps) {
             />
           </div>
 
+          {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-3">
             <button
-              className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={submit}
+              disabled={sending}
+              className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              Send Interview Request
+              {sending ? 'Sending…' : 'Send Interview Request'}
             </button>
             <button
               onClick={onClose}
@@ -466,8 +528,77 @@ function InterviewModal({ member, onClose }: InterviewModalProps) {
 
 // ─── Discovery Call Modal ─────────────────────────────────────────────────────
 
-function DiscoveryModal({ onClose }: { onClose: () => void }) {
-  const [msg, setMsg] = useState('');
+function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const bookingMethod: string = vendor.booking_method ?? 'manual';
+  const [msg, setMsg] = useState(
+    `Hi ${vendor.company_name}, I'd like to book a discovery call to discuss a potential project.`
+  );
+  const [slot, setSlot] = useState('');
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    if (!user) { navigate('/signin'); return; }
+    setSending(true);
+    setError('');
+    try {
+      if (bookingMethod === 'manual') {
+        // Manual: pre-filled message only — no real booking, no pending_engagement.
+        const { error: msgErr } = await supabase.from('messages').insert({
+          sender_id: user.id,
+          recipient_id: vendor.id,
+          content: msg.trim(),
+          thread_type: 'pre_engagement',
+        });
+        if (msgErr) throw msgErr;
+        await notify(vendor.id, 'message', 'Discovery call request',
+          'A buyer wants to arrange a discovery call. Reply with your availability.', '/messages');
+      } else {
+        // Calendly / Google: booking confirmed -> pending_engagement is created and
+        // the T+1 follow-up converts it into a proposal prompt.
+        if (!slot) { setError('Pick a time slot.'); setSending(false); return; }
+        const { error: peErr } = await supabase.from('pending_engagement').insert({
+          buyer_id: user.id,
+          vendor_id: vendor.id,
+          meeting_datetime: new Date(slot).toISOString(),
+          status: 'scheduled',
+        });
+        if (peErr) throw peErr;
+        await notify(vendor.id, 'enquiry', 'Discovery call booked',
+          `A buyer booked a call for ${new Date(slot).toLocaleString('en-GB')}. The meeting link comes from your ${bookingMethod === 'calendly' ? 'Calendly' : 'Google Calendar'} setup.`,
+          '/vendor/dashboard/enquiries');
+      }
+      setDone(true);
+    } catch (e) {
+      console.error('Booking failed:', e);
+      setError('Could not complete the booking. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="bg-white rounded-2xl w-full max-w-md p-8 text-center">
+          <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-[#0B2D59] mb-1">
+            {bookingMethod === 'manual' ? 'Message sent' : 'Call booked'}
+          </h2>
+          <p className="text-sm text-gray-500 mb-5">
+            {bookingMethod === 'manual'
+              ? 'The vendor will reply with available times.'
+              : 'Collabov tracks that a call was booked but does not host it — your meeting link comes from the vendor’s calendar tool. The day after the call we’ll nudge you to request a proposal.'}
+          </p>
+          <button onClick={onClose} className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">Done</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-2xl w-full max-w-md">
@@ -476,22 +607,44 @@ function DiscoveryModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-6 space-y-4">
-          <p className="text-sm text-gray-500">
-            Send a message to introduce your project. The vendor will respond with available times.
-          </p>
-          <textarea
-            rows={4}
-            value={msg}
-            onChange={e => setMsg(e.target.value)}
-            placeholder="Briefly describe your project and what you'd like to discuss..."
-            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
-          />
-          <p className="text-xs text-gray-400">
-            Connect your calendar in vendor settings to enable direct booking.
-          </p>
+          {bookingMethod === 'manual' ? (
+            <>
+              <p className="text-sm text-gray-500">
+                Send a message to introduce your project. The vendor will respond with available times.
+              </p>
+              <textarea
+                rows={4}
+                value={msg}
+                onChange={e => setMsg(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+              />
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-500">
+                {bookingMethod === 'calendly'
+                  ? 'This vendor uses Calendly — pick a slot and the video link is generated by Calendly, not Collabov.'
+                  : 'This vendor’s Google Calendar availability is connected — pick a slot and the meeting link comes from Google.'}
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Choose a time</label>
+                <input
+                  type="datetime-local"
+                  value={slot}
+                  onChange={e => setSlot(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+              </div>
+            </>
+          )}
+          {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-3">
-            <button className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-              Send Request
+            <button
+              onClick={submit}
+              disabled={sending}
+              className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {sending ? 'Sending…' : bookingMethod === 'manual' ? 'Send Request' : 'Book Call'}
             </button>
             <button onClick={onClose} className="px-5 py-3 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
@@ -1310,6 +1463,74 @@ function CalendarTab({ onDiscovery }: { onDiscovery: () => void }) {
 // ─── RFP Modal ────────────────────────────────────────────────────────────────
 
 function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void }) {
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+  const [title, setTitle] = useState('');
+  const [serviceType, setServiceType] = useState('');
+  const [description, setDescription] = useState('');
+  const [budgetFrom, setBudgetFrom] = useState('');
+  const [budgetTo, setBudgetTo] = useState('');
+  const [model, setModel] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    if (!user) { navigate('/signin'); return; }
+    if (!title.trim() || !serviceType) { setError('Title and service type are required.'); return; }
+    if (description.trim().length < 100) {
+      setError(`Description must be at least 100 characters (currently ${description.trim().length}).`);
+      return;
+    }
+    setSending(true);
+    setError('');
+    try {
+      const { data: enquiry, error: insErr } = await supabase.from('enquiries').insert({
+        customer_id: user.id,
+        vendor_id: (vendor as any).id,
+        enquiry_type: 'rfp',
+        subject: title.trim(),
+        title: title.trim(),
+        service_type: serviceType,
+        message: description.trim(),
+        budget_from: budgetFrom ? Number(budgetFrom) : null,
+        budget_to: budgetTo ? Number(budgetTo) : null,
+        engagement_model: model || null,
+        customer_email: profile?.email ?? user.email ?? '',
+        status: 'new',
+      }).select().single();
+      if (insErr) throw insErr;
+      await notify((vendor as any).id, 'enquiry', 'New proposal request',
+        `You received a direct RFP: "${title.trim()}". Respond from your Enquiries inbox.`,
+        '/vendor/dashboard/enquiries');
+      await logEvent('rfp_sent', user.id, 'buyer', 'enquiry', enquiry.id, { vendor_id: (vendor as any).id });
+      setSent(true);
+    } catch (e) {
+      console.error('RFP failed:', e);
+      setError('Could not send the request. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="bg-white rounded-2xl w-full max-w-md p-8 text-center">
+          <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-[#0B2D59] mb-1">Proposal request sent</h2>
+          <p className="text-sm text-gray-500 mb-5">
+            {vendor.company_name} has been notified. Their proposal will appear in your Proposals inbox.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => navigate('/proposals')} className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">View Proposals</button>
+            <button onClick={onClose} className="px-5 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg">Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1323,11 +1544,11 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
         <div className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Project title <span className="text-red-500">*</span></label>
-            <input type="text" placeholder="e.g. React dashboard for SaaS platform" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. React dashboard for SaaS platform" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Service type <span className="text-red-500">*</span></label>
-            <select className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]">
+            <select value={serviceType} onChange={e => setServiceType(e.target.value)} className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]">
               <option value="">Select service type</option>
               {['Software Development', 'Cloud & Infrastructure', 'DevOps', 'QA & Testing', 'Staff Augmentation', 'Other'].map(s => (
                 <option key={s} value={s}>{s}</option>
@@ -1335,17 +1556,21 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project description <span className="text-red-500">*</span></label>
-            <textarea rows={4} placeholder="Describe what you need built or managed, key requirements, and any technical context." className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Project description <span className="text-red-500">*</span>{' '}
+              <span className="text-gray-400 font-normal">(min 100 characters)</span>
+            </label>
+            <textarea rows={4} value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe what you need built or managed, key requirements, and any technical context." className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none" />
+            <p className="text-xs text-gray-400 mt-1">{description.trim().length}/100 characters minimum</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Budget from (£)</label>
-              <input type="number" placeholder="e.g. 10000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+              <input type="number" value={budgetFrom} onChange={e => setBudgetFrom(e.target.value)} placeholder="e.g. 10000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Budget to (£)</label>
-              <input type="number" placeholder="e.g. 50000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
+              <input type="number" value={budgetTo} onChange={e => setBudgetTo(e.target.value)} placeholder="e.g. 50000" className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]" />
             </div>
           </div>
           <div>
@@ -1353,7 +1578,7 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
             <div className="space-y-2">
               {['Long-term dedicated resource', 'Short-term project', 'Flexible', 'Not sure'].map(m => (
                 <label key={m} className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="model" className="text-[#0070F3]" />
+                  <input type="radio" name="model" checked={model === m} onChange={() => setModel(m)} className="text-[#0070F3]" />
                   <span className="text-sm text-gray-600">{m}</span>
                 </label>
               ))}
@@ -1367,8 +1592,9 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
               <input type="file" accept=".pdf,.docx" className="sr-only" />
             </label>
           </div>
-          <button className="w-full py-3 bg-[#0070F3] text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
-            Send Proposal Request
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <button onClick={submit} disabled={sending} className="w-full py-3 bg-[#0070F3] text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+            {sending ? 'Sending…' : 'Send Proposal Request'}
           </button>
         </div>
       </div>
@@ -1660,9 +1886,9 @@ const VendorProfilePage: React.FC = () => {
 
       {/* Modals */}
       {showRFP && <RFPModal vendor={vendor} onClose={() => setShowRFP(false)} />}
-      {showDiscovery && <DiscoveryModal onClose={() => setShowDiscovery(false)} />}
+      {showDiscovery && <DiscoveryModal vendor={vendor} onClose={() => setShowDiscovery(false)} />}
       {interviewTarget && (
-        <InterviewModal member={interviewTarget} onClose={() => setInterviewTarget(null)} />
+        <InterviewModal member={interviewTarget} vendorId={(vendor as any).id ?? vendorId ?? ''} onClose={() => setInterviewTarget(null)} />
       )}
     </div>
   );
