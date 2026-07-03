@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  ArrowLeft, ArrowRight, Plus, X, DollarSign, 
+import {
+  ArrowLeft, ArrowRight, Plus, X, DollarSign,
   Calendar, MapPin, Briefcase, FileText, Users,
   Clock, Target, Zap, Globe, User, ChevronDown,
-  Upload, Eye, Edit, Save, Send
+  Upload, Eye, Edit, Save, Send, AlertTriangle
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { notify, logEvent } from '../../lib/workflows';
 
 export interface JobData {
   title: string;
@@ -29,13 +32,24 @@ export interface JobData {
 
 const PostJobPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const isPrivate = searchParams.get('private') === 'true';
-  const preSelectedVendors = searchParams.get('vendors')?.split(',') || [];
+  const preSelectedVendors = searchParams.get('vendors')?.split(',').filter(Boolean) || [];
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
   const [newSkill, setNewSkill] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [isTender, setIsTender] = useState(searchParams.get('type') === 'tender');
+  const [tenderData, setTenderData] = useState({
+    tenderTitle: '',
+    deadline: '',
+    criteria: '',
+    ndaRequired: false,
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [profileGate, setProfileGate] = useState(false);
 
   const [jobData, setJobData] = useState<JobData>({
     title: '',
@@ -126,10 +140,70 @@ const PostJobPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = () => {
-    // Handle job posting submission
-    console.log('Job posted:', jobData);
-    navigate('/customer/dashboard?success=job-posted');
+  const handleSubmit = async () => {
+    if (!user) { navigate('/signin'); return; }
+    if (isTender && !tenderData.deadline) {
+      setSubmitError('A tender needs a submission deadline.');
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      // Hard gate: no spend before the business is identifiable.
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('company_name, country')
+        .eq('id', user.id)
+        .single();
+      if (!customer?.company_name?.trim() || !customer?.country?.trim()) {
+        setProfileGate(true);
+        setSubmitting(false);
+        return;
+      }
+
+      const { data: job, error } = await supabase.from('jobs').insert({
+        customer_id: user.id,
+        title: jobData.title,
+        description: jobData.description,
+        category: jobData.category || null,
+        budget_type: jobData.budget.type,
+        budget_amount: Number(jobData.budget.amount) || 0,
+        currency: jobData.budget.currency,
+        timeline: jobData.timeline || null,
+        experience_level: (jobData.experienceLevel || 'intermediate') as 'entry' | 'intermediate' | 'expert',
+        project_type: (jobData.projectType === 'contract' ? 'contract-to-hire' : jobData.projectType || 'one-time') as
+          | 'one-time' | 'ongoing' | 'contract-to-hire',
+        location: jobData.location || null,
+        status: 'open',
+        visibility: jobData.visibility,
+        invited_vendor_ids: jobData.invitedVendors.length ? jobData.invitedVendors : null,
+        job_kind: isTender ? 'tender' : 'job',
+        tender_title: isTender ? (tenderData.tenderTitle.trim() || jobData.title) : null,
+        nda_required: isTender ? tenderData.ndaRequired : false,
+        submission_deadline: isTender && tenderData.deadline ? new Date(tenderData.deadline).toISOString() : null,
+        evaluation_criteria: isTender && tenderData.criteria.trim()
+          ? tenderData.criteria.split('\n').map(s => s.trim()).filter(Boolean)
+          : null,
+        tech_stack: jobData.skills.length ? jobData.skills : null,
+        admin_status: 'pending_review',
+      }).select().single();
+      if (error) throw error;
+
+      // Private job: notify the invited vendors directly.
+      for (const vendorId of jobData.invitedVendors) {
+        await notify(vendorId, 'enquiry', 'You were invited to a private job',
+          `"${jobData.title}" — you were pre-selected by the buyer.`, '/vendor/dashboard/jobs');
+      }
+      await logEvent(isTender ? 'tender_posted' : 'job_posted', user.id, 'buyer', 'job', job.id, {
+        visibility: jobData.visibility,
+      });
+      navigate('/customer/dashboard?success=job-posted');
+    } catch (e) {
+      console.error('Job post failed:', e);
+      setSubmitError('Could not post the job. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderStep = () => {
@@ -472,6 +546,89 @@ const PostJobPage: React.FC = () => {
               <p className="text-gray-600">Review your job posting before publishing</p>
             </div>
 
+            <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Visibility</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    ['public', 'Public', 'Any matching vendor can apply'],
+                    ['private', 'Private', 'Only vendors you invite can see it'],
+                  ] as const).map(([val, label, desc]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => handleInputChange('visibility', val)}
+                      className={`p-3 rounded-lg border-2 text-left transition-colors ${
+                        jobData.visibility === val ? 'border-[#0070F3] bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="font-medium text-gray-900 text-sm">{label}</div>
+                      <div className="text-xs text-gray-500">{desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isTender}
+                  onChange={(e) => setIsTender(e.target.checked)}
+                  className="rounded text-[#0070F3]"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Run this as a formal tender (submission deadline + evaluation criteria)
+                </span>
+              </label>
+
+              {isTender && (
+                <div className="space-y-4 pl-1 border-l-2 border-blue-100 ml-1 pt-1">
+                  <div className="pl-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tender title</label>
+                    <input
+                      type="text"
+                      value={tenderData.tenderTitle}
+                      onChange={(e) => setTenderData(p => ({ ...p, tenderTitle: e.target.value }))}
+                      placeholder="Defaults to the job title"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                    />
+                  </div>
+                  <div className="pl-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Submission deadline <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={tenderData.deadline}
+                      onChange={(e) => setTenderData(p => ({ ...p, deadline: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                    />
+                  </div>
+                  <div className="pl-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Evaluation criteria <span className="text-gray-400 font-normal">(one per line)</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={tenderData.criteria}
+                      onChange={(e) => setTenderData(p => ({ ...p, criteria: e.target.value }))}
+                      placeholder={'Technical approach\nPrice\nDelivery timeline'}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer pl-4">
+                    <input
+                      type="checkbox"
+                      checked={tenderData.ndaRequired}
+                      onChange={(e) => setTenderData(p => ({ ...p, ndaRequired: e.target.checked }))}
+                      className="rounded text-[#0070F3]"
+                    />
+                    <span className="text-sm text-gray-700">Require NDA before vendors see the tender document</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
             <div className="bg-gray-50 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Job Summary</h3>
               <div className="space-y-4">
@@ -672,17 +829,43 @@ const PostJobPage: React.FC = () => {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </button>
             ) : (
-              <button
-                onClick={handleSubmit}
-                className="inline-flex items-center px-8 py-3 bg-[#0070F3] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-              >
-                <Send className="mr-2 h-4 w-4" />
-                Post Job
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="inline-flex items-center px-8 py-3 bg-[#0070F3] text-white rounded-lg hover:bg-blue-600 transition-colors font-medium disabled:opacity-50"
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {submitting ? 'Posting…' : isTender ? 'Post Tender' : 'Post Job'}
+                </button>
+              </div>
             )}
           </div>
         </motion.div>
       </div>
+
+      {/* Company profile hard gate */}
+      {profileGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-md p-8 text-center">
+            <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Complete your company profile first</h2>
+            <p className="text-sm text-gray-500 mb-5">
+              You can't post a job until your company name and country are filled in. This keeps every
+              engagement identifiable for tax and contract purposes.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Link to="/customer/dashboard?open=company-profile" className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">
+                Complete Profile
+              </Link>
+              <button onClick={() => setProfileGate(false)} className="px-5 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg">
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

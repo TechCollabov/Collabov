@@ -111,10 +111,14 @@ function RehireModal({ vendor, onClose }: RehireModalProps) {
 
   function handleBegin() {
     if (option === 'new') {
-      navigate(`/sow-wizard?vendor=${encodeURIComponent(vendor.company_name)}`);
+      // New proposal request: opens the vendor profile with the RFP modal path.
+      navigate(`/vendor/profile/${vendor.id}`);
     } else {
+      // Re-use the previous SOW as a template: wizard pre-populated, new engagement record.
       navigate(
-        `/sow-wizard?vendor=${encodeURIComponent(vendor.company_name)}&template=previous`
+        `/sow-wizard?vendorId=${vendor.id}&vendor=${encodeURIComponent(vendor.company_name)}` +
+        `&type=${vendor.business_type === 'independent' ? 'staffaug' : vendor.business_type}` +
+        `&budget=${vendor.last_engagement_value}&project=${encodeURIComponent(vendor.last_engagement)}`
       );
     }
   }

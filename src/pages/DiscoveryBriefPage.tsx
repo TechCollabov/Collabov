@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckSquare, Square } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { notify, logEvent } from '../lib/workflows';
 
 const OUTPUT_OPTIONS = [
   { id: 'spec', label: 'Technical specification document' },
@@ -8,14 +12,35 @@ const OUTPUT_OPTIONS = [
   { id: 'all', label: 'All three' },
 ];
 
-const VENDOR_NAME = 'TechForge Solutions';
-
 const DiscoveryBriefPage: React.FC = () => {
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const vendorId = searchParams.get('vendor');
+  const [vendorName, setVendorName] = useState('');
+  const [vendorType, setVendorType] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [outputs, setOutputs] = useState<Set<string>>(new Set());
   const [budget, setBudget] = useState('');
   const [startDate, setStartDate] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!vendorId) return;
+    supabase
+      .from('vendors')
+      .select('company_name, business_type')
+      .eq('id', vendorId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setVendorName(data.company_name);
+          setVendorType(data.business_type ?? null);
+        }
+      });
+  }, [vendorId]);
 
   const toggleOutput = (id: string) => {
     setOutputs(prev => {
@@ -29,12 +54,41 @@ const DiscoveryBriefPage: React.FC = () => {
     });
   };
 
-  const canSubmit = description.length >= 100 && outputs.size >= 1 && budget.trim() !== '';
+  const canSubmit = description.length >= 100 && outputs.size >= 1 && budget.trim() !== '' && !!vendorId && !sending;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    setSubmitted(true);
+    if (!user) { navigate('/signin'); return; }
+    setSending(true);
+    setError('');
+    try {
+      const { data: enquiry, error: insErr } = await supabase.from('enquiries').insert({
+        customer_id: user.id,
+        vendor_id: vendorId!,
+        enquiry_type: 'discovery_brief',
+        subject: 'Discovery brief',
+        title: 'Discovery brief',
+        message: description.trim(),
+        expected_output: Array.from(outputs).join(', '),
+        budget_from: Number(budget) || null,
+        budget_to: Number(budget) || null,
+        start_date: startDate || null,
+        customer_email: profile?.email ?? user.email ?? '',
+        status: 'new',
+      }).select().single();
+      if (insErr) throw insErr;
+      await notify(vendorId!, 'enquiry', 'New discovery brief',
+        'A buyer sent you a discovery brief. Respond with a discovery proposal from your Enquiries inbox.',
+        '/vendor/dashboard/enquiries');
+      await logEvent('discovery_brief_sent', user.id, 'buyer', 'enquiry', enquiry.id, {});
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Discovery brief failed:', err);
+      setError('Could not send the brief. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   if (submitted) {
@@ -48,7 +102,7 @@ const DiscoveryBriefPage: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-[#0B2D59] mb-2">Discovery Brief Sent</h2>
           <p className="text-gray-600 text-sm leading-relaxed">
-            Discovery brief sent to <strong>{VENDOR_NAME}</strong>. You'll receive their proposal within 4 hours.
+            Discovery brief sent to <strong>{vendorName || 'the agency'}</strong>. Their discovery proposal will arrive in your Proposals inbox.
           </p>
           <button
             onClick={() => setSubmitted(false)}
@@ -156,12 +210,30 @@ const DiscoveryBriefPage: React.FC = () => {
           </div>
 
           {/* Submit */}
+          {!vendorId && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+              Discovery briefs go to a specific project agency.{' '}
+              <Link to="/results" className="font-semibold underline">Find an agency</Link> and start the
+              discovery from their profile.
+            </div>
+          )}
+          {vendorId && vendorType && vendorType !== 'agency' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+              Note: discovery engagements are designed for project agencies.
+            </div>
+          )}
+          {vendorId && vendorName && (
+            <p className="text-sm text-gray-500">
+              Sending to <strong className="text-gray-700">{vendorName}</strong>
+            </p>
+          )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={!canSubmit}
             className="w-full py-3 bg-[#0070F3] text-white font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-sm"
           >
-            Send Discovery Brief
+            {sending ? 'Sending…' : 'Send Discovery Brief'}
           </button>
         </form>
       </div>

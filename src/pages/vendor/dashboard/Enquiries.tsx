@@ -1,65 +1,34 @@
-import React, { useState } from 'react';
-import { MessageSquare, Clock, CheckCircle2, XCircle, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { MessageSquare, Clock, CheckCircle2, Calendar, Loader2 } from 'lucide-react';
 import ProposalForm from './ProposalForm';
+import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
+import { addDays, notify, logEvent, paymentBadge, PAYMENT_BADGE_LABEL, PROPOSAL_EXPIRY_DAYS } from '../../../lib/workflows';
 
-const MOCK_ENQUIRIES = [
-  {
-    id: '1',
-    type: 'rfp',
-    buyer_type: 'Fintech scale-up',
-    buyer_location: 'London, UK',
-    title: 'Senior React Developer — 6-month contract',
-    description:
-      'We need a senior React developer with TypeScript experience to join our team and build a customer-facing dashboard. Must have experience with financial data visualization.',
-    budget_from: 3000,
-    budget_to: 4000,
-    timeline: '6 months',
-    service_type: 'Staff Augmentation',
-    received: '1h ago',
-    status: 'new',
-    payment_badge: 'green',
-  },
-  {
-    id: '2',
-    type: 'discovery',
-    buyer_type: 'SaaS platform',
-    buyer_location: 'Manchester, UK',
-    title: 'Discovery: E-commerce Platform Architecture',
-    description:
-      'We need a technical specification for migrating our legacy PHP monolith to a modern microservices architecture. Need full scope definition and technology recommendations.',
-    budget_from: 2000,
-    budget_to: 4000,
-    timeline: '3-4 weeks',
-    service_type: 'Software Development',
-    received: '3h ago',
-    status: 'new',
-    payment_badge: 'green',
-  },
-  {
-    id: '3',
-    type: 'interview',
-    buyer_type: 'HealthTech company',
-    buyer_location: 'Remote',
-    title: 'Interview Request: Anna Kowalczyk — Frontend Developer',
-    description: '',
-    budget_from: 0,
-    budget_to: 0,
-    timeline: '3 months',
-    service_type: 'Staff Augmentation',
-    employee_name: 'Anna Kowalczyk',
-    employee_title: 'Mid Frontend Developer',
-    interview_type: 'Interview this candidate',
-    format: 'Video',
-    proposed_times: ['2026-06-15 10:00', '2026-06-16 14:00', '2026-06-17 11:00'],
-    message:
-      'We are looking for a React developer for a 3-month project. Would love to speak with Anna about her experience with Next.js.',
-    received: '6h ago',
-    status: 'new',
-    payment_badge: 'amber',
-  },
-];
-
-type Enquiry = typeof MOCK_ENQUIRIES[number] & { [key: string]: any };
+interface Enquiry {
+  id: string;
+  kind: 'rfp' | 'discovery' | 'interview';
+  customer_id: string;
+  title: string;
+  description: string;
+  budget_from: number;
+  budget_to: number;
+  timeline: string;
+  service_type: string;
+  buyer_type: string;
+  buyer_location: string;
+  received: string;
+  status: string;
+  payment_badge: 'green' | 'amber' | 'red';
+  // interview extras
+  employee_name?: string;
+  employee_title?: string;
+  interview_type?: string;
+  format?: string;
+  proposed_times?: string[];
+  message?: string;
+  raw?: any;
+}
 
 const TYPE_BADGE: Record<string, { label: string; color: string }> = {
   rfp: { label: 'RFP', color: 'bg-blue-100 text-blue-700' },
@@ -73,15 +42,18 @@ const PAYMENT_DOT: Record<string, string> = {
   red: 'bg-red-500',
 };
 
-const PAYMENT_LABEL: Record<string, string> = {
-  green: 'Reliable payer',
-  amber: 'Average payer',
-  red: 'Late payer',
-};
+function timeAgo(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 60) return `${Math.max(1, mins)}m ago`;
+  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+  return `${Math.floor(mins / 1440)}d ago`;
+}
 
 const Enquiries: React.FC = () => {
-  const [enquiries, setEnquiries] = useState<Enquiry[]>(MOCK_ENQUIRIES);
-  const [selected, setSelected] = useState<string>(MOCK_ENQUIRIES[0].id);
+  const { user } = useAuth();
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<string | null>(null);
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -91,12 +63,87 @@ const Enquiries: React.FC = () => {
   const [discFee, setDiscFee] = useState('');
   const [discDays, setDiscDays] = useState('');
   const [discSubmitted, setDiscSubmitted] = useState(false);
+  const [discSending, setDiscSending] = useState(false);
 
   // Interview state
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [showAlternative, setShowAlternative] = useState(false);
   const [altTimes, setAltTimes] = useState(['', '', '']);
   const [interviewConfirmed, setInterviewConfirmed] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const [enqRes, intRes] = await Promise.all([
+      supabase
+        .from('enquiries')
+        .select('*, customers(company_name, country, industry, on_time_payment_rate)')
+        .eq('vendor_id', user.id)
+        .neq('status', 'declined')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('interview_requests')
+        .select('*, vendor_employees(name, role, job_title), customers:buyer_id(country, industry, on_time_payment_rate)')
+        .eq('vendor_id', user.id)
+        .in('status', ['requested', 'confirmed'])
+        .order('created_at', { ascending: false }),
+    ]);
+
+    const rows: Enquiry[] = [];
+    for (const e of enqRes.data ?? []) {
+      const cust: any = e.customers;
+      rows.push({
+        id: e.id,
+        kind: e.enquiry_type === 'discovery_brief' ? 'discovery' : 'rfp',
+        customer_id: e.customer_id,
+        title: e.title || e.subject,
+        description: e.message,
+        budget_from: e.budget_from ?? 0,
+        budget_to: e.budget_to ?? 0,
+        timeline: e.start_date && e.end_date ? `${e.start_date} → ${e.end_date}` : 'Flexible',
+        service_type: e.service_type ?? 'Not specified',
+        // Buyer is anonymised until a proposal is sent: type + location only.
+        buyer_type: cust?.industry ? `${cust.industry} company` : 'Company',
+        buyer_location: cust?.country ?? 'Unknown',
+        received: timeAgo(e.created_at),
+        status: e.status ?? 'new',
+        payment_badge: paymentBadge(cust?.on_time_payment_rate ?? 100),
+        raw: e,
+      });
+    }
+    for (const i of intRes.data ?? []) {
+      const emp: any = i.vendor_employees;
+      const cust: any = i.customers;
+      rows.push({
+        id: i.id,
+        kind: 'interview',
+        customer_id: i.buyer_id,
+        title: `Interview Request: ${emp?.name ?? 'Employee'}`,
+        description: '',
+        budget_from: 0,
+        budget_to: 0,
+        timeline: '',
+        service_type: 'Staff Augmentation',
+        buyer_type: cust?.industry ? `${cust.industry} company` : 'Company',
+        buyer_location: cust?.country ?? 'Unknown',
+        received: timeAgo(i.created_at),
+        status: i.status,
+        payment_badge: paymentBadge(cust?.on_time_payment_rate ?? 100),
+        employee_name: emp?.name,
+        employee_title: emp?.job_title ?? emp?.role ?? '',
+        interview_type: i.interview_type === 'discovery_call' ? 'General discovery call' : 'Interview this candidate',
+        format: i.format === 'in_person' ? 'In-person' : i.format === 'phone' ? 'Phone' : 'Video',
+        proposed_times: Array.isArray(i.proposed_times) ? i.proposed_times.map(String) : [],
+        raw: i,
+      });
+    }
+    rows.sort((a, b) => (a.received > b.received ? 1 : -1));
+    setEnquiries(rows);
+    setSelected(prev => prev ?? rows[0]?.id ?? null);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
 
   const selectedEnquiry = enquiries.find(e => e.id === selected);
 
@@ -105,8 +152,11 @@ const Enquiries: React.FC = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const handleDecline = (id: string) => {
-    setEnquiries(prev => prev.map(e => e.id === id ? { ...e, status: 'declined' } : e));
+  const handleDecline = async (enq: Enquiry) => {
+    await supabase.from('enquiries').update({ status: 'declined' }).eq('id', enq.id);
+    await notify(enq.customer_id, 'enquiry', 'Enquiry declined',
+      `The vendor declined your request "${enq.title}". You can approach another vendor from search.`);
+    setEnquiries(prev => prev.filter(e => e.id !== enq.id));
     showToastMsg('Enquiry declined.');
   };
 
@@ -117,6 +167,109 @@ const Enquiries: React.FC = () => {
     setInterviewConfirmed(false);
     setShowAlternative(false);
     setSelectedTime(null);
+  };
+
+  const submitProposal = async (enq: Enquiry, proposal: any) => {
+    if (!user) return;
+    const isDraft = !!proposal.draft;
+    try {
+      const milestonesJson = proposal.milestones
+        .filter((m: any) => m.name.trim())
+        .map((m: any) => ({
+          name: m.name,
+          description: m.description,
+          amount: parseFloat(m.amount) || 0,
+          due_date: m.target_date || null,
+        }));
+      const { data: created, error } = await supabase.from('proposals').insert({
+        vendor_id: user.id,
+        customer_id: enq.customer_id,
+        enquiry_id: enq.id,
+        proposal_kind: 'standard',
+        proposal_content: proposal.approach,
+        approach_summary: proposal.approach,
+        proposed_team: proposal.team ? { description: proposal.team } : null,
+        milestones: milestonesJson,
+        assumptions: proposal.assumptions || null,
+        exclusions: proposal.exclusions || null,
+        proposed_budget: proposal.total || 0,
+        proposed_timeline: milestonesJson.at(-1)?.due_date ?? 'See milestones',
+        workflow_state: isDraft ? 'draft' : 'sent',
+        expires_at: isDraft ? null : addDays(new Date(), PROPOSAL_EXPIRY_DAYS).toISOString(),
+      }).select().single();
+      if (error) throw error;
+
+      if (!isDraft) {
+        await supabase.from('enquiries').update({ status: 'responded', responded_at: new Date().toISOString() }).eq('id', enq.id);
+        await notify(enq.customer_id, 'new_proposal', 'New proposal received',
+          `A vendor responded to "${enq.title}". Review it in your Proposals inbox.`, '/proposals');
+        await logEvent('proposal_submitted', user.id, 'vendor', 'proposal', created.id, { total: proposal.total });
+      }
+      showToastMsg(isDraft ? 'Draft saved to My Proposals.' : 'Proposal sent to buyer. 30-day expiry clock started.');
+      setShowProposalForm(false);
+      load();
+    } catch (e) {
+      console.error('Proposal submit failed:', e);
+      showToastMsg('Could not send the proposal. Please try again.');
+    }
+  };
+
+  const submitDiscoveryProposal = async (enq: Enquiry) => {
+    if (!user || discApproach.length < 100 || !discFee) return;
+    setDiscSending(true);
+    try {
+      const specItems = discSpec.split('\n').map(s => s.trim()).filter(Boolean);
+      const { data: created, error } = await supabase.from('proposals').insert({
+        vendor_id: user.id,
+        customer_id: enq.customer_id,
+        enquiry_id: enq.id,
+        proposal_kind: 'discovery',
+        proposal_content: discApproach,
+        approach_summary: discApproach,
+        spec_structure: specItems,
+        discovery_fee: Number(discFee),
+        timeline_days: Number(discDays) || null,
+        proposed_budget: Number(discFee),
+        proposed_timeline: `${discDays || '?'} working days`,
+        workflow_state: 'sent',
+        expires_at: addDays(new Date(), PROPOSAL_EXPIRY_DAYS).toISOString(),
+      }).select().single();
+      if (error) throw error;
+      await supabase.from('enquiries').update({ status: 'responded', responded_at: new Date().toISOString() }).eq('id', enq.id);
+      await notify(enq.customer_id, 'new_proposal', 'Discovery proposal received',
+        'The agency responded to your discovery brief. Review the proposed spec structure and fee.', '/proposals');
+      await logEvent('proposal_submitted', user.id, 'vendor', 'proposal', created.id, { kind: 'discovery' });
+      setDiscSubmitted(true);
+    } catch (e) {
+      console.error('Discovery proposal failed:', e);
+      showToastMsg('Could not send the discovery proposal.');
+    } finally {
+      setDiscSending(false);
+    }
+  };
+
+  const confirmInterview = async (enq: Enquiry) => {
+    if (!selectedTime) { showToastMsg('Please select a proposed time first.'); return; }
+    await supabase.from('interview_requests').update({
+      status: 'confirmed',
+      confirmed_time: new Date(selectedTime).toISOString(),
+    }).eq('id', enq.id);
+    await notify(enq.customer_id, 'enquiry', 'Interview confirmed',
+      `${enq.employee_name} is confirmed for ${new Date(selectedTime).toLocaleString('en-GB')}.`);
+    setInterviewConfirmed(true);
+    showToastMsg('Interview confirmed. Buyer notified.');
+  };
+
+  const sendAlternatives = async (enq: Enquiry) => {
+    const times = altTimes.filter(Boolean);
+    if (times.length === 0) { showToastMsg('Add at least one alternative time.'); return; }
+    await supabase.from('interview_requests').update({
+      alternative_times: times.map(t => new Date(t).toISOString()),
+    }).eq('id', enq.id);
+    await notify(enq.customer_id, 'enquiry', 'Alternative interview times proposed',
+      `The vendor proposed ${times.length} alternative time(s) for the interview with ${enq.employee_name}. Pick one to confirm.`);
+    setShowAlternative(false);
+    showToastMsg('Alternative times sent to buyer.');
   };
 
   const renderRFPDetail = (enq: Enquiry) => {
@@ -133,10 +286,7 @@ const Enquiries: React.FC = () => {
               buyer_type: enq.buyer_type,
               buyer_location: enq.buyer_location,
             }}
-            onSubmit={(proposal) => {
-              showToastMsg(proposal.draft ? 'Draft saved.' : 'Proposal sent to buyer.');
-              setShowProposalForm(false);
-            }}
+            onSubmit={(proposal) => submitProposal(enq, proposal)}
             onCancel={() => setShowProposalForm(false)}
           />
         </div>
@@ -152,12 +302,17 @@ const Enquiries: React.FC = () => {
 
         <div className="text-sm text-gray-500 mb-4">
           <span className="font-medium text-gray-700">{enq.buyer_type}</span> — {enq.buyer_location}
+          <span className="ml-2 text-xs text-gray-400">(full buyer name shown after you send a proposal)</span>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="text-xs text-gray-500 mb-1">Budget</div>
-            <div className="font-bold text-[#0B2D59]">£{enq.budget_from.toLocaleString()}–£{enq.budget_to.toLocaleString()}/month</div>
+            <div className="font-bold text-[#0B2D59]">
+              {enq.budget_from || enq.budget_to
+                ? `£${enq.budget_from.toLocaleString()}–£${enq.budget_to.toLocaleString()}`
+                : 'Not specified'}
+            </div>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="text-xs text-gray-500 mb-1">Timeline</div>
@@ -181,7 +336,7 @@ const Enquiries: React.FC = () => {
                 : 'bg-red-100 text-red-700'
             }`}
           >
-            {PAYMENT_LABEL[enq.payment_badge]}
+            {PAYMENT_BADGE_LABEL[enq.payment_badge]}
           </span>
         </div>
 
@@ -193,7 +348,7 @@ const Enquiries: React.FC = () => {
             Respond
           </button>
           <button
-            onClick={() => handleDecline(enq.id)}
+            onClick={() => handleDecline(enq)}
             className="px-5 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors"
           >
             Decline
@@ -235,12 +390,14 @@ const Enquiries: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="bg-gray-50 rounded-xl p-4">
-            <div className="text-xs text-gray-500 mb-1">Budget</div>
-            <div className="font-bold text-[#0B2D59]">£{enq.budget_from.toLocaleString()}–£{enq.budget_to.toLocaleString()}</div>
+            <div className="text-xs text-gray-500 mb-1">Proposed budget</div>
+            <div className="font-bold text-[#0B2D59]">
+              {enq.budget_from ? `£${enq.budget_from.toLocaleString()}` : 'Open'}
+            </div>
           </div>
           <div className="bg-gray-50 rounded-xl p-4">
-            <div className="text-xs text-gray-500 mb-1">Timeline</div>
-            <div className="font-bold text-[#0B2D59]">{enq.timeline}</div>
+            <div className="text-xs text-gray-500 mb-1">Expected output</div>
+            <div className="font-bold text-[#0B2D59]">{enq.raw?.expected_output ?? 'Specification'}</div>
           </div>
         </div>
 
@@ -266,12 +423,14 @@ const Enquiries: React.FC = () => {
               )}
             </div>
             <div>
-              <label className="text-sm font-semibold text-gray-700 block mb-2">Proposed spec structure</label>
+              <label className="text-sm font-semibold text-gray-700 block mb-2">
+                Proposed spec structure <span className="font-normal text-gray-400">(one item per line, min 3)</span>
+              </label>
               <textarea
                 value={discSpec}
                 onChange={e => setDiscSpec(e.target.value)}
                 rows={4}
-                placeholder="List what the specification document will cover: 1. Current architecture assessment 2. ..."
+                placeholder={'Current architecture assessment\nTarget architecture & tech recommendations\nMigration roadmap & cost model'}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
               />
             </div>
@@ -304,13 +463,11 @@ const Enquiries: React.FC = () => {
               </div>
             </div>
             <button
-              onClick={() => {
-                if (discApproach.length >= 100 && discFee) setDiscSubmitted(true);
-              }}
-              disabled={discApproach.length < 100 || !discFee}
+              onClick={() => submitDiscoveryProposal(enq)}
+              disabled={discApproach.length < 100 || !discFee || discSpec.split('\n').filter(s => s.trim()).length < 3 || discSending}
               className="w-full py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Send Discovery Proposal
+              {discSending ? 'Sending…' : 'Send Discovery Proposal'}
             </button>
           </div>
         </div>
@@ -319,8 +476,6 @@ const Enquiries: React.FC = () => {
   };
 
   const renderInterviewDetail = (enq: Enquiry) => {
-    const responseDeadline = '48 hours';
-
     return (
       <div className="p-6 overflow-y-auto flex-1">
         <div className="flex items-center gap-3 mb-4">
@@ -331,7 +486,9 @@ const Enquiries: React.FC = () => {
         {/* Response window */}
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mb-4 flex items-center gap-2">
           <Clock className="h-4 w-4 text-amber-600 flex-shrink-0" />
-          <span className="text-sm text-amber-700 font-semibold">Respond within {responseDeadline}</span>
+          <span className="text-sm text-amber-700 font-semibold">
+            Respond within 48 hours or the buyer is prompted to pick another employee
+          </span>
         </div>
 
         <div className="text-sm text-gray-500 mb-4">
@@ -349,17 +506,11 @@ const Enquiries: React.FC = () => {
           </div>
         </div>
 
-        {/* Buyer message */}
-        <div className="bg-blue-50 rounded-xl p-4 mb-4">
-          <div className="text-xs font-semibold text-blue-500 mb-1 uppercase tracking-wide">Message from buyer</div>
-          <p className="text-sm text-gray-700">{enq.message}</p>
-        </div>
-
         {/* Proposed times */}
         <div className="mb-6">
           <div className="text-sm font-semibold text-gray-700 mb-3">Proposed times</div>
           <div className="space-y-2">
-            {enq.proposed_times.map((time: string) => (
+            {(enq.proposed_times ?? []).map((time: string) => (
               <button
                 key={time}
                 onClick={() => setSelectedTime(time)}
@@ -370,24 +521,17 @@ const Enquiries: React.FC = () => {
                 }`}
               >
                 <Calendar className="h-4 w-4 flex-shrink-0" />
-                {time}
+                {new Date(time).toLocaleString('en-GB')}
               </button>
             ))}
           </div>
         </div>
 
         {/* Action buttons */}
-        {!interviewConfirmed && !showAlternative && (
+        {!interviewConfirmed && !showAlternative && enq.status !== 'confirmed' && (
           <div className="flex gap-3">
             <button
-              onClick={() => {
-                if (selectedTime) {
-                  setInterviewConfirmed(true);
-                  showToastMsg('Interview confirmed. Buyer notified.');
-                } else {
-                  showToastMsg('Please select a proposed time first.');
-                }
-              }}
+              onClick={() => confirmInterview(enq)}
               className="flex-1 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
             >
               Confirm availability
@@ -401,19 +545,21 @@ const Enquiries: React.FC = () => {
           </div>
         )}
 
-        {interviewConfirmed && (
+        {(interviewConfirmed || enq.status === 'confirmed') && (
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
             <div>
               <div className="text-sm font-semibold text-green-700">Interview confirmed</div>
-              <div className="text-xs text-green-600">{selectedTime} — Buyer has been notified.</div>
+              <div className="text-xs text-green-600">
+                {selectedTime ? new Date(selectedTime).toLocaleString('en-GB') : enq.raw?.confirmed_time ? new Date(enq.raw.confirmed_time).toLocaleString('en-GB') : ''} — Buyer has been notified.
+              </div>
             </div>
           </div>
         )}
 
         {showAlternative && !interviewConfirmed && (
           <div className="border border-gray-200 rounded-xl p-4">
-            <div className="text-sm font-semibold text-gray-700 mb-3">Propose alternative times</div>
+            <div className="text-sm font-semibold text-gray-700 mb-3">Propose alternative times (max 3)</div>
             <div className="space-y-2 mb-4">
               {altTimes.map((t, i) => (
                 <input
@@ -431,10 +577,7 @@ const Enquiries: React.FC = () => {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setShowAlternative(false);
-                  showToastMsg('Alternative times sent to buyer.');
-                }}
+                onClick={() => sendAlternatives(enq)}
                 className="flex-1 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
               >
                 Send alternative times
@@ -468,8 +611,14 @@ const Enquiries: React.FC = () => {
       <div className="flex gap-0 h-[720px] bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         {/* Left panel */}
         <div className="w-80 flex-shrink-0 border-r border-gray-100 overflow-y-auto">
-          {enquiries.map(enq => {
-            const badge = TYPE_BADGE[enq.type];
+          {loading ? (
+            <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 text-[#0070F3] animate-spin" /></div>
+          ) : enquiries.length === 0 ? (
+            <div className="p-6 text-center text-sm text-gray-400">
+              No enquiries yet. Buyers find you through search — keep your listing complete.
+            </div>
+          ) : enquiries.map(enq => {
+            const badge = TYPE_BADGE[enq.kind];
             const isSelected = selected === enq.id;
             return (
               <button
@@ -481,7 +630,7 @@ const Enquiries: React.FC = () => {
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${badge.color}`}>{badge.label}</span>
                   <div className="flex items-center gap-1.5">
                     {enq.status === 'new' && <div className="w-2 h-2 rounded-full bg-[#0070F3]" />}
-                    <div className={`w-2 h-2 rounded-full ${PAYMENT_DOT[enq.payment_badge]}`} title={PAYMENT_LABEL[enq.payment_badge]} />
+                    <div className={`w-2 h-2 rounded-full ${PAYMENT_DOT[enq.payment_badge]}`} title={PAYMENT_BADGE_LABEL[enq.payment_badge]} />
                   </div>
                 </div>
                 <div className="text-sm font-medium text-gray-900 truncate mb-1">{enq.title}</div>
@@ -497,9 +646,9 @@ const Enquiries: React.FC = () => {
         {/* Right panel */}
         {selectedEnquiry ? (
           <div className="flex-1 flex flex-col overflow-hidden">
-            {selectedEnquiry.type === 'rfp' && renderRFPDetail(selectedEnquiry)}
-            {selectedEnquiry.type === 'discovery' && renderDiscoveryDetail(selectedEnquiry)}
-            {selectedEnquiry.type === 'interview' && renderInterviewDetail(selectedEnquiry)}
+            {selectedEnquiry.kind === 'rfp' && renderRFPDetail(selectedEnquiry)}
+            {selectedEnquiry.kind === 'discovery' && renderDiscoveryDetail(selectedEnquiry)}
+            {selectedEnquiry.kind === 'interview' && renderInterviewDetail(selectedEnquiry)}
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">

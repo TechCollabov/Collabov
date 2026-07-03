@@ -1,35 +1,21 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Send, UserPlus, Clock, RefreshCw } from 'lucide-react';
-
-const BLOCKED_DOMAINS = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'yahoo.co.uk', 'hotmail.co.uk'];
-
-function isBusinessEmail(email: string): boolean {
-  const parts = email.split('@');
-  if (parts.length !== 2) return false;
-  const domain = parts[1].toLowerCase();
-  return !BLOCKED_DOMAINS.includes(domain);
-}
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, CheckCircle, Send, UserPlus, Clock, RefreshCw, Search } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, logEvent } from '../../lib/workflows';
 
 interface PendingInvitation {
-  id: number;
-  vendorName: string;
-  contactEmail: string;
-  invitedOn: string;
+  id: string;
+  company_name: string;
+  contact_email: string;
+  created_at: string;
   status: string;
 }
 
-const mockPendingInvitations: PendingInvitation[] = [
-  {
-    id: 1,
-    vendorName: 'Acme Tech Solutions',
-    contactEmail: 'james@acmetech.io',
-    invitedOn: '2026-06-03',
-    status: 'Invitation sent',
-  },
-];
-
 const BYOVPage: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [vendorCompany, setVendorCompany] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -39,6 +25,19 @@ const BYOVPage: React.FC = () => {
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [submittedCompany, setSubmittedCompany] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
+  const [duplicateVendorId, setDuplicateVendorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('partner_invites')
+      .select('id, company_name, contact_email, created_at, status')
+      .eq('inviter_id', user.id)
+      .eq('inviter_role', 'buyer')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setInvitations((data as PendingInvitation[]) ?? []));
+  }, [user, submitted]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -55,17 +54,48 @@ const BYOVPage: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    if (!user) { navigate('/signin'); return; }
     setLoading(true);
-    // Mock async submit
-    setTimeout(() => {
+    setDuplicateVendorId(null);
+    try {
+      // Dedup: if this vendor is already on Collabov, search and request instead.
+      const { data: existing } = await supabase
+        .from('vendors')
+        .select('id, company_name')
+        .or(`contact_email.eq.${contactEmail.trim()},company_name.ilike.${vendorCompany.trim()}`)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        setDuplicateVendorId(existing[0].id);
+        setLoading(false);
+        return;
+      }
+
+      const { data: invite, error } = await supabase.from('partner_invites').insert({
+        inviter_id: user.id,
+        inviter_role: 'buyer',
+        company_name: vendorCompany.trim(),
+        contact_name: contactName.trim(),
+        contact_email: contactEmail.trim(),
+        note: note.trim() || null,
+        status: 'pending',
+        expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(),
+      }).select().single();
+      if (error) throw error;
+      await logEvent('byov_invite_sent', user.id, 'buyer', 'partner_invite', invite.id, {
+        company: vendorCompany.trim(),
+      });
       setSubmittedEmail(contactEmail);
       setSubmittedCompany(vendorCompany);
-      setLoading(false);
       setSubmitted(true);
-    }, 1200);
+    } catch (err) {
+      console.error('BYOV invite failed:', err);
+      setErrors({ contactEmail: 'Could not send the invitation. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -145,6 +175,19 @@ const BYOVPage: React.FC = () => {
           ) : (
             /* Form */
             <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              {duplicateVendorId && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800 space-y-2">
+                  <p className="font-medium">This vendor is already on Collabov.</p>
+                  <p>Search for them and send a proposal request instead of inviting them again.</p>
+                  <Link
+                    to={`/vendor/profile/${duplicateVendorId}`}
+                    className="inline-flex items-center space-x-1 text-[#0070F3] font-semibold hover:underline"
+                  >
+                    <Search className="h-4 w-4" />
+                    <span>View their profile</span>
+                  </Link>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Vendor company name <span className="text-red-500">*</span>
@@ -225,7 +268,7 @@ const BYOVPage: React.FC = () => {
         {/* Pending Invitations */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">My Pending Invitations</h2>
-          {mockPendingInvitations.length === 0 ? (
+          {invitations.length === 0 ? (
             <p className="text-sm text-gray-500">No pending invitations.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -240,18 +283,29 @@ const BYOVPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {mockPendingInvitations.map((inv) => (
+                  {invitations.map((inv) => (
                     <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 pr-4 font-medium text-gray-900">{inv.vendorName}</td>
-                      <td className="py-3 pr-4 text-gray-600">{inv.contactEmail}</td>
-                      <td className="py-3 pr-4 text-gray-500">{inv.invitedOn}</td>
+                      <td className="py-3 pr-4 font-medium text-gray-900">{inv.company_name}</td>
+                      <td className="py-3 pr-4 text-gray-600">{inv.contact_email}</td>
+                      <td className="py-3 pr-4 text-gray-500">{new Date(inv.created_at).toLocaleDateString('en-GB')}</td>
                       <td className="py-3 pr-4">
-                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
-                          {inv.status}
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          inv.status === 'accepted' ? 'bg-green-100 text-green-800'
+                          : inv.status === 'expired' ? 'bg-gray-100 text-gray-600'
+                          : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {inv.status === 'pending' ? 'Invitation sent' : inv.status}
                         </span>
                       </td>
                       <td className="py-3">
-                        <button className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center space-x-1">
+                        <button
+                          onClick={async () => {
+                            await supabase.from('partner_invites')
+                              .update({ expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(), status: 'pending' })
+                              .eq('id', inv.id);
+                          }}
+                          className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center space-x-1"
+                        >
                           <RefreshCw className="h-3 w-3" />
                           <span>Resend</span>
                         </button>
