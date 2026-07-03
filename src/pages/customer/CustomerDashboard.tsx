@@ -11,6 +11,7 @@ import {
   Sparkles, ShieldAlert, Scale, Brain, Lock, Info,
   TrendingUp, UserPlus
 } from 'lucide-react';
+import { sweepProposalExpiry, sweepRehirePrompts } from '../../lib/workflows';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -447,6 +448,9 @@ const CustomerDashboard: React.FC = () => {
     if (!user) return;
     async function load() {
       try {
+        // Lazy sweeps: proposal expiry + 30-day re-hire prompts.
+        sweepProposalExpiry({ customer_id: user!.id }).catch(() => {});
+        sweepRehirePrompts(user!.id).catch(() => {});
         const [projRes, msgRes, jobRes, contractRes] = await Promise.all([
           supabase.from('projects').select('id, status').eq('customer_id', user!.id),
           supabase.from('messages').select('id').eq('recipient_id', user!.id).eq('is_read', false),

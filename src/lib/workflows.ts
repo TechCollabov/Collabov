@@ -471,6 +471,43 @@ export async function sweepFlagDeadlines(engagement: EngagementParties) {
   }
 }
 
+// ── Re-hire prompt (30 days after close) ─────────────────────────────────────
+
+/** Lazy "cron": 30 days after a clean close (no disputes, vendor available),
+ *  prompt the buyer to re-engage. Idempotent via platform_event. */
+export async function sweepRehirePrompts(buyerId: string) {
+  const cutoff = addDays(new Date(), -REHIRE_PROMPT_DAYS).toISOString();
+  const { data: closed } = await supabase
+    .from('engagements')
+    .select('id, vendor_id, project_title, closed_at, status')
+    .eq('buyer_id', buyerId)
+    .in('status', ['closed', 'closing'])
+    .lt('closed_at', cutoff);
+
+  for (const eng of closed ?? []) {
+    const { data: already } = await supabase
+      .from('platform_event')
+      .select('event_id')
+      .eq('event_type', 'rehire_prompted')
+      .eq('entity_id', eng.id)
+      .limit(1);
+    if (already && already.length > 0) continue;
+
+    const { data: hadDispute } = await supabase
+      .from('disputes').select('id').eq('engagement_id', eng.id).limit(1);
+    if (hadDispute && hadDispute.length > 0) continue;
+
+    const { data: vendor } = await supabase
+      .from('vendors').select('availability_status, company_name').eq('id', eng.vendor_id).maybeSingle();
+    if (vendor && vendor.availability_status !== 'available') continue;
+
+    await notify(buyerId, 'system', 'Ready to re-engage?',
+      `It's been 30 days since "${eng.project_title}" closed with ${vendor?.company_name ?? 'your vendor'}. Re-hire with a pre-filled proposal or re-use the previous SOW from My Vendors.`,
+      '/customer/my-vendors');
+    await logEvent('rehire_prompted', buyerId, 'system', 'engagement', eng.id, {});
+  }
+}
+
 // ── Buyer payment reliability ────────────────────────────────────────────────
 
 /** Record a payment event against the buyer's public reliability badge.

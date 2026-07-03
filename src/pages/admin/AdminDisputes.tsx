@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { platformFee, nextInvoiceNumber, notify, logEvent } from '../../lib/workflows';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -210,15 +211,71 @@ const ResolutionPanel: React.FC<ResolutionPanelProps> = ({ dispute, onResolve })
   const confirmResolution = async () => {
     setIsProcessing(true);
     try {
-      const resolution = resType === 'split'
-        ? `Split: ${vendorPct}% vendor / ${buyerPct}% buyer`
-        : resType === 'vendor'
-        ? 'Full release to vendor'
-        : 'Full refund to buyer';
-      const { error } = await supabase.from('disputes').update({ status: 'resolved', resolution_notes: notes, resolution }).eq('id', dispute.id);
-      if (error) console.error('Dispute update error:', error);
+      const d = dispute as any;
+      const resolution = resType === 'split' ? 'split' : resType === 'vendor' ? 'full_vendor' : 'full_buyer';
+      const vendorShare = resType === 'split' ? parseInt(vendorPct, 10) : resType === 'vendor' ? 100 : 0;
+
+      const { error } = await supabase.from('disputes').update({
+        status: 'resolved',
+        resolution,
+        split_vendor_pct: resType === 'split' ? vendorShare : null,
+        resolution_notes: notes,
+        resolved_at: new Date().toISOString(),
+      }).eq('id', dispute.id);
+      if (error) throw error;
+
+      // Money moves immediately; the decision is final. Fee on split applies
+      // to the vendor portion only.
+      const amount = Number(d.escrow_amount) || 0;
+      const vendorGross = Math.round(amount * vendorShare) / 100;
+      const buyerRefund = amount - vendorGross;
+      if (d.engagement_id && amount > 0) {
+        if (vendorGross > 0) {
+          const fee = platformFee(vendorGross);
+          await supabase.from('escrow_transactions').insert({
+            engagement_id: d.engagement_id, milestone_id: d.milestone_id ?? null,
+            buyer_id: d.buyer_id, vendor_id: d.vendor_id,
+            transaction_type: resType === 'split' ? 'split_release' : 'release',
+            amount: vendorGross, platform_fee_amount: fee, net_amount: vendorGross - fee,
+            reference: `dispute ${d.id}`, status: 'completed',
+          });
+          await supabase.from('invoices').insert({
+            invoice_number: nextInvoiceNumber(),
+            engagement_id: d.engagement_id, milestone_id: d.milestone_id ?? null,
+            buyer_id: d.buyer_id, vendor_id: d.vendor_id,
+            description: `Dispute resolution — ${resType === 'split' ? `${vendorShare}% to vendor` : 'full release'}`,
+            gross_amount: vendorGross, platform_fee_amount: fee, net_amount: vendorGross - fee,
+            status: 'paid',
+          });
+        }
+        if (buyerRefund > 0) {
+          await supabase.from('escrow_transactions').insert({
+            engagement_id: d.engagement_id, milestone_id: d.milestone_id ?? null,
+            buyer_id: d.buyer_id, vendor_id: d.vendor_id,
+            transaction_type: 'refund', amount: buyerRefund,
+            reference: `dispute ${d.id}`, status: 'completed',
+          });
+        }
+      }
+      if (d.milestone_id) {
+        await supabase.from('project_milestones').update({
+          escrow_status: resolution === 'full_buyer' ? 'refunded' : 'released',
+          released_at: new Date().toISOString(),
+          completed: resolution !== 'full_buyer',
+        }).eq('id', d.milestone_id);
+      }
+
+      // Outcome count on both profiles + notifications.
+      const { data: v } = await supabase.from('vendors').select('dispute_outcome_count').eq('id', d.vendor_id).maybeSingle();
+      if (v) await supabase.from('vendors').update({ dispute_outcome_count: (v.dispute_outcome_count ?? 0) + 1 }).eq('id', d.vendor_id);
+      const summary = resType === 'split'
+        ? `Split resolution: ${vendorShare}% to vendor, ${100 - vendorShare}% refunded to buyer.`
+        : resType === 'vendor' ? 'Full release to the vendor.' : 'Full refund to the buyer.';
+      await notify(d.vendor_id, 'system', 'Dispute resolved by admin', `${summary} The decision is final. ${notes}`, d.engagement_id ? `/engagement/${d.engagement_id}` : undefined);
+      await notify(d.buyer_id, 'system', 'Dispute resolved by admin', `${summary} The decision is final. ${notes}`, d.engagement_id ? `/engagement/${d.engagement_id}` : undefined);
+      await logEvent('dispute_resolved', d.buyer_id, 'admin', 'dispute', d.id, { resolution, vendorShare });
     } catch (e) {
-      console.error('Dispute update failed:', e);
+      console.error('Dispute resolution failed:', e);
     } finally {
       setIsProcessing(false);
       setShowModal(false);
@@ -372,38 +429,41 @@ const AdminDisputes: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(MOCK_DISPUTES[0]?.id ?? null);
   const [activeTab, setActiveTab] = useState<Tab>('all');
   const [loading, setLoading] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const { data, error } = await supabase.from('disputes').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setDisputes(data as unknown as Dispute[]);
-          setSelectedId((data[0] as any).id ?? null);
-        }
-      } catch {
-        // disputes table may not exist yet — use mock data
-        setDisputes(MOCK_DISPUTES);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
   const [tableMissing, setTableMissing] = useState(false);
 
   useEffect(() => {
     const fetchDisputes = async () => {
       try {
-        const { data, error } = await supabase.from('disputes').select('*').order('opened_at', { ascending: false });
+        const { data, error } = await supabase
+          .from('disputes')
+          .select('*, engagements(project_title)')
+          .order('opened_at', { ascending: false });
         if (error) throw error;
         if (data && data.length > 0) {
-          setDisputes(data as Dispute[]);
-          setSelectedId(data[0]?.id ?? null);
+          // Resolve party names for display.
+          const vendorIds = Array.from(new Set(data.map((d: any) => d.vendor_id)));
+          const buyerIds = Array.from(new Set(data.map((d: any) => d.buyer_id)));
+          const [{ data: vendors }, { data: buyers }] = await Promise.all([
+            supabase.from('vendors').select('id, company_name').in('id', vendorIds),
+            supabase.from('customers').select('id, company_name').in('id', buyerIds),
+          ]);
+          const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v.company_name]));
+          const bMap = new Map((buyers ?? []).map((b: any) => [b.id, b.company_name]));
+          const mapped = data.map((d: any) => ({
+            ...d,
+            engagement: (Array.isArray(d.engagements) ? d.engagements[0] : d.engagements)?.project_title ?? 'Engagement',
+            vendor: vMap.get(d.vendor_id) ?? 'Vendor',
+            buyer: bMap.get(d.buyer_id) ?? 'Buyer',
+            vendor_position: d.vendor_position ?? '',
+            buyer_position: d.buyer_position ?? '',
+          }));
+          setDisputes(mapped as Dispute[]);
+          setSelectedId(mapped[0]?.id ?? null);
         }
       } catch {
         setTableMissing(true);
+      } finally {
+        setLoading(false);
       }
     };
     fetchDisputes();

@@ -160,6 +160,78 @@ function DocModal({ doc, adminStatus, onSave, onClose }: DocModalProps) {
 
 /* ─── Main Component ────────────────────────────────────────────── */
 
+/** Staff-aug engagements signed by both parties wait here for the IR35 SDS
+ *  stamp — the contract activates only after an admin stamps inside/outside. */
+function IR35StampQueue() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = async () => {
+    const { data } = await supabase
+      .from('engagements')
+      .select('id, project_title, buyer_id, vendor_id, working_location, status, created_at')
+      .eq('ir35_status', 'pending')
+      .eq('status', 'pending_ir35')
+      .order('created_at', { ascending: true });
+    setRows(data ?? []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const stamp = async (row: any, determination: 'inside' | 'outside') => {
+    setBusyId(row.id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('engagements').update({
+        ir35_status: determination,
+        ir35_stamped_by: user?.id ?? null,
+        ir35_stamped_at: new Date().toISOString(),
+        status: 'active',
+      }).eq('id', row.id);
+      const { data: eng } = await supabase.from('engagements').select('contract_id').eq('id', row.id).single();
+      if (eng?.contract_id) await supabase.from('contracts').update({ status: 'active' }).eq('id', eng.contract_id);
+      for (const uid of [row.buyer_id, row.vendor_id]) {
+        await supabase.from('notifications').insert({
+          user_id: uid, type: 'contract', title: 'Contract active — IR35 stamped',
+          message: `The IR35 status determination for "${row.project_title}" is stamped ${determination.toUpperCase()} IR35. The contract is now active.`,
+          link_url: `/engagement/${row.id}`,
+        });
+      }
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 mb-6">
+      <h2 className="text-sm font-bold text-[#0B2D59] mb-1">IR35 SDS Stamp Queue ({rows.length})</h2>
+      <p className="text-xs text-gray-400 mb-3">Staff-aug contracts signed by both parties — stamp the status determination to activate.</p>
+      <div className="space-y-2">
+        {rows.map(row => (
+          <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded-lg p-3">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">{row.project_title}</div>
+              <div className="text-xs text-gray-400">Working location: {row.working_location ?? 'unspecified'} · Signed {fmtDate(row.created_at)}</div>
+            </div>
+            <div className="flex gap-2">
+              <button disabled={busyId === row.id} onClick={() => stamp(row, 'outside')}
+                className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                Stamp OUTSIDE IR35
+              </button>
+              <button disabled={busyId === row.id} onClick={() => stamp(row, 'inside')}
+                className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                Stamp INSIDE IR35
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const AdminVerification: React.FC = () => {
   const [vendors, setVendors] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -277,6 +349,8 @@ const AdminVerification: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Vendor Verification</h1>
+
+      <IR35StampQueue />
 
       <div className="flex gap-0 flex-1 min-h-0 rounded-xl border border-gray-100 shadow-sm overflow-hidden bg-white">
         {/* ── Left Panel: Queue ── */}

@@ -289,6 +289,8 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
           subject: null,
           is_read: false,
           created_at: now,
+          // Admin sees this flag; the message still delivers.
+          flagged_off_platform: showWarning,
         })
         .select('id')
         .single();
