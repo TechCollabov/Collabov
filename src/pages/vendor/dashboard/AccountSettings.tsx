@@ -10,24 +10,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
-import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS } from '../../../lib/workflows';
+import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, NOTIFICATION_EVENTS } from '../../../lib/workflows';
 
 interface SettingsSection {
   id: string;
   title: string;
   icon: React.ElementType;
 }
-
-const NOTIFICATION_EVENTS = [
-  { key: 'dispute', label: 'Dispute opened / resolved', forced: true },
-  { key: 'payment_failed', label: 'Payment failed', forced: true },
-  { key: 'evidence_submitted', label: 'Evidence submitted', forced: true },
-  { key: 'criteria_flagged', label: 'Criteria flagged', forced: true },
-  { key: 'new_proposal', label: 'New proposal / enquiry', forced: false },
-  { key: 'message', label: 'New message', forced: false },
-  { key: 'milestone', label: 'Milestone status change', forced: false },
-  { key: 'review', label: 'New review', forced: false },
-];
 
 const AccountSettings: React.FC = () => {
   const { user, profile } = useAuth();

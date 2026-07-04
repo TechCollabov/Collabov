@@ -69,6 +69,18 @@ export const VENDOR_REVIEW_CRITERIA = [
   'Overall',
 ];
 
+export interface NotificationEventDef { key: string; label: string; forced: boolean }
+export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
+  { key: 'dispute', label: 'Dispute opened / resolved', forced: true },
+  { key: 'payment_failed', label: 'Payment failed', forced: true },
+  { key: 'evidence_submitted', label: 'Evidence submitted', forced: true },
+  { key: 'criteria_flagged', label: 'Criteria flagged', forced: true },
+  { key: 'new_proposal', label: 'New proposal / enquiry', forced: false },
+  { key: 'message', label: 'New message', forced: false },
+  { key: 'milestone', label: 'Milestone status change', forced: false },
+  { key: 'review', label: 'New review', forced: false },
+];
+
 export const DISPUTE_REASONS = [
   { value: 'scope_mismatch', label: 'Scope mismatch' },
   { value: 'delivery_quality', label: 'Delivery quality' },

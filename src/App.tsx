@@ -51,6 +51,9 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import EngagementWorkspacePage from './pages/EngagementWorkspacePage';
 import ReviewPage from './pages/ReviewPage';
 import MyVendorsPage from './pages/customer/MyVendorsPage';
+import CustomerPayments from './pages/customer/CustomerPayments';
+import CustomerGovernance from './pages/customer/CustomerGovernance';
+import CustomerSettings from './pages/customer/CustomerSettings';
 import EvidenceBuilderPage from './pages/vendor/dashboard/EvidenceBuilder';
 
 const hideNavbarFooterPaths = [
@@ -112,6 +115,9 @@ function AppContent() {
           <Route path="/engagement/:engagementId" element={<EngagementWorkspacePage />} />
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/customer/my-vendors" element={<CustomerRoute><MyVendorsPage /></CustomerRoute>} />
+          <Route path="/customer/payments" element={<CustomerRoute><CustomerPayments /></CustomerRoute>} />
+          <Route path="/customer/governance" element={<CustomerRoute><CustomerGovernance /></CustomerRoute>} />
+          <Route path="/customer/settings" element={<CustomerRoute><CustomerSettings /></CustomerRoute>} />
 
           {/* Legal & Info */}
           <Route path="/terms" element={<TermsPage />} />

@@ -508,8 +508,9 @@ const CustomerDashboard: React.FC = () => {
     { id: 'ai-matchmaking', label: 'Find Vendors', icon: Bot },
     { id: 'saved-talent', label: 'Shortlisted', icon: Bookmark },
     { id: 'my-projects', label: 'My Projects', icon: FolderOpen },
-    { id: 'contracts', label: 'Contracts', icon: FileCheck },
+    { id: 'contracts', label: 'Governance', icon: FileCheck },
     { id: 'invoices', label: 'Payments', icon: CreditCard },
+    { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'disputes', label: 'Disputes', icon: AlertTriangle },
     { id: 'help', label: 'Help Center', icon: HelpCircle },
@@ -530,12 +531,16 @@ const CustomerDashboard: React.FC = () => {
 
             {/* Center tabs */}
             <div className="hidden lg:flex items-center space-x-1">
-              {navigationTabs.slice(0, 6).map((tab) => (
+              {navigationTabs.slice(0, 9).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => {
                     if (tab.id === 'invite-vendor') navigate('/customer/byov');
                     else if (tab.id === 'post-job') navigate('/customer/post-job');
+                    else if (tab.id === 'create-tender') navigate('/customer/post-job?type=tender');
+                    else if (tab.id === 'contracts' || tab.id === 'disputes') navigate('/customer/governance');
+                    else if (tab.id === 'invoices') navigate('/customer/payments');
+                    else if (tab.id === 'settings') navigate('/customer/settings');
                     else setActiveTab(tab.id);
                   }}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
