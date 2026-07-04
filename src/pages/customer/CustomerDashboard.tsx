@@ -231,34 +231,42 @@ const WorkspaceModule: React.FC<WorkspaceModuleProps> = ({ activeProjects }) => 
 
 // ─── Module 3 — MILESTONE PAYMENTS ───────────────────────────────────────────
 
-const MilestonePaymentsModule: React.FC = () => (
+interface MilestonePaymentsModuleProps {
+  pendingEscrow: number;
+  releasedMTD: number;
+  awaitingReview: number;
+  unfundedCount: number;
+}
+const MilestonePaymentsModule: React.FC<MilestonePaymentsModuleProps> = ({ pendingEscrow, releasedMTD, awaitingReview, unfundedCount }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
         <CreditCard className="h-5 w-5 text-emerald-300" />
       </div>
-      <span className="text-xs font-bold tracking-[0.15em] uppercase text-gray-900">Milestone Payments</span>
+      <span className="text-xs font-bold tracking-[0.15em] uppercase text-gray-900">Escrow</span>
     </div>
 
     <div className="text-center mb-5">
-      <p className="text-4xl font-black text-[#0B2D59]">£10,300.00</p>
+      <p className="text-4xl font-black text-[#0B2D59]">£{pendingEscrow.toLocaleString()}</p>
       <p className="text-xs text-gray-400 uppercase tracking-wide mt-1">Pending in Escrow</p>
     </div>
 
     <div className="grid grid-cols-2 gap-3 mb-4">
       <div className="bg-gray-50 rounded-xl p-3 text-center">
-        <p className="text-sm font-bold text-gray-900">£8,500</p>
+        <p className="text-sm font-bold text-gray-900">£{releasedMTD.toLocaleString()}</p>
         <p className="text-[10px] text-gray-400 mt-0.5">Released MTD</p>
       </div>
       <div className="bg-gray-50 rounded-xl p-3 text-center">
-        <p className="text-sm font-bold text-gray-900">1</p>
+        <p className="text-sm font-bold text-gray-900">{awaitingReview}</p>
         <p className="text-[10px] text-gray-400 mt-0.5">Awaiting Review</p>
       </div>
     </div>
 
-    <div className="bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-700 flex-1">
-      1 unfunded milestone — fund to begin work
-    </div>
+    {unfundedCount > 0 && (
+      <div className="bg-amber-50 rounded-lg px-3 py-2 text-xs text-amber-700 flex-1">
+        {unfundedCount} unfunded milestone{unfundedCount !== 1 ? 's' : ''} — fund to begin work
+      </div>
+    )}
 
     <CardFooter expandTo="/customer/dashboard" />
   </div>
@@ -443,6 +451,7 @@ const CustomerDashboard: React.FC = () => {
   const [showPaymentAlert, setShowPaymentAlert] = useState(false);
   const [stats, setStats] = useState({ activeProjects: 0, pendingMilestones: 0, totalSpent: 0, unreadMessages: 0, openJobs: 0 });
   const [loadingStats, setLoadingStats] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [escrowStats, setEscrowStats] = useState({ pendingEscrow: 0, releasedMTD: 0, awaitingReview: 0, unfundedCount: 0 });
 
   useEffect(() => {
     if (!user) return;
@@ -463,6 +472,26 @@ const CustomerDashboard: React.FC = () => {
         const openJobs = jobRes.data?.length || 0;
         const totalSpent = contractRes.data?.reduce((s, c) => s + (c.total_value || 0), 0) || 0;
         setStats({ activeProjects: active, pendingMilestones: 0, totalSpent, unreadMessages: unread, openJobs });
+
+        // Escrow module: pending in escrow, released this month, milestones awaiting review.
+        const projectIds = (projRes.data ?? []).map(p => p.id);
+        if (projectIds.length > 0) {
+          const { data: milestones } = await supabase
+            .from('project_milestones')
+            .select('amount, escrow_status, released_at')
+            .in('project_id', projectIds);
+          const now = new Date();
+          const pendingEscrow = (milestones ?? [])
+            .filter(m => ['funded', 'in_progress', 'submitted', 'rejected'].includes(m.escrow_status))
+            .reduce((s, m) => s + (m.amount ?? 0), 0);
+          const releasedMTD = (milestones ?? [])
+            .filter(m => m.escrow_status === 'released' && m.released_at &&
+              new Date(m.released_at).getMonth() === now.getMonth() && new Date(m.released_at).getFullYear() === now.getFullYear())
+            .reduce((s, m) => s + (m.amount ?? 0), 0);
+          const awaitingReview = (milestones ?? []).filter(m => m.escrow_status === 'submitted').length;
+          const unfundedCount = (milestones ?? []).filter(m => m.escrow_status === 'unfunded').length;
+          setEscrowStats({ pendingEscrow, releasedMTD, awaitingReview, unfundedCount });
+        }
       } finally {
         setLoadingStats(false);
       }
@@ -656,7 +685,7 @@ const CustomerDashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <FindWithAIModule />
           <WorkspaceModule activeProjects={stats.activeProjects} />
-          <MilestonePaymentsModule />
+          <MilestonePaymentsModule {...escrowStats} />
           <RiskDashboardModule />
           <GovernanceModule />
           <IntelligenceModule />
