@@ -262,6 +262,7 @@ const ResultsPage: React.FC = () => {
             vendor_services ( service_categories ( name ) ),
             vendor_industries ( industries ( name ) )
           `)
+          .eq('is_blacklisted', false)
           .order('rating', { ascending: false });
 
         if (error) throw error;

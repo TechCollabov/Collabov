@@ -37,8 +37,16 @@ interface Conversation {
   avatar_color: string;
   preview: string;
   timestamp: string;
+  lastMessageAt: string;
   unread: number;
   messages: UiMessage[];
+}
+
+const IDLE_READONLY_DAYS = 90;
+
+function isIdleReadOnly(lastMessageAt: string): boolean {
+  const days = (Date.now() - new Date(lastMessageAt).getTime()) / 86400000;
+  return days > IDLE_READONLY_DAYS;
 }
 
 const AVATAR_COLORS = [
@@ -172,6 +180,7 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
           avatar_color: getAvatarColor(otherId),
           preview: latest.content.slice(0, 80),
           timestamp: timeAgo(latest.created_at),
+          lastMessageAt: latest.created_at,
           unread,
           messages: [], // loaded on demand
         };
@@ -243,6 +252,15 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
     if (activeId) fetchConversationMessages(activeId);
   }, [activeId, fetchConversationMessages]);
 
+  // Poll every 30s: conversation list previews/unread counts, and the open thread.
+  useEffect(() => {
+    const t = setInterval(() => {
+      fetchConversations();
+      if (activeId) fetchConversationMessages(activeId);
+    }, 30000);
+    return () => clearInterval(t);
+  }, [fetchConversations, fetchConversationMessages, activeId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeId, activeConversation?.messages.length]);
@@ -254,6 +272,7 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || !user || !activeId || sending) return;
+    if (activeConversation && isIdleReadOnly(activeConversation.lastMessageAt)) return;
 
     setSending(true);
     const isUrl = /^https?:\/\//.test(text);
@@ -507,34 +526,41 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
           </div>
 
           {/* Input row */}
-          <div className="px-6 py-4 border-t border-gray-200 bg-white flex gap-3 items-end flex-shrink-0">
-            <textarea
-              ref={textareaRef}
-              value={inputText}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
-              rows={1}
-              className="flex-1 resize-none bg-gray-100 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#0070F3]/30 focus:border-[#0070F3]/40"
-              style={{ minHeight: '42px', maxHeight: '100px' }}
-            />
-            <button
-              type="button"
-              className="text-gray-400 hover:text-gray-600 flex-shrink-0 pb-2"
-              title="Attach file"
-            >
-              <Paperclip className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!inputText.trim() || sending}
-              className="bg-[#0070F3] text-white w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
-              title="Send message"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
+          {isIdleReadOnly(activeConversation.lastMessageAt) ? (
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-sm text-gray-500 flex items-center gap-2 flex-shrink-0">
+              <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+              This thread has been inactive for over 90 days and is now read-only.
+            </div>
+          ) : (
+            <div className="px-6 py-4 border-t border-gray-200 bg-white flex gap-3 items-end flex-shrink-0">
+              <textarea
+                ref={textareaRef}
+                value={inputText}
+                onChange={handleTextareaChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+                rows={1}
+                className="flex-1 resize-none bg-gray-100 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#0070F3]/30 focus:border-[#0070F3]/40"
+                style={{ minHeight: '42px', maxHeight: '100px' }}
+              />
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600 flex-shrink-0 pb-2"
+                title="Attach file"
+              >
+                <Paperclip className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!inputText.trim() || sending}
+                className="bg-[#0070F3] text-white w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+                title="Send message"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-sm text-gray-400">

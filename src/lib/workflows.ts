@@ -574,6 +574,49 @@ export async function recordPaymentEvent(customerId: string, onTime: boolean) {
   }).eq('id', customerId);
 }
 
+// ── Vendor blacklist ──────────────────────────────────────────────────────────
+
+/**
+ * Blacklist a vendor. If a dispute is currently open on the vendor, its
+ * resolution proceeds independently — blacklisting does not force any
+ * escrow release or refund; that stays gated on the dispute's own outcome.
+ */
+export async function blacklistVendor(vendorId: string, reason: string, adminId: string) {
+  await supabase.from('vendors').update({
+    is_blacklisted: true,
+    blacklist_reason: reason,
+    blacklisted_at: new Date().toISOString(),
+    blacklisted_by: adminId,
+    restoration_approvals: [],
+  }).eq('id', vendorId);
+  await logEvent('vendor_blacklisted', adminId, 'admin', 'vendor', vendorId, { reason });
+}
+
+/**
+ * Restoration requires two distinct admin approvals. Returns the approval
+ * count after this call; restoration only completes once two different
+ * admin ids have signed off.
+ */
+export async function approveVendorRestoration(vendorId: string, adminId: string): Promise<number> {
+  const { data: v } = await supabase.from('vendors').select('restoration_approvals').eq('id', vendorId).single();
+  const approvals: string[] = Array.isArray(v?.restoration_approvals) ? v!.restoration_approvals : [];
+  if (approvals.includes(adminId)) return approvals.length;
+  const next = [...approvals, adminId];
+  if (next.length >= 2) {
+    await supabase.from('vendors').update({
+      is_blacklisted: false,
+      blacklist_reason: null,
+      blacklisted_at: null,
+      blacklisted_by: null,
+      restoration_approvals: [],
+    }).eq('id', vendorId);
+    await logEvent('vendor_restored', adminId, 'admin', 'vendor', vendorId, { approvedBy: next });
+  } else {
+    await supabase.from('vendors').update({ restoration_approvals: next }).eq('id', vendorId);
+  }
+  return next.length;
+}
+
 // ── Notifications + audit trail ───────────────────────────────────────────────
 
 export async function notify(
