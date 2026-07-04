@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Mail, Phone, Lock, Globe, Building2, DollarSign,
@@ -6,8 +6,11 @@ import {
   ChevronDown, Upload, AlertTriangle, CheckCircle,
   Smartphone, Bell, Languages, CreditCard, FileText,
   Users, Eye, EyeOff, Download, MessageSquare,
-  BellRing, Palette, Clock, BookOpen, Calendar
+  BellRing, Palette, Clock, BookOpen, Calendar, Loader2, UserPlus, Send,
 } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
+import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, NOTIFICATION_EVENTS } from '../../../lib/workflows';
 
 interface SettingsSection {
   id: string;
@@ -16,16 +19,26 @@ interface SettingsSection {
 }
 
 const AccountSettings: React.FC = () => {
+  const { user, profile } = useAuth();
   const [activeSection, setActiveSection] = useState('general');
   const [theme, setTheme] = useState('light');
   const [isPublic, setIsPublic] = useState(true);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [otpValue, setOtpValue] = useState('');
-  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [bookingMethod, setBookingMethod] = useState('manual');
   const [calendlyUrl, setCalendlyUrl] = useState('');
   const [calendlySaved, setCalendlySaved] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(true);
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, 'realtime' | 'digest' | 'off'>>({});
+  const [notifSaved, setNotifSaved] = useState(false);
+  const [byocCompany, setByocCompany] = useState('');
+  const [byocEmail, setByocEmail] = useState('');
+  const [byocError, setByocError] = useState('');
+  const [byocInvites, setByocInvites] = useState<any[]>([]);
 
   const sections: SettingsSection[] = [
     { id: 'general', title: 'General Settings', icon: Settings },
@@ -33,9 +46,107 @@ const AccountSettings: React.FC = () => {
     { id: 'payment', title: 'Payment & Billing', icon: DollarSign },
     { id: 'legal', title: 'Legal & Compliance', icon: FileText },
     { id: 'security', title: 'Security & Privacy', icon: Shield },
+    { id: 'notifications', title: 'Notification Preferences', icon: BellRing },
+    { id: 'clients', title: 'Invite Clients (BYOC)', icon: UserPlus },
     { id: 'support', title: 'Support & Help', icon: HelpCircle },
     { id: 'preferences', title: 'Platform Preferences', icon: Settings }
   ];
+
+  // Load persisted calendar/2FA/notification/BYOC state.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const [{ data: vendorRow }, { data: prefsRow }, { data: invites }] = await Promise.all([
+        supabase.from('vendors').select('booking_method, calendly_url').eq('id', user.id).maybeSingle(),
+        supabase.from('notification_prefs').select('prefs').eq('user_id', user.id).maybeSingle(),
+        supabase.from('partner_invites').select('*').eq('inviter_id', user.id).eq('inviter_role', 'vendor').order('created_at', { ascending: false }),
+      ]);
+      if (vendorRow) {
+        setBookingMethod(vendorRow.booking_method ?? 'manual');
+        setCalendlyUrl(vendorRow.calendly_url ?? '');
+      }
+      const defaults: Record<string, 'realtime' | 'digest' | 'off'> = {};
+      NOTIFICATION_EVENTS.forEach(e => { defaults[e.key] = e.forced ? 'realtime' : 'realtime'; });
+      setNotifPrefs({ ...defaults, ...(prefsRow?.prefs as any ?? {}) });
+      setByocInvites(invites ?? []);
+      setCalendarLoading(false);
+    })();
+  }, [user]);
+
+  useEffect(() => {
+    setTwoFactorEnabled(!!(profile as any)?.two_factor_enabled);
+  }, [profile]);
+
+  const connectGoogleCalendar = async () => {
+    if (!user) return;
+    // Simulated OAuth: recorded in-platform, no real Google account linked.
+    await supabase.from('vendors').update({ booking_method: 'google' }).eq('id', user.id);
+    setBookingMethod('google');
+  };
+
+  const disconnectCalendar = async () => {
+    if (!user) return;
+    await supabase.from('vendors').update({ booking_method: 'manual' }).eq('id', user.id);
+    setBookingMethod('manual');
+  };
+
+  const saveCalendlyUrl = async () => {
+    if (!user || !calendlyUrl) return;
+    await supabase.from('vendors').update({ booking_method: 'calendly', calendly_url: calendlyUrl }).eq('id', user.id);
+    setBookingMethod('calendly');
+    setCalendlySaved(true);
+  };
+
+  const toggleTwoFactor = async () => {
+    if (!user) return;
+    const next = !twoFactorEnabled;
+    if (next) {
+      const codes = Array.from({ length: 8 }, () => Math.random().toString(36).slice(2, 8).toUpperCase());
+      await supabase.from('profiles').update({
+        two_factor_enabled: true,
+        two_factor_backup_codes: codes,
+        two_factor_enabled_at: new Date().toISOString(),
+      }).eq('id', user.id);
+      setBackupCodes(codes);
+      setShowBackupCodes(true);
+    } else {
+      await supabase.from('profiles').update({
+        two_factor_enabled: false,
+        two_factor_backup_codes: null,
+      }).eq('id', user.id);
+    }
+    setTwoFactorEnabled(next);
+  };
+
+  const setNotifPref = (key: string, value: 'realtime' | 'digest' | 'off') => {
+    setNotifPrefs(prev => ({ ...prev, [key]: value }));
+    setNotifSaved(false);
+  };
+
+  const saveNotifPrefs = async () => {
+    if (!user) return;
+    await supabase.from('notification_prefs').upsert({ user_id: user.id, prefs: notifPrefs, updated_at: new Date().toISOString() });
+    setNotifSaved(true);
+  };
+
+  const sendByocInvite = async () => {
+    if (!user) return;
+    setByocError('');
+    if (!byocCompany.trim() || !byocEmail.trim()) { setByocError('Company name and contact email are required.'); return; }
+    if (!isBusinessEmail(byocEmail)) { setByocError('Please use a business email address.'); return; }
+    const { data, error } = await supabase.from('partner_invites').insert({
+      inviter_id: user.id,
+      inviter_role: 'vendor',
+      company_name: byocCompany.trim(),
+      contact_email: byocEmail.trim(),
+      status: 'pending',
+      expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(),
+    }).select().single();
+    if (error) { setByocError('Could not send the invitation. Please try again.'); return; }
+    setByocInvites(prev => [data, ...prev]);
+    setByocCompany('');
+    setByocEmail('');
+  };
 
   const handleOTPSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,14 +265,16 @@ const AccountSettings: React.FC = () => {
                     <p className="text-xs text-gray-500">Allow buyers to book discovery calls via your Google Calendar</p>
                   </div>
                 </div>
-                {googleCalendarConnected ? (
+                {calendarLoading ? (
+                  <Loader2 className="h-4 w-4 text-gray-300 animate-spin" />
+                ) : bookingMethod === 'google' ? (
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>
-                    <button onClick={() => setGoogleCalendarConnected(false)} className="text-xs text-red-500 hover:text-red-600">Disconnect</button>
+                    <button onClick={disconnectCalendar} className="text-xs text-red-500 hover:text-red-600">Disconnect</button>
                   </div>
                 ) : (
                   <button
-                    onClick={() => { setGoogleCalendarConnected(true); /* TODO: Real OAuth flow */ }}
+                    onClick={connectGoogleCalendar}
                     className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
                   >
                     Connect Google Calendar
@@ -184,18 +297,19 @@ const AccountSettings: React.FC = () => {
                   <input
                     type="url"
                     value={calendlyUrl}
-                    onChange={e => setCalendlyUrl(e.target.value)}
+                    onChange={e => { setCalendlyUrl(e.target.value); setCalendlySaved(false); }}
                     placeholder="https://calendly.com/yourname/discovery-call"
                     className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
                   />
                   <button
-                    onClick={() => { if (calendlyUrl) { setCalendlySaved(true); } }}
+                    onClick={saveCalendlyUrl}
                     className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700"
                   >
-                    {calendlySaved ? 'Saved ✓' : 'Save'}
+                    {calendlySaved && bookingMethod === 'calendly' ? 'Saved ✓' : 'Save'}
                   </button>
                 </div>
-                {calendlySaved && <p className="text-xs text-green-600 mt-1.5">Calendly URL saved. Buyers can now book directly from your profile.</p>}
+                {calendlySaved && bookingMethod === 'calendly' && <p className="text-xs text-green-600 mt-1.5">Calendly URL saved. Buyers can now book directly from your profile.</p>}
+                {bookingMethod === 'manual' && <p className="text-xs text-gray-400 mt-1.5">No calendar connected — buyers send a pre-filled message to book instead.</p>}
               </div>
             </div>
           </div>
@@ -399,7 +513,7 @@ const AccountSettings: React.FC = () => {
                     className={`relative inline-flex h-6 w-11 items-center rounded-full ${
                       twoFactorEnabled ? 'bg-primary-600' : 'bg-gray-200'
                     }`}
-                    onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
+                    onClick={toggleTwoFactor}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
@@ -408,21 +522,17 @@ const AccountSettings: React.FC = () => {
                     />
                   </button>
                 </div>
-                {twoFactorEnabled && (
-                  <div className="space-y-2">
-                    <label className="flex items-center space-x-2">
-                      <input type="radio" name="2fa-method" value="sms" />
-                      <span>SMS</span>
-                    </label>
-                    <label className="flex items-center space-x-2">
-                      <input type="radio" name="2fa-method" value="email" />
-                      <span>Email</span>
-                    </label>
-                    <label className="flex items-center space-x-2">
-                      <input type="radio" name="2fa-method" value="authenticator" />
-                      <span>Authenticator App</span>
-                    </label>
+                {twoFactorEnabled && showBackupCodes && backupCodes.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-sm font-semibold text-amber-800 mb-2">Save your backup codes — shown once</p>
+                    <div className="grid grid-cols-4 gap-2 font-mono text-xs text-amber-900">
+                      {backupCodes.map(c => <span key={c} className="bg-white rounded px-2 py-1 text-center">{c}</span>)}
+                    </div>
+                    <button onClick={() => setShowBackupCodes(false)} className="text-xs text-amber-700 underline mt-2">I've saved these codes</button>
                   </div>
+                )}
+                {twoFactorEnabled && !showBackupCodes && (
+                  <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Two-factor authentication is enabled.</p>
                 )}
               </div>
             </div>
@@ -492,6 +602,112 @@ const AccountSettings: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        );
+
+      case 'notifications':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-1">Notification Preferences</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Action-required items are always real-time and can't be switched to digest.
+              </p>
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                    <tr>
+                      <th className="text-left px-4 py-2.5">Event</th>
+                      <th className="text-center px-4 py-2.5">Real-time</th>
+                      <th className="text-center px-4 py-2.5">Daily digest</th>
+                      <th className="text-center px-4 py-2.5">Off</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {NOTIFICATION_EVENTS.map(evt => (
+                      <tr key={evt.key}>
+                        <td className="px-4 py-3 text-gray-700">
+                          {evt.label}
+                          {evt.forced && <span className="ml-2 text-xs text-amber-600 font-medium">Action required</span>}
+                        </td>
+                        {(['realtime', 'digest', 'off'] as const).map(opt => (
+                          <td key={opt} className="text-center px-4 py-3">
+                            <input
+                              type="radio"
+                              name={`notif-${evt.key}`}
+                              disabled={evt.forced && opt !== 'realtime'}
+                              checked={notifPrefs[evt.key] === opt}
+                              onChange={() => setNotifPref(evt.key, opt)}
+                              className="accent-[#0070F3] disabled:opacity-30"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button onClick={saveNotifPrefs} className="mt-4 px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+                {notifSaved ? 'Saved ✓' : 'Save Preferences'}
+              </button>
+            </div>
+          </div>
+        );
+
+      case 'clients':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-1">Invite Clients (BYOC)</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Already work with a client outside Collabov? Invite them so you can run the engagement through the platform.
+              </p>
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+                <input
+                  type="text"
+                  placeholder="Client company name"
+                  value={byocCompany}
+                  onChange={e => setByocCompany(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+                <input
+                  type="email"
+                  placeholder="Contact business email"
+                  value={byocEmail}
+                  onChange={e => setByocEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+                {byocError && <p className="text-xs text-red-600">{byocError}</p>}
+                <button onClick={sendByocInvite} className="flex items-center gap-2 px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+                  <Send className="h-3.5 w-3.5" /> Send Invitation
+                </button>
+              </div>
+
+              {byocInvites.length > 0 && (
+                <div className="mt-5">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Pending Invitations</h4>
+                  <div className="space-y-2">
+                    {byocInvites.map(inv => {
+                      const daysLeft = inv.expires_at ? Math.max(0, Math.ceil((new Date(inv.expires_at).getTime() - Date.now()) / 86400000)) : null;
+                      return (
+                        <div key={inv.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-4 py-2.5 text-sm">
+                          <div>
+                            <div className="font-medium text-gray-900">{inv.company_name}</div>
+                            <div className="text-xs text-gray-500">{inv.contact_email}</div>
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                            inv.status === 'accepted' ? 'bg-green-100 text-green-700'
+                            : inv.status === 'expired' ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {inv.status === 'pending' ? `${daysLeft}d left` : inv.status}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );

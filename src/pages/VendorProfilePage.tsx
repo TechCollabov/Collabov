@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent } from '../lib/workflows';
+import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent, hasCompanyProfile } from '../lib/workflows';
+import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -1474,6 +1475,7 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [showProfileGate, setShowProfileGate] = useState(false);
 
   const submit = async () => {
     if (!user) { navigate('/signin'); return; }
@@ -1485,6 +1487,11 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
     setSending(true);
     setError('');
     try {
+      if (!(await hasCompanyProfile(user.id))) {
+        setShowProfileGate(true);
+        setSending(false);
+        return;
+      }
       const { data: enquiry, error: insErr } = await supabase.from('enquiries').insert({
         customer_id: user.id,
         vendor_id: (vendor as any).id,
@@ -1529,6 +1536,10 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
         </div>
       </div>
     );
+  }
+
+  if (showProfileGate) {
+    return <CompanyProfileGateModal action="request a proposal" onClose={() => setShowProfileGate(false)} />;
   }
 
   return (
@@ -1855,10 +1866,12 @@ const VendorProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — min 3 employee profiles required before staff-aug vendors show Team Members to buyers */}
         <div className="container mx-auto px-6">
           <div className="flex gap-0 border-b border-gray-200 overflow-x-auto">
-            {TABS.map(tab => (
+            {TABS.filter(tab =>
+              tab !== 'Team Members' || vendor.business_type !== 'staffaug' || dbEmployees.length >= 3
+            ).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

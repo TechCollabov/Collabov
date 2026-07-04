@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, ArrowRight, Plus, X, DollarSign,
   Calendar, MapPin, Briefcase, FileText, Users,
   Clock, Target, Zap, Globe, User, ChevronDown,
-  Upload, Eye, Edit, Save, Send, AlertTriangle
+  Upload, Eye, Edit, Save, Send
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { notify, logEvent } from '../../lib/workflows';
+import { notify, logEvent, hasCompanyProfile } from '../../lib/workflows';
+import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 export interface JobData {
   title: string;
@@ -69,6 +70,26 @@ const PostJobPage: React.FC = () => {
     visibility: isPrivate ? 'private' : 'public',
     invitedVendors: preSelectedVendors,
   });
+
+  // "Take to marketplace": pre-fill from a completed discovery engagement's spec.
+  useEffect(() => {
+    const fromDiscovery = searchParams.get('fromDiscovery');
+    if (!fromDiscovery) return;
+    (async () => {
+      const { data: eng } = await supabase.from('engagements').select('project_title').eq('id', fromDiscovery).maybeSingle();
+      const { data: msRows } = await supabase.from('project_milestones').select('id').eq('engagement_id', fromDiscovery).limit(1);
+      const specMilestoneId = msRows?.[0]?.id;
+      const { data: ev } = specMilestoneId
+        ? await supabase.from('evidence').select('delivery_description').eq('milestone_id', specMilestoneId).maybeSingle()
+        : { data: null };
+      setJobData(prev => ({
+        ...prev,
+        title: eng?.project_title ? `${eng.project_title} — full build` : prev.title,
+        description: ev?.delivery_description ?? prev.description,
+      }));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const categories = [
     'Web Development',
@@ -150,12 +171,7 @@ const PostJobPage: React.FC = () => {
     setSubmitError('');
     try {
       // Hard gate: no spend before the business is identifiable.
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('company_name, country')
-        .eq('id', user.id)
-        .single();
-      if (!customer?.company_name?.trim() || !customer?.country?.trim()) {
+      if (!(await hasCompanyProfile(user.id))) {
         setProfileGate(true);
         setSubmitting(false);
         return;
@@ -846,26 +862,7 @@ const PostJobPage: React.FC = () => {
       </div>
 
       {/* Company profile hard gate */}
-      {profileGate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl w-full max-w-md p-8 text-center">
-            <AlertTriangle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Complete your company profile first</h2>
-            <p className="text-sm text-gray-500 mb-5">
-              You can't post a job until your company name and country are filled in. This keeps every
-              engagement identifiable for tax and contract purposes.
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Link to="/customer/dashboard?open=company-profile" className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">
-                Complete Profile
-              </Link>
-              <button onClick={() => setProfileGate(false)} className="px-5 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg">
-                Not now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {profileGate && <CompanyProfileGateModal action={isTender ? 'post a tender' : 'post a job'} onClose={() => setProfileGate(false)} />}
     </div>
   );
 };

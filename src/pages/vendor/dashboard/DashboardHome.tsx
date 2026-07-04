@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
+import { sweepPendingEngagementFollowups } from '../../../lib/workflows';
 
 // ─── Mock Data ─────────────────────────────────────────────────────────────────
 
@@ -358,6 +359,7 @@ const DashboardHome: React.FC = () => {
     if (!user) return;
     async function load() {
       try {
+        sweepPendingEngagementFollowups(user!.id).catch(() => {});
         const [vendorRes, enquiryRes, jobRes] = await Promise.all([
           supabase.from('vendors').select('*').eq('id', user!.id).single(),
           supabase.from('enquiries').select('*, profiles(full_name)').eq('vendor_id', user!.id).order('created_at', { ascending: false }).limit(5),

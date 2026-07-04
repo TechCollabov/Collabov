@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Send, UserPlus, Clock, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, logEvent } from '../../lib/workflows';
+import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, logEvent, hasCompanyProfile } from '../../lib/workflows';
+import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 interface PendingInvitation {
   id: string;
@@ -27,6 +28,7 @@ const BYOVPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [duplicateVendorId, setDuplicateVendorId] = useState<string | null>(null);
+  const [showProfileGate, setShowProfileGate] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -61,6 +63,11 @@ const BYOVPage: React.FC = () => {
     setLoading(true);
     setDuplicateVendorId(null);
     try {
+      if (!(await hasCompanyProfile(user.id))) {
+        setShowProfileGate(true);
+        setLoading(false);
+        return;
+      }
       // Dedup: if this vendor is already on Collabov, search and request instead.
       const { data: existing } = await supabase
         .from('vendors')
@@ -318,6 +325,7 @@ const BYOVPage: React.FC = () => {
           )}
         </div>
       </div>
+      {showProfileGate && <CompanyProfileGateModal action="invite a vendor" onClose={() => setShowProfileGate(false)} />}
     </div>
   );
 };

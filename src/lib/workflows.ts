@@ -69,6 +69,18 @@ export const VENDOR_REVIEW_CRITERIA = [
   'Overall',
 ];
 
+export interface NotificationEventDef { key: string; label: string; forced: boolean }
+export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
+  { key: 'dispute', label: 'Dispute opened / resolved', forced: true },
+  { key: 'payment_failed', label: 'Payment failed', forced: true },
+  { key: 'evidence_submitted', label: 'Evidence submitted', forced: true },
+  { key: 'criteria_flagged', label: 'Criteria flagged', forced: true },
+  { key: 'new_proposal', label: 'New proposal / enquiry', forced: false },
+  { key: 'message', label: 'New message', forced: false },
+  { key: 'milestone', label: 'Milestone status change', forced: false },
+  { key: 'review', label: 'New review', forced: false },
+];
+
 export const DISPUTE_REASONS = [
   { value: 'scope_mismatch', label: 'Scope mismatch' },
   { value: 'delivery_quality', label: 'Delivery quality' },
@@ -84,6 +96,17 @@ export const PERSONAL_EMAIL_DOMAINS = ['gmail.com', 'yahoo.com', 'hotmail.com', 
 export function isBusinessEmail(email: string): boolean {
   const domain = email.split('@')[1]?.toLowerCase() ?? '';
   return domain.length > 0 && !PERSONAL_EMAIL_DOMAINS.includes(domain);
+}
+
+/** Hard gate: the buyer can't spend (RFP, job, tender, BYOV, discovery,
+ *  package purchase) until company name and country are filled in. */
+export async function hasCompanyProfile(customerId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('customers')
+    .select('company_name, country')
+    .eq('id', customerId)
+    .maybeSingle();
+  return !!(data?.company_name?.trim() && data?.country?.trim());
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -471,6 +494,51 @@ export async function sweepFlagDeadlines(engagement: EngagementParties) {
   }
 }
 
+// ── Calendar booking → RFP conversion (T+1 follow-up) ─────────────────────────
+
+/**
+ * Lazy "cron": the day after a booked discovery call, nudge both sides.
+ * MSP/Agency: vendor is prompted to submit a proposal, buyer to request one
+ * (or drop the vendor from the shortlist). Staff Aug: vendor confirms team
+ * availability, buyer is prompted to request an interview instead.
+ */
+export async function sweepPendingEngagementFollowups(partyId: string) {
+  const { data: due } = await supabase
+    .from('pending_engagement')
+    .select('*')
+    .eq('status', 'scheduled')
+    .or(`buyer_id.eq.${partyId},vendor_id.eq.${partyId}`)
+    .lt('meeting_datetime', new Date().toISOString());
+
+  for (const pe of due ?? []) {
+    const { data: vendor } = await supabase
+      .from('vendors')
+      .select('business_type, company_name')
+      .eq('id', pe.vendor_id)
+      .maybeSingle();
+    const isStaffAug = vendor?.business_type === 'staffaug';
+
+    await supabase.from('pending_engagement').update({ status: 'followed_up' }).eq('id', pe.id);
+
+    if (isStaffAug) {
+      await notify(pe.vendor_id, 'system', 'Confirm team availability',
+        'Yesterday\'s call is done — confirm which team members are available so the buyer can request an interview.',
+        '/vendor/dashboard/employees');
+      await notify(pe.buyer_id, 'system', 'Request an interview',
+        `Your call with ${vendor?.company_name ?? 'the vendor'} is done. Request an interview with an available team member.`,
+        `/vendor/profile/${pe.vendor_id}`);
+    } else {
+      await notify(pe.vendor_id, 'system', 'Submit a proposal for your meeting',
+        'Yesterday\'s discovery call is done — submit a proposal while it\'s fresh.',
+        '/vendor/dashboard/enquiries');
+      await notify(pe.buyer_id, 'system', 'Request a proposal or remove from shortlist',
+        `Your call with ${vendor?.company_name ?? 'the vendor'} is done. Request a proposal, or remove them from your shortlist.`,
+        `/vendor/profile/${pe.vendor_id}`);
+    }
+    await logEvent('pending_engagement_followup', partyId, 'system', 'pending_engagement', pe.id, { isStaffAug });
+  }
+}
+
 // ── Re-hire prompt (30 days after close) ─────────────────────────────────────
 
 /** Lazy "cron": 30 days after a clean close (no disputes, vendor available),
@@ -527,6 +595,49 @@ export async function recordPaymentEvent(customerId: string, onTime: boolean) {
     late_payment_count: late,
     on_time_payment_rate: Math.round(((total - late) / total) * 10000) / 100,
   }).eq('id', customerId);
+}
+
+// ── Vendor blacklist ──────────────────────────────────────────────────────────
+
+/**
+ * Blacklist a vendor. If a dispute is currently open on the vendor, its
+ * resolution proceeds independently — blacklisting does not force any
+ * escrow release or refund; that stays gated on the dispute's own outcome.
+ */
+export async function blacklistVendor(vendorId: string, reason: string, adminId: string) {
+  await supabase.from('vendors').update({
+    is_blacklisted: true,
+    blacklist_reason: reason,
+    blacklisted_at: new Date().toISOString(),
+    blacklisted_by: adminId,
+    restoration_approvals: [],
+  }).eq('id', vendorId);
+  await logEvent('vendor_blacklisted', adminId, 'admin', 'vendor', vendorId, { reason });
+}
+
+/**
+ * Restoration requires two distinct admin approvals. Returns the approval
+ * count after this call; restoration only completes once two different
+ * admin ids have signed off.
+ */
+export async function approveVendorRestoration(vendorId: string, adminId: string): Promise<number> {
+  const { data: v } = await supabase.from('vendors').select('restoration_approvals').eq('id', vendorId).single();
+  const approvals: string[] = Array.isArray(v?.restoration_approvals) ? v!.restoration_approvals : [];
+  if (approvals.includes(adminId)) return approvals.length;
+  const next = [...approvals, adminId];
+  if (next.length >= 2) {
+    await supabase.from('vendors').update({
+      is_blacklisted: false,
+      blacklist_reason: null,
+      blacklisted_at: null,
+      blacklisted_by: null,
+      restoration_approvals: [],
+    }).eq('id', vendorId);
+    await logEvent('vendor_restored', adminId, 'admin', 'vendor', vendorId, { approvedBy: next });
+  } else {
+    await supabase.from('vendors').update({ restoration_approvals: next }).eq('id', vendorId);
+  }
+  return next.length;
 }
 
 // ── Notifications + audit trail ───────────────────────────────────────────────

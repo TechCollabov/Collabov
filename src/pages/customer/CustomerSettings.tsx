@@ -1,0 +1,286 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, Users, BellRing, ShieldCheck, UserCircle, Plus, Trash2, Loader2, Download, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { NOTIFICATION_EVENTS, isBusinessEmail } from '../../lib/workflows';
+
+type Tab = 'account' | 'team' | 'notifications' | 'privacy';
+
+const ROLES = [
+  { value: 'admin', label: 'Admin', desc: 'Full access — spend, sign, review, manage team' },
+  { value: 'project_manager', label: 'Project Manager', desc: 'Review evidence, message vendors, raise change requests' },
+  { value: 'finance', label: 'Finance', desc: 'Fund milestones, view invoices, manage payment methods' },
+  { value: 'viewer', label: 'Viewer', desc: 'Read-only access to engagements and governance' },
+];
+
+const CustomerSettings: React.FC = () => {
+  const { user, profile } = useAuth();
+  const [tab, setTab] = useState<Tab>('account');
+  const [loading, setLoading] = useState(true);
+
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState('');
+
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('viewer');
+  const [inviteError, setInviteError] = useState('');
+
+  const [notifPrefs, setNotifPrefs] = useState<Record<string, 'realtime' | 'digest' | 'off'>>({});
+  const [notifSaved, setNotifSaved] = useState(false);
+
+  const [exportRequested, setExportRequested] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const [{ data: prof }, { data: team }, { data: prefsRow }] = await Promise.all([
+      supabase.from('profiles').select('two_factor_enabled').eq('id', user.id).maybeSingle(),
+      supabase.from('customer_team_members').select('*').eq('customer_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('notification_prefs').select('prefs').eq('user_id', user.id).maybeSingle(),
+    ]);
+    setTwoFactorEnabled(!!(prof as any)?.two_factor_enabled);
+    setTeamMembers(team ?? []);
+    const defaults: Record<string, 'realtime' | 'digest' | 'off'> = {};
+    NOTIFICATION_EVENTS.forEach(e => { defaults[e.key] = 'realtime'; });
+    setNotifPrefs({ ...defaults, ...(prefsRow?.prefs as any ?? {}) });
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleTwoFactor = async () => {
+    if (!user) return;
+    const next = !twoFactorEnabled;
+    if (next) {
+      const codes = Array.from({ length: 8 }, () => Math.random().toString(36).slice(2, 8).toUpperCase());
+      await supabase.from('profiles').update({
+        two_factor_enabled: true, two_factor_backup_codes: codes, two_factor_enabled_at: new Date().toISOString(),
+      }).eq('id', user.id);
+      setBackupCodes(codes);
+      setShowBackupCodes(true);
+    } else {
+      await supabase.from('profiles').update({ two_factor_enabled: false, two_factor_backup_codes: null }).eq('id', user.id);
+    }
+    setTwoFactorEnabled(next);
+  };
+
+  const changePassword = async () => {
+    if (newPassword.length < 8) { setPasswordMsg('Password must be at least 8 characters.'); return; }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setPasswordMsg(error ? 'Could not update password.' : 'Password updated.');
+    if (!error) setNewPassword('');
+  };
+
+  const inviteTeamMember = async () => {
+    if (!user) return;
+    setInviteError('');
+    if (!inviteEmail.trim()) { setInviteError('Email is required.'); return; }
+    if (!isBusinessEmail(inviteEmail)) { setInviteError('Please use a business email address.'); return; }
+    const { data, error } = await supabase.from('customer_team_members').insert({
+      customer_id: user.id, email: inviteEmail.trim(), role: inviteRole, status: 'invited',
+    }).select().single();
+    if (error) { setInviteError('Could not send the invite — check the email is unique.'); return; }
+    setTeamMembers(prev => [data, ...prev]);
+    setInviteEmail('');
+  };
+
+  const removeTeamMember = async (id: string) => {
+    await supabase.from('customer_team_members').delete().eq('id', id);
+    setTeamMembers(prev => prev.filter(m => m.id !== id));
+  };
+
+  const setNotifPref = (key: string, value: 'realtime' | 'digest' | 'off') => {
+    setNotifPrefs(prev => ({ ...prev, [key]: value }));
+    setNotifSaved(false);
+  };
+
+  const saveNotifPrefs = async () => {
+    if (!user) return;
+    await supabase.from('notification_prefs').upsert({ user_id: user.id, prefs: notifPrefs, updated_at: new Date().toISOString() });
+    setNotifSaved(true);
+  };
+
+  const requestDataExport = async () => {
+    if (!user) return;
+    await supabase.from('notifications').insert({
+      user_id: user.id, type: 'system', title: 'Data export requested',
+      message: 'Your full data export request was received. Under UK GDPR it will be delivered by email within 30 days.',
+    });
+    setExportRequested(true);
+  };
+
+  if (loading) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="h-8 w-8 text-[#0070F3] animate-spin" /></div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center gap-3 mb-6">
+          <Link to="/customer/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+            <ArrowLeft className="h-4 w-4" /> Dashboard
+          </Link>
+          <h1 className="text-2xl font-bold text-[#0B2D59]">Settings</h1>
+        </div>
+
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-6">
+          {([
+            ['account', 'Account', UserCircle],
+            ['team', 'Team', Users],
+            ['notifications', 'Notifications', BellRing],
+            ['privacy', 'Data & Privacy', ShieldCheck],
+          ] as const).map(([key, label, Icon]) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === key ? 'bg-white text-[#0070F3] shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'account' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+            <div>
+              <h2 className="font-bold text-[#0B2D59] mb-3">Account</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                  <input disabled value={profile?.full_name ?? ''} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                  <input disabled value={profile?.email ?? user?.email ?? ''} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500" />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Change Password</h3>
+              <div className="flex gap-2">
+                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                <button onClick={changePassword} className="px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">Update</button>
+              </div>
+              {passwordMsg && <p className="text-xs text-gray-500 mt-1.5">{passwordMsg}</p>}
+            </div>
+
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Two-Factor Authentication</h3>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">2FA Status</span>
+                <button onClick={toggleTwoFactor} className={`relative inline-flex h-6 w-11 items-center rounded-full ${twoFactorEnabled ? 'bg-[#0070F3]' : 'bg-gray-200'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {twoFactorEnabled && showBackupCodes && backupCodes.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-3">
+                  <p className="text-sm font-semibold text-amber-800 mb-2">Save your backup codes — shown once</p>
+                  <div className="grid grid-cols-4 gap-2 font-mono text-xs text-amber-900">
+                    {backupCodes.map(c => <span key={c} className="bg-white rounded px-2 py-1 text-center">{c}</span>)}
+                  </div>
+                  <button onClick={() => setShowBackupCodes(false)} className="text-xs text-amber-700 underline mt-2">I've saved these codes</button>
+                </div>
+              )}
+              {twoFactorEnabled && !showBackupCodes && (
+                <p className="text-xs text-green-600 flex items-center gap-1 mt-2"><CheckCircle className="h-3.5 w-3.5" /> Two-factor authentication is enabled.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'team' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="font-bold text-[#0B2D59] mb-1">Team Management</h2>
+            <p className="text-xs text-gray-400 mb-4">Invite colleagues and control who can spend, sign and review.</p>
+
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-5">
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="colleague@company.com"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                <select value={inviteRole} onChange={e => setInviteRole(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              {inviteError && <p className="text-xs text-red-600 mb-2">{inviteError}</p>}
+              <button onClick={inviteTeamMember} className="flex items-center gap-1.5 px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">
+                <Plus className="h-3.5 w-3.5" /> Invite
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {teamMembers.length === 0 && <p className="text-sm text-gray-400">No team members invited yet.</p>}
+              {teamMembers.map(m => (
+                <div key={m.id} className="flex items-center justify-between border border-gray-100 rounded-lg p-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{m.email}</div>
+                    <div className="text-xs text-gray-400 capitalize">{ROLES.find(r => r.value === m.role)?.label ?? m.role} · {m.status}</div>
+                  </div>
+                  <button onClick={() => removeTeamMember(m.id)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'notifications' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="font-bold text-[#0B2D59] mb-1">Notification Preferences</h2>
+            <p className="text-xs text-gray-400 mb-4">Action-required items are always real-time and can't be switched to digest.</p>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                  <tr>
+                    <th className="text-left px-4 py-2.5">Event</th>
+                    <th className="text-center px-4 py-2.5">Real-time</th>
+                    <th className="text-center px-4 py-2.5">Daily digest</th>
+                    <th className="text-center px-4 py-2.5">Off</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {NOTIFICATION_EVENTS.map(evt => (
+                    <tr key={evt.key}>
+                      <td className="px-4 py-3 text-gray-700">
+                        {evt.label}
+                        {evt.forced && <span className="ml-2 text-xs text-amber-600 font-medium">Action required</span>}
+                      </td>
+                      {(['realtime', 'digest', 'off'] as const).map(opt => (
+                        <td key={opt} className="text-center px-4 py-3">
+                          <input type="radio" name={`notif-${evt.key}`} disabled={evt.forced && opt !== 'realtime'}
+                            checked={notifPrefs[evt.key] === opt} onChange={() => setNotifPref(evt.key, opt)}
+                            className="accent-[#0070F3] disabled:opacity-30" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button onClick={saveNotifPrefs} className="mt-4 px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+              {notifSaved ? 'Saved ✓' : 'Save Preferences'}
+            </button>
+          </div>
+        )}
+
+        {tab === 'privacy' && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="font-bold text-[#0B2D59] mb-1">Data & Privacy</h2>
+            <p className="text-xs text-gray-400 mb-4">Request a full export of your data under UK GDPR — delivered by email within 30 days.</p>
+            {exportRequested ? (
+              <p className="text-sm text-green-600 flex items-center gap-1.5"><CheckCircle className="h-4 w-4" /> Export requested — you'll receive it by email within 30 days.</p>
+            ) : (
+              <button onClick={requestDataExport} className="flex items-center gap-1.5 px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">
+                <Download className="h-3.5 w-3.5" /> Request Data Export
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CustomerSettings;
