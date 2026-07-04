@@ -1855,10 +1855,12 @@ const VendorProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — min 3 employee profiles required before staff-aug vendors show Team Members to buyers */}
         <div className="container mx-auto px-6">
           <div className="flex gap-0 border-b border-gray-200 overflow-x-auto">
-            {TABS.map(tab => (
+            {TABS.filter(tab =>
+              tab !== 'Team Members' || vendor.business_type !== 'staffaug' || dbEmployees.length >= 3
+            ).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -69,6 +69,26 @@ const PostJobPage: React.FC = () => {
     visibility: isPrivate ? 'private' : 'public',
     invitedVendors: preSelectedVendors,
   });
+
+  // "Take to marketplace": pre-fill from a completed discovery engagement's spec.
+  useEffect(() => {
+    const fromDiscovery = searchParams.get('fromDiscovery');
+    if (!fromDiscovery) return;
+    (async () => {
+      const { data: eng } = await supabase.from('engagements').select('project_title').eq('id', fromDiscovery).maybeSingle();
+      const { data: msRows } = await supabase.from('project_milestones').select('id').eq('engagement_id', fromDiscovery).limit(1);
+      const specMilestoneId = msRows?.[0]?.id;
+      const { data: ev } = specMilestoneId
+        ? await supabase.from('evidence').select('delivery_description').eq('milestone_id', specMilestoneId).maybeSingle()
+        : { data: null };
+      setJobData(prev => ({
+        ...prev,
+        title: eng?.project_title ? `${eng.project_title} — full build` : prev.title,
+        description: ev?.delivery_description ?? prev.description,
+      }));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const categories = [
     'Web Development',

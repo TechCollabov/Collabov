@@ -245,6 +245,12 @@ const ResultsPage: React.FC = () => {
   const [loadingVendors, setLoadingVendors] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
+    supabase.from('saved_vendors').select('vendor_id').eq('customer_id', user.id).is('contractor_id', null)
+      .then(({ data }) => setSaved((data ?? []).map((r: any) => r.vendor_id).filter(Boolean)));
+  }, [user]);
+
+  useEffect(() => {
     async function fetchVendors() {
       try {
         const { data, error } = await supabase
@@ -342,8 +348,16 @@ const ResultsPage: React.FC = () => {
     });
   };
 
-  const toggleSaved = (id: string) =>
-    setSaved(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleSaved = async (id: string) => {
+    const alreadySaved = saved.includes(id);
+    setSaved(prev => alreadySaved ? prev.filter(x => x !== id) : [...prev, id]);
+    if (!user) return;
+    if (alreadySaved) {
+      await supabase.from('saved_vendors').delete().eq('customer_id', user.id).eq('vendor_id', id).is('contractor_id', null);
+    } else {
+      await supabase.from('saved_vendors').insert({ customer_id: user.id, vendor_id: id });
+    }
+  };
 
   const FilterPanel = () => (
     <div className="space-y-0">

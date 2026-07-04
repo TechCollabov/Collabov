@@ -913,6 +913,21 @@ export default function EngagementWorkspacePage() {
             </div>
           )}
 
+          {/* Discovery conversion CTAs — agency only, once the spec milestone is accepted */}
+          {role === 'buyer' && eng.engagement_type === 'discovery' &&
+            milestones.length > 0 && milestones.every(m => ['released', 'accepted'].includes(m.escrow_status)) && (
+            <DiscoveryConversionCard
+              engagement={eng}
+              evidence={evidenceByMilestone[milestones[0].id]}
+              counterparty={counterparty}
+              onBuildWith={() => navigate(
+                `/sow-wizard?discoveryFrom=${eng.id}&vendorId=${eng.vendor_id}` +
+                `&vendor=${encodeURIComponent(counterparty)}&type=agency&project=${encodeURIComponent(eng.project_title ?? 'Project')}`
+              )}
+              onTakeToMarketplace={() => navigate(`/customer/post-job?fromDiscovery=${eng.id}`)}
+            />
+          )}
+
           {/* Tabs */}
           <div className="mt-6 flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
             {([
@@ -1119,6 +1134,47 @@ function DisputeBanner({ dispute, role, onPosition, onSettle }: {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function DiscoveryConversionCard({ engagement, evidence, counterparty, onBuildWith, onTakeToMarketplace }: {
+  engagement: Engagement; evidence: any; counterparty: string;
+  onBuildWith: () => void; onTakeToMarketplace: () => void;
+}) {
+  const downloadSpec = () => {
+    const lines = [
+      'DISCOVERY SPECIFICATION SUMMARY',
+      `Engagement: ${engagement.project_title ?? ''}`,
+      `Vendor: ${counterparty}`,
+      '',
+      evidence?.delivery_description ?? 'No executive summary recorded.',
+      '',
+      'Files delivered:',
+      ...((Array.isArray(evidence?.files) ? evidence.files : []).map((f: string) => `- ${f}`)),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Discovery_Spec_${(engagement.project_title ?? 'project').replace(/\s+/g, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="text-sm text-blue-800">
+        <span className="font-semibold">Discovery complete.</span> Build the full project with {counterparty}, or take the spec to the open marketplace.
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => { downloadSpec(); onTakeToMarketplace(); }} className="px-4 py-2 border border-blue-300 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-100">
+          Take to marketplace
+        </button>
+        <button onClick={onBuildWith} className="px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
+          Build with {counterparty}
+        </button>
+      </div>
     </div>
   );
 }

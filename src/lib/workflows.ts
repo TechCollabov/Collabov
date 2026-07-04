@@ -471,6 +471,51 @@ export async function sweepFlagDeadlines(engagement: EngagementParties) {
   }
 }
 
+// ── Calendar booking → RFP conversion (T+1 follow-up) ─────────────────────────
+
+/**
+ * Lazy "cron": the day after a booked discovery call, nudge both sides.
+ * MSP/Agency: vendor is prompted to submit a proposal, buyer to request one
+ * (or drop the vendor from the shortlist). Staff Aug: vendor confirms team
+ * availability, buyer is prompted to request an interview instead.
+ */
+export async function sweepPendingEngagementFollowups(partyId: string) {
+  const { data: due } = await supabase
+    .from('pending_engagement')
+    .select('*')
+    .eq('status', 'scheduled')
+    .or(`buyer_id.eq.${partyId},vendor_id.eq.${partyId}`)
+    .lt('meeting_datetime', new Date().toISOString());
+
+  for (const pe of due ?? []) {
+    const { data: vendor } = await supabase
+      .from('vendors')
+      .select('business_type, company_name')
+      .eq('id', pe.vendor_id)
+      .maybeSingle();
+    const isStaffAug = vendor?.business_type === 'staffaug';
+
+    await supabase.from('pending_engagement').update({ status: 'followed_up' }).eq('id', pe.id);
+
+    if (isStaffAug) {
+      await notify(pe.vendor_id, 'system', 'Confirm team availability',
+        'Yesterday\'s call is done — confirm which team members are available so the buyer can request an interview.',
+        '/vendor/dashboard/employees');
+      await notify(pe.buyer_id, 'system', 'Request an interview',
+        `Your call with ${vendor?.company_name ?? 'the vendor'} is done. Request an interview with an available team member.`,
+        `/vendor/profile/${pe.vendor_id}`);
+    } else {
+      await notify(pe.vendor_id, 'system', 'Submit a proposal for your meeting',
+        'Yesterday\'s discovery call is done — submit a proposal while it\'s fresh.',
+        '/vendor/dashboard/enquiries');
+      await notify(pe.buyer_id, 'system', 'Request a proposal or remove from shortlist',
+        `Your call with ${vendor?.company_name ?? 'the vendor'} is done. Request a proposal, or remove them from your shortlist.`,
+        `/vendor/profile/${pe.vendor_id}`);
+    }
+    await logEvent('pending_engagement_followup', partyId, 'system', 'pending_engagement', pe.id, { isStaffAug });
+  }
+}
+
 // ── Re-hire prompt (30 days after close) ─────────────────────────────────────
 
 /** Lazy "cron": 30 days after a clean close (no disputes, vendor available),

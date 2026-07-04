@@ -1261,6 +1261,7 @@ export default function SOWWizardPage() {
   const proposalId = searchParams.get('proposal') || '';
   const packageId = searchParams.get('package') || '';
   const isDiscovery = searchParams.get('discovery') === '1';
+  const discoveryFromId = searchParams.get('discoveryFrom') || '';
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(() =>
@@ -1315,6 +1316,24 @@ export default function SOWWizardPage() {
             })),
           }));
         }
+      } else if (discoveryFromId) {
+        // "Build with [Vendor]": pre-populate from the discovery spec, locked to this vendor.
+        const { data: msRows } = await supabase
+          .from('project_milestones')
+          .select('id')
+          .eq('engagement_id', discoveryFromId)
+          .limit(1);
+        const specMilestoneId = msRows?.[0]?.id;
+        const { data: ev } = specMilestoneId
+          ? await supabase.from('evidence').select('delivery_description, files').eq('milestone_id', specMilestoneId).maybeSingle()
+          : { data: null };
+        if (cancelled) return;
+        setFormData(prev => ({
+          ...prev,
+          description: ev?.delivery_description
+            ? `${ev.delivery_description}\n\nBuilt from discovery specification.`
+            : prev.description,
+        }));
       } else if (packageId) {
         const { data: pkg } = await supabase
           .from('vendor_packages')
@@ -1341,7 +1360,7 @@ export default function SOWWizardPage() {
     }
     prefill();
     return () => { cancelled = true; };
-  }, [proposalId, packageId]);
+  }, [proposalId, packageId, discoveryFromId]);
 
   const onChange = (patch: Partial<FormData>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
@@ -1409,9 +1428,10 @@ export default function SOWWizardPage() {
         project_title: formData.project_title,
         status: 'pending_signature',
         engagement_type: isDiscovery ? 'discovery' : vendorType === 'msp' ? 'managed_service' : vendorType === 'staffaug' ? 'staff_aug' : 'project',
-        source: packageId ? 'package' : isDiscovery ? 'discovery' : 'rfp',
+        source: discoveryFromId ? 'discovery_conversion' : packageId ? 'package' : isDiscovery ? 'discovery' : 'rfp',
         proposal_id: proposalId || null,
         package_id: packageId || null,
+        parent_engagement_id: discoveryFromId || null,
         payment_model: paymentModel,
         monthly_amount: paymentModel === 'monthly' ? formData.budget : null,
         total_value: formData.budget,
