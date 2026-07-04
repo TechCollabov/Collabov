@@ -86,6 +86,17 @@ export function isBusinessEmail(email: string): boolean {
   return domain.length > 0 && !PERSONAL_EMAIL_DOMAINS.includes(domain);
 }
 
+/** Hard gate: the buyer can't spend (RFP, job, tender, BYOV, discovery,
+ *  package purchase) until company name and country are filled in. */
+export async function hasCompanyProfile(customerId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('customers')
+    .select('company_name, country')
+    .eq('id', customerId)
+    .maybeSingle();
+  return !!(data?.company_name?.trim() && data?.country?.trim());
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 export function addDays(base: Date, days: number): Date {

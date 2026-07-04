@@ -3,7 +3,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckSquare, Square } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { notify, logEvent } from '../lib/workflows';
+import { notify, logEvent, hasCompanyProfile } from '../lib/workflows';
+import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 const OUTPUT_OPTIONS = [
   { id: 'spec', label: 'Technical specification document' },
@@ -25,6 +26,7 @@ const DiscoveryBriefPage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showProfileGate, setShowProfileGate] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -63,6 +65,11 @@ const DiscoveryBriefPage: React.FC = () => {
     setSending(true);
     setError('');
     try {
+      if (!(await hasCompanyProfile(user.id))) {
+        setShowProfileGate(true);
+        setSending(false);
+        return;
+      }
       const { data: enquiry, error: insErr } = await supabase.from('enquiries').insert({
         customer_id: user.id,
         vendor_id: vendorId!,
@@ -113,6 +120,10 @@ const DiscoveryBriefPage: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (showProfileGate) {
+    return <CompanyProfileGateModal action="send a discovery brief" onClose={() => setShowProfileGate(false)} />;
   }
 
   return (

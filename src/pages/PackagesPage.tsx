@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Search, ShieldCheck, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logEvent } from '../lib/workflows';
+import { logEvent, hasCompanyProfile } from '../lib/workflows';
+import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 interface PackageRow {
   id: string;
@@ -31,6 +32,7 @@ const PackagesPage: React.FC = () => {
   const [packages, setPackages] = useState<PackageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState<PackageRow | null>(null);
+  const [showProfileGate, setShowProfileGate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +65,11 @@ const PackagesPage: React.FC = () => {
 
   const purchase = async (pkg: PackageRow) => {
     if (!user) { navigate('/signin'); return; }
+    if (!(await hasCompanyProfile(user.id))) {
+      setConfirming(null);
+      setShowProfileGate(true);
+      return;
+    }
     await logEvent('package_purchase_started', user.id, 'buyer', 'package', pkg.id, { price: pkg.price });
     // The SOW wizard is auto-populated from the package: title, deliverables,
     // single milestone at the package price, duration.
@@ -198,6 +205,7 @@ const PackagesPage: React.FC = () => {
           </div>
         </div>
       )}
+      {showProfileGate && <CompanyProfileGateModal action="purchase a package" onClose={() => setShowProfileGate(false)} />}
     </div>
   );
 };

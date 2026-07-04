@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent } from '../lib/workflows';
+import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent, hasCompanyProfile } from '../lib/workflows';
+import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -1474,6 +1475,7 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [showProfileGate, setShowProfileGate] = useState(false);
 
   const submit = async () => {
     if (!user) { navigate('/signin'); return; }
@@ -1485,6 +1487,11 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
     setSending(true);
     setError('');
     try {
+      if (!(await hasCompanyProfile(user.id))) {
+        setShowProfileGate(true);
+        setSending(false);
+        return;
+      }
       const { data: enquiry, error: insErr } = await supabase.from('enquiries').insert({
         customer_id: user.id,
         vendor_id: (vendor as any).id,
@@ -1529,6 +1536,10 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
         </div>
       </div>
     );
+  }
+
+  if (showProfileGate) {
+    return <CompanyProfileGateModal action="request a proposal" onClose={() => setShowProfileGate(false)} />;
   }
 
   return (
