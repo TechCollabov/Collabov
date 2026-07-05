@@ -10,8 +10,8 @@ import {
   addDays, addHours, addBusinessDays, hoursLeft, formatGBP, platformFee,
   fundMilestone, releaseMilestone, refundMilestone, openDispute,
   sweepAutoReleases, sweepDisputeEscalation, sweepFlagDeadlines,
-  notify, logEvent, sendEngagementMessage, recordPaymentEvent,
-  AUTO_RELEASE_DAYS, FLAG_RESPONSE_DAYS, CHANGE_REQUEST_RESPONSE_DAYS,
+  notify, logEvent, sendEngagementMessage, recordPaymentEvent, getPlatformSettings,
+  FLAG_RESPONSE_DAYS, CHANGE_REQUEST_RESPONSE_DAYS,
   REVIEW_WINDOW_DAYS, DEFECT_LIABILITY_DAYS, NOTICE_PERIOD_DAYS,
   MSP_CHECKIN_CRITERIA, STAFFAUG_CHECKIN_CRITERIA,
   BUYER_REVIEW_CRITERIA, VENDOR_REVIEW_CRITERIA, DISPUTE_REASONS,
@@ -339,7 +339,7 @@ export default function EngagementWorkspacePage() {
       await supabase.from('project_milestones').update({
         escrow_status: 'submitted',
         submitted_at: new Date().toISOString(),
-        auto_release_at: addDays(new Date(), AUTO_RELEASE_DAYS).toISOString(),
+        auto_release_at: addDays(new Date(), getPlatformSettings().autoReleaseDays).toISOString(),
       }).eq('id', ms.id);
       await notify(eng.buyer_id, 'milestone', 'Evidence submitted — review within 7 days',
         `The vendor submitted delivery evidence for "${ms.title}". Silence releases payment automatically on day 7.`,
@@ -489,7 +489,7 @@ export default function EngagementWorkspacePage() {
         status: 'resolved', resolution: 'settled_bilaterally', resolved_at: new Date().toISOString(),
       }).eq('id', dispute.id);
       if (dispute.milestone_id) {
-        await supabase.from('project_milestones').update({ escrow_status: 'submitted', auto_release_at: addDays(new Date(), AUTO_RELEASE_DAYS).toISOString() }).eq('id', dispute.milestone_id);
+        await supabase.from('project_milestones').update({ escrow_status: 'submitted', auto_release_at: addDays(new Date(), getPlatformSettings().autoReleaseDays).toISOString() }).eq('id', dispute.milestone_id);
       }
       const other = role === 'buyer' ? eng.vendor_id : eng.buyer_id;
       await notify(other, 'system', 'Dispute settled', 'The dispute was marked settled bilaterally. Escrow is unfrozen.', `/engagement/${eng.id}`);

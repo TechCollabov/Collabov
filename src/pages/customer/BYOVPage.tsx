@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Send, UserPlus, Clock, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../../lib/workflows';
+import { isBusinessEmail, addDays, getPlatformSettings, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../../lib/workflows';
 import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 interface PendingInvitation {
@@ -93,7 +93,7 @@ const BYOVPage: React.FC = () => {
         contact_email: contactEmail.trim(),
         note: note.trim() || null,
         status: 'pending',
-        expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(),
+        expires_at: addDays(new Date(), getPlatformSettings().byovInviteExpiryDays).toISOString(),
       }).select().single();
       if (error) throw error;
       await logEvent('byov_invite_sent', user.id, 'buyer', 'partner_invite', invite.id, {
@@ -318,7 +318,7 @@ const BYOVPage: React.FC = () => {
                         <button
                           onClick={async () => {
                             await supabase.from('partner_invites')
-                              .update({ expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(), status: 'pending' })
+                              .update({ expires_at: addDays(new Date(), getPlatformSettings().byovInviteExpiryDays).toISOString(), status: 'pending' })
                               .eq('id', inv.id);
                           }}
                           className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center space-x-1"

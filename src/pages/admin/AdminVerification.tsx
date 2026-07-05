@@ -4,7 +4,7 @@ import {
   CheckCircle, AlertTriangle, Eye, Loader2, Ban, ShieldOff, UserCheck,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { blacklistVendor, approveVendorRestoration } from '../../lib/workflows';
+import { blacklistVendor, approveVendorRestoration, getPlatformSettings } from '../../lib/workflows';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
@@ -647,7 +647,8 @@ const AdminVerification: React.FC = () => {
             {filteredQueue.map(v => {
               const dateStr = v.created_at || new Date().toISOString();
               const age = daysAgo(dateStr);
-              const timeColor = age > 7 ? 'text-red-500' : age > 3 ? 'text-amber-500' : 'text-gray-400';
+              const sla = getPlatformSettings().vendorVerificationSlaDays;
+              const timeColor = age > sla ? 'text-red-500' : age > Math.max(1, sla - 2) ? 'text-amber-500' : 'text-gray-400';
               const s = STATUS_MAP[v.status] ?? STATUS_MAP['submitted'];
               return (
                 <div

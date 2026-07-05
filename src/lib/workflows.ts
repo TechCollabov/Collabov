@@ -10,6 +10,9 @@ import { supabase } from './supabase';
 
 // ── Platform rules ────────────────────────────────────────────────────────────
 
+// Defaults used until platform_settings loads (and as a fallback if the row
+// is ever missing). Admin-editable values from platform_settings take over
+// via refreshPlatformSettings() below.
 export const PLATFORM_FEE_PCT = 10;
 export const AUTO_RELEASE_DAYS = 7;
 export const AUTO_RELEASE_WARNING_DAY = 5;
@@ -147,10 +150,57 @@ export function daysLeft(deadline: string | Date): number {
   return hoursLeft(deadline) / 24;
 }
 
+// ── Live platform settings cache ───────────────────────────────────────────────
+
+interface CachedPlatformSettings {
+  platformFeePct: number;
+  autoReleaseDays: number;
+  autoReleaseWarningDays: number;
+  byovInviteExpiryDays: number;
+  minimumProjectValue: number;
+  vendorVerificationSlaDays: number;
+}
+
+let cachedPlatformSettings: CachedPlatformSettings = {
+  platformFeePct: PLATFORM_FEE_PCT,
+  autoReleaseDays: AUTO_RELEASE_DAYS,
+  autoReleaseWarningDays: AUTO_RELEASE_WARNING_DAY,
+  byovInviteExpiryDays: PARTNER_INVITE_EXPIRY_DAYS,
+  minimumProjectValue: 500,
+  vendorVerificationSlaDays: 2,
+};
+
+/** Re-reads platform_settings from the DB. Call after an admin saves changes;
+ *  also runs once automatically when this module first loads. */
+export async function refreshPlatformSettings(): Promise<CachedPlatformSettings> {
+  const { data } = await supabase
+    .from('platform_settings')
+    .select('platform_fee_pct, auto_release_days, auto_release_warning_days, byov_invite_expiry_days, minimum_project_value, vendor_verification_sla_days')
+    .eq('id', true)
+    .maybeSingle();
+  if (data) {
+    cachedPlatformSettings = {
+      platformFeePct: Number(data.platform_fee_pct),
+      autoReleaseDays: data.auto_release_days,
+      autoReleaseWarningDays: data.auto_release_warning_days,
+      byovInviteExpiryDays: data.byov_invite_expiry_days,
+      minimumProjectValue: Number(data.minimum_project_value),
+      vendorVerificationSlaDays: data.vendor_verification_sla_days,
+    };
+  }
+  return cachedPlatformSettings;
+}
+
+export function getPlatformSettings(): CachedPlatformSettings {
+  return cachedPlatformSettings;
+}
+
+refreshPlatformSettings().catch(() => {});
+
 // ── Money ─────────────────────────────────────────────────────────────────────
 
 export function platformFee(gross: number): number {
-  return Math.round(gross * PLATFORM_FEE_PCT) / 100;
+  return Math.round(gross * getPlatformSettings().platformFeePct) / 100;
 }
 
 export function netToVendor(gross: number): number {

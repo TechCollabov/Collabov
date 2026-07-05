@@ -1,21 +1,83 @@
-import React, { useState } from 'react';
-import { Save, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Save, AlertTriangle, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { refreshPlatformSettings } from '../../lib/workflows';
+
+interface Settings {
+  platform_fee_pct: string;
+  auto_release_days: string;
+  minimum_project_value: string;
+  byov_invite_expiry_days: string;
+  admin_alert_email: string;
+  maintenance_mode: boolean;
+  vendor_verification_sla_days: string;
+}
 
 const AdminSettings: React.FC = () => {
-  const [settings, setSettings] = useState({
-    platformFeePercent: '5',
-    autoReleaseDays: '7',
-    minProjectValue: '500',
-    invitationExpiryDays: '14',
-    adminEmail: 'admin@collabov.com',
-    maintenanceMode: false,
-    vendorVerificationSla: '3',
+  const [settings, setSettings] = useState<Settings>({
+    platform_fee_pct: '10',
+    auto_release_days: '7',
+    minimum_project_value: '500',
+    byov_invite_expiry_days: '7',
+    admin_alert_email: '',
+    maintenance_mode: false,
+    vendor_verification_sla_days: '2',
   });
-
-  const update = (key: string, value: string | boolean) => setSettings(s => ({ ...s, [key]: value }));
-
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('platform_settings')
+      .select('platform_fee_pct, auto_release_days, minimum_project_value, byov_invite_expiry_days, admin_alert_email, maintenance_mode, vendor_verification_sla_days')
+      .eq('id', true)
+      .maybeSingle();
+    if (data) {
+      setSettings({
+        platform_fee_pct: String(data.platform_fee_pct),
+        auto_release_days: String(data.auto_release_days),
+        minimum_project_value: String(data.minimum_project_value),
+        byov_invite_expiry_days: String(data.byov_invite_expiry_days),
+        admin_alert_email: data.admin_alert_email ?? '',
+        maintenance_mode: data.maintenance_mode,
+        vendor_verification_sla_days: String(data.vendor_verification_sla_days),
+      });
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const update = (key: keyof Settings, value: string | boolean) => setSettings(s => ({ ...s, [key]: value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('platform_settings').update({
+        platform_fee_pct: Number(settings.platform_fee_pct),
+        auto_release_days: Number(settings.auto_release_days),
+        minimum_project_value: Number(settings.minimum_project_value),
+        byov_invite_expiry_days: Number(settings.byov_invite_expiry_days),
+        admin_alert_email: settings.admin_alert_email || null,
+        maintenance_mode: settings.maintenance_mode,
+        vendor_verification_sla_days: Number(settings.vendor_verification_sla_days),
+        updated_at: new Date().toISOString(),
+        updated_by: user?.id ?? null,
+      }).eq('id', true);
+      await refreshPlatformSettings();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-blue-600" size={32} /></div>;
+  }
 
   return (
     <div>
@@ -29,14 +91,14 @@ const AdminSettings: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Platform Fee (%)</label>
-              <p className="text-xs text-gray-400 mb-2">Percentage deducted from each milestone payment before vendor payout.</p>
+              <p className="text-xs text-gray-400 mb-2">Percentage deducted from each milestone payment before vendor payout. Applies to every new release immediately.</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min="0"
                   max="30"
-                  value={settings.platformFeePercent}
-                  onChange={e => update('platformFeePercent', e.target.value)}
+                  value={settings.platform_fee_pct}
+                  onChange={e => update('platform_fee_pct', e.target.value)}
                   className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
                 />
                 <span className="text-sm text-gray-500">%</span>
@@ -44,14 +106,14 @@ const AdminSettings: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Auto-Release Days</label>
-              <p className="text-xs text-gray-400 mb-2">Number of days after milestone delivery approval before funds are automatically released to vendor.</p>
+              <p className="text-xs text-gray-400 mb-2">Days after milestone submission before funds are automatically released. Applies to newly-submitted milestones.</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min="1"
                   max="30"
-                  value={settings.autoReleaseDays}
-                  onChange={e => update('autoReleaseDays', e.target.value)}
+                  value={settings.auto_release_days}
+                  onChange={e => update('auto_release_days', e.target.value)}
                   className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
                 />
                 <span className="text-sm text-gray-500">days</span>
@@ -59,14 +121,14 @@ const AdminSettings: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Project Value (£)</label>
-              <p className="text-xs text-gray-400 mb-2">Minimum total contract value allowed on the platform.</p>
+              <p className="text-xs text-gray-400 mb-2">Minimum fixed-price budget allowed on a new job post or tender.</p>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">£</span>
                 <input
                   type="number"
                   min="0"
-                  value={settings.minProjectValue}
-                  onChange={e => update('minProjectValue', e.target.value)}
+                  value={settings.minimum_project_value}
+                  onChange={e => update('minimum_project_value', e.target.value)}
                   className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
                 />
               </div>
@@ -79,18 +141,18 @@ const AdminSettings: React.FC = () => {
           <h2 className="text-base font-semibold text-gray-800 mb-4">Vendor Verification</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Verification SLA (working days)</label>
-              <p className="text-xs text-gray-400 mb-2">Target number of working days to review and respond to a vendor verification application.</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Verification SLA (days)</label>
+              <p className="text-xs text-gray-400 mb-2">Target days to review a vendor application. Drives the age-warning colours on the Verification Queue.</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min="1"
                   max="14"
-                  value={settings.vendorVerificationSla}
-                  onChange={e => update('vendorVerificationSla', e.target.value)}
+                  value={settings.vendor_verification_sla_days}
+                  onChange={e => update('vendor_verification_sla_days', e.target.value)}
                   className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
                 />
-                <span className="text-sm text-gray-500">working days</span>
+                <span className="text-sm text-gray-500">days</span>
               </div>
             </div>
           </div>
@@ -101,15 +163,15 @@ const AdminSettings: React.FC = () => {
           <h2 className="text-base font-semibold text-gray-800 mb-4">Users & Platform</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Invitation Expiry (days)</label>
-              <p className="text-xs text-gray-400 mb-2">How long a vendor or buyer invitation link remains active.</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">BYOV/BYOC Invitation Expiry (days)</label>
+              <p className="text-xs text-gray-400 mb-2">How long a buyer-invites-vendor or vendor-invites-client link remains active.</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min="1"
                   max="90"
-                  value={settings.invitationExpiryDays}
-                  onChange={e => update('invitationExpiryDays', e.target.value)}
+                  value={settings.byov_invite_expiry_days}
+                  onChange={e => update('byov_invite_expiry_days', e.target.value)}
                   className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
                 />
                 <span className="text-sm text-gray-500">days</span>
@@ -117,11 +179,11 @@ const AdminSettings: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Admin Notification Email</label>
-              <p className="text-xs text-gray-400 mb-2">Receives platform alerts, new verifications, and dispute notifications.</p>
+              <p className="text-xs text-gray-400 mb-2">Contact address for platform alerts, stored for reference by the operations team.</p>
               <input
                 type="email"
-                value={settings.adminEmail}
-                onChange={e => update('adminEmail', e.target.value)}
+                value={settings.admin_alert_email}
+                onChange={e => update('admin_alert_email', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
               />
             </div>
@@ -129,20 +191,20 @@ const AdminSettings: React.FC = () => {
         </div>
 
         {/* Maintenance Mode */}
-        <div className={`rounded-xl border shadow-sm p-6 ${settings.maintenanceMode ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+        <div className={`rounded-xl border shadow-sm p-6 ${settings.maintenance_mode ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <AlertTriangle className={`h-4 w-4 ${settings.maintenanceMode ? 'text-red-500' : 'text-gray-400'}`} />
+                <AlertTriangle className={`h-4 w-4 ${settings.maintenance_mode ? 'text-red-500' : 'text-gray-400'}`} />
                 <h2 className="text-base font-semibold text-gray-800">Maintenance Mode</h2>
               </div>
-              <p className="text-xs text-gray-500 mt-1">When enabled, the public-facing site shows a maintenance page. Admin panel remains accessible.</p>
+              <p className="text-xs text-gray-500 mt-1">When enabled, every public and buyer/vendor route shows a maintenance page. The admin panel stays accessible so you can turn it back off.</p>
             </div>
             <button
-              onClick={() => update('maintenanceMode', !settings.maintenanceMode)}
-              className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${settings.maintenanceMode ? 'bg-red-500' : 'bg-gray-200'}`}
+              onClick={() => update('maintenance_mode', !settings.maintenance_mode)}
+              className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${settings.maintenance_mode ? 'bg-red-500' : 'bg-gray-200'}`}
             >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings.maintenanceMode ? 'translate-x-7' : 'translate-x-1'}`} />
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings.maintenance_mode ? 'translate-x-7' : 'translate-x-1'}`} />
             </button>
           </div>
         </div>
@@ -150,10 +212,11 @@ const AdminSettings: React.FC = () => {
         {/* Save */}
         <button
           onClick={handleSave}
-          className={`flex items-center gap-2 py-2.5 px-5 text-sm font-semibold rounded-xl transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-[#0070F3] text-white hover:bg-blue-700'}`}
+          disabled={saving}
+          className={`flex items-center gap-2 py-2.5 px-5 text-sm font-semibold rounded-xl transition-colors disabled:opacity-60 ${saved ? 'bg-green-600 text-white' : 'bg-[#0070F3] text-white hover:bg-blue-700'}`}
         >
           <Save className="h-4 w-4" />
-          {saved ? 'Settings Saved!' : 'Save Settings'}
+          {saving ? 'Saving...' : saved ? 'Settings Saved!' : 'Save Settings'}
         </button>
       </div>
     </div>
