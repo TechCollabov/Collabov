@@ -1,24 +1,30 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, ShieldCheck, AlertCircle, FileText, CreditCard, Clock, ArrowRight } from 'lucide-react';
+import { TrendingUp, Users, ShieldCheck, AlertCircle, FileText, CreditCard, Clock, ArrowRight, Lock, Building2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { formatGBP } from '../../lib/workflows';
 
-/* No hardcoded GMV data — will be loaded from the database */
-const gmvData: { month: string; gmv: number }[] = [];
+interface Kpis {
+  gmvThisMonth: number;
+  gmvAllTime: number;
+  activeEngagements: number;
+  verifiedVendors: number;
+  activeBuyers: number;
+  openDisputes: number;
+  pendingVerifications: number;
+  pendingBriefs: number;
+}
 
-const KPIS = [
-  { label: 'Total GMV This Month', value: '—', icon: TrendingUp, color: 'text-[#0070F3]', bg: 'bg-blue-50', change: '' },
-  { label: 'Total GMV All Time', value: '—', icon: CreditCard, color: 'text-purple-600', bg: 'bg-purple-50', change: '' },
-  { label: 'Active Engagements', value: '—', icon: FileText, color: 'text-green-600', bg: 'bg-green-50', change: '' },
-  { label: 'Verified Vendors', value: '—', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50', change: '' },
-  { label: 'Active Buyers', value: '—', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', change: '' },
-  { label: 'Open Disputes', value: '—', icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', change: '' },
-  { label: 'Pending Verifications', value: '—', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', change: '' },
-  { label: 'Pending Brief Reviews', value: '—', icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50', change: '' },
-];
-
-/* No hardcoded actions — will be loaded from the database */
-const ACTIONS: { id: string; type: string; priority: string; title: string; detail: string; href: string; label: string }[] = [];
+interface PriorityAction {
+  id: string;
+  type: string;
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  detail: string;
+  href: string;
+  label: string;
+}
 
 const PRIORITY_COLORS: Record<string, string> = {
   high: 'bg-red-100 text-red-700',
@@ -26,28 +32,188 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: 'bg-blue-100 text-blue-600',
 };
 
+const monthKey = (d: Date) => d.toLocaleString('en-GB', { month: 'short', year: '2-digit' });
+
 const AdminDashboard: React.FC = () => {
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [gmvData, setGmvData] = useState<{ month: string; gmv: number }[]>([]);
+  const [actions, setActions] = useState<PriorityAction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+      sixMonthsAgo.setDate(1);
+      sixMonthsAgo.setHours(0, 0, 0, 0);
+
+      const [
+        { count: verifiedVendors },
+        { count: pendingVerifications },
+        { count: activeEngagements },
+        { count: openDisputes },
+        { count: pendingBriefs },
+        { count: activeBuyers },
+        { data: allReleases },
+        { data: recentReleases },
+        { data: adminReviewDisputes },
+        { data: lockedAdmins },
+        { data: pendingRestorations },
+        { data: pendingBriefRows },
+      ] = await Promise.all([
+        supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
+        supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', false).is('rejected_at', null),
+        supabase.from('engagements').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+        supabase.from('disputes').select('id', { count: 'exact', head: true }).neq('status', 'resolved'),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('admin_status', 'pending_review'),
+        supabase.from('customers').select('id', { count: 'exact', head: true }).gt('active_projects_count', 0),
+        supabase.from('escrow_transactions').select('amount').eq('transaction_type', 'release'),
+        supabase.from('escrow_transactions').select('amount, created_at').eq('transaction_type', 'release').gte('created_at', sixMonthsAgo.toISOString()),
+        supabase.from('disputes').select('id, reason, engagement_id').eq('status', 'admin_review'),
+        supabase.from('profiles').select('id, full_name').eq('user_type', 'admin').not('locked_at', 'is', null),
+        supabase.from('vendors').select('id, company_name, restoration_approvals').eq('is_blacklisted', true),
+        supabase.from('jobs').select('id, title, tender_title, job_kind').eq('admin_status', 'pending_review').limit(5),
+      ]);
+
+      const gmvAllTime = (allReleases || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+      const { data: thisMonthReleases } = await supabase
+        .from('escrow_transactions')
+        .select('amount')
+        .eq('transaction_type', 'release')
+        .gte('created_at', startOfMonth.toISOString());
+      const gmvThisMonth = (thisMonthReleases || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+      setKpis({
+        gmvThisMonth,
+        gmvAllTime,
+        activeEngagements: activeEngagements || 0,
+        verifiedVendors: verifiedVendors || 0,
+        activeBuyers: activeBuyers || 0,
+        openDisputes: openDisputes || 0,
+        pendingVerifications: pendingVerifications || 0,
+        pendingBriefs: pendingBriefs || 0,
+      });
+
+      const buckets = new Map<string, number>();
+      for (let i = 0; i < 6; i++) {
+        const d = new Date(sixMonthsAgo);
+        d.setMonth(d.getMonth() + i);
+        buckets.set(monthKey(d), 0);
+      }
+      (recentReleases || []).forEach((r: any) => {
+        const key = monthKey(new Date(r.created_at));
+        buckets.set(key, (buckets.get(key) || 0) + Number(r.amount || 0));
+      });
+      setGmvData(Array.from(buckets.entries()).map(([month, gmv]) => ({ month, gmv })));
+
+      const queue: PriorityAction[] = [];
+      if ((pendingVerifications || 0) > 0) {
+        queue.push({
+          id: 'pending-verifications',
+          type: 'verification',
+          priority: 'high',
+          title: `${pendingVerifications} vendor verification${pendingVerifications === 1 ? '' : 's'} pending`,
+          detail: 'New vendor applications awaiting document review',
+          href: '/admin/verification',
+          label: 'Review',
+        });
+      }
+      (pendingBriefRows || []).forEach((j: any) => {
+        queue.push({
+          id: `brief-${j.id}`,
+          type: 'brief',
+          priority: 'medium',
+          title: j.job_kind === 'tender' ? (j.tender_title || 'Tender submission') : (j.title || 'Job brief'),
+          detail: `${j.job_kind === 'tender' ? 'Tender' : 'Job'} awaiting admin approval before going live`,
+          href: '/admin/briefs',
+          label: 'Review',
+        });
+      });
+      (adminReviewDisputes || []).forEach((d: any) => {
+        queue.push({
+          id: `dispute-${d.id}`,
+          type: 'dispute',
+          priority: 'high',
+          title: `Dispute escalated to admin — ${d.reason.replace(/_/g, ' ')}`,
+          detail: 'Bilateral window expired without resolution',
+          href: '/admin/disputes',
+          label: 'Resolve',
+        });
+      });
+      (lockedAdmins || []).forEach((a: any) => {
+        queue.push({
+          id: `locked-${a.id}`,
+          type: 'lockout',
+          priority: 'medium',
+          title: `${a.full_name}'s admin account is locked`,
+          detail: '3 failed sign-in attempts — needs a second admin to unlock',
+          href: '/admin/users',
+          label: 'Unlock',
+        });
+      });
+      (pendingRestorations || []).forEach((v: any) => {
+        const approvals = Array.isArray(v.restoration_approvals) ? v.restoration_approvals.length : 0;
+        if (approvals >= 1 && approvals < 2) {
+          queue.push({
+            id: `restore-${v.id}`,
+            type: 'restoration',
+            priority: 'low',
+            title: `${v.company_name} restoration awaiting second approval`,
+            detail: `${approvals}/2 admin approvals recorded`,
+            href: '/admin/verification',
+            label: 'Approve',
+          });
+        }
+      });
+
+      const priorityRank = { high: 0, medium: 1, low: 2 };
+      queue.sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]);
+      setActions(queue);
+      setLoading(false);
+    };
+
+    load();
+  }, []);
+
+  const KPI_CARDS = kpis ? [
+    { label: 'Total GMV This Month', value: formatGBP(kpis.gmvThisMonth), icon: TrendingUp, color: 'text-[#0070F3]', bg: 'bg-blue-50' },
+    { label: 'Total GMV All Time', value: formatGBP(kpis.gmvAllTime), icon: CreditCard, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Active Engagements', value: String(kpis.activeEngagements), icon: FileText, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Verified Vendors', value: String(kpis.verifiedVendors), icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Active Buyers', value: String(kpis.activeBuyers), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: 'Open Disputes', value: String(kpis.openDisputes), icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Pending Verifications', value: String(kpis.pendingVerifications), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Pending Brief Reviews', value: String(kpis.pendingBriefs), icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50' },
+  ] : [];
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {KPIS.map(kpi => {
-          const Icon = kpi.icon;
-          return (
-            <div key={kpi.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className={`w-8 h-8 rounded-lg ${kpi.bg} flex items-center justify-center`}>
-                  <Icon className={`h-4 w-4 ${kpi.color}`} />
+        {(loading ? Array.from({ length: 8 }) : KPI_CARDS).map((kpi: any, idx) => (
+          <div key={kpi?.label ?? idx} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            {kpi ? (
+              <>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className={`w-8 h-8 rounded-lg ${kpi.bg} flex items-center justify-center`}>
+                    <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-tight">{kpi.label}</span>
                 </div>
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-tight">{kpi.label}</span>
-              </div>
-              <div className="text-2xl font-bold text-gray-900">{kpi.value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{kpi.change}</div>
-            </div>
-          );
-        })}
+                <div className="text-2xl font-bold text-gray-900">{kpi.value}</div>
+              </>
+            ) : (
+              <div className="h-16 animate-pulse bg-gray-50 rounded-lg" />
+            )}
+          </div>
+        ))}
       </div>
 
       {/* GMV Chart */}
@@ -69,14 +235,23 @@ const AdminDashboard: React.FC = () => {
         <div className="px-5 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800">Priority Action Queue</h2>
         </div>
+        {actions.length === 0 && !loading && (
+          <div className="px-5 py-8 text-center text-sm text-gray-400 flex flex-col items-center gap-2">
+            <Building2 className="h-5 w-5 text-gray-300" />
+            Nothing needs your attention right now.
+          </div>
+        )}
         <ul className="divide-y divide-gray-50">
-          {ACTIONS.map(action => (
+          {actions.map(action => (
             <li key={action.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50">
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${PRIORITY_COLORS[action.priority]}`}>
                 {action.priority}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-800 truncate">{action.title}</div>
+                <div className="text-sm font-medium text-gray-800 truncate flex items-center gap-1.5">
+                  {action.type === 'lockout' && <Lock className="h-3.5 w-3.5 text-gray-400" />}
+                  {action.title}
+                </div>
                 <div className="text-xs text-gray-400 mt-0.5">{action.detail}</div>
               </div>
               <Link
