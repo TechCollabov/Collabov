@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, User, Building2, Ban, Mail, Lock, Unlock, ShieldOff } from 'lucide-react';
+import { Search, User, Building2, Ban, Mail, Lock, Unlock, ShieldOff, Link2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { blacklistCustomer, approveCustomerRestoration } from '../../lib/workflows';
@@ -167,27 +167,94 @@ function BuyerBlacklistPanel() {
   );
 }
 
-/* No hardcoded users — data will be loaded from the database */
-const USERS: {
-  id: string; name: string; email: string; role: string; company: string;
-  joined: string; status: string; projects: number;
-}[] = [];
+interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  role: 'buyer' | 'vendor';
+  company: string;
+  joined: string;
+  status: string;
+  projects: number;
+  linkedNote: string | null;
+}
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   active: { label: 'Active', color: 'bg-green-100 text-green-700' },
-  suspended: { label: 'Suspended', color: 'bg-red-100 text-red-700' },
-  pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700' },
+  pending_verification: { label: 'Pending Verification', color: 'bg-amber-100 text-amber-700' },
+  blacklist_pending: { label: 'Blacklist Pending', color: 'bg-amber-100 text-amber-700' },
+  blacklisted: { label: 'Blacklisted', color: 'bg-red-100 text-red-700' },
 };
 
 const AdminUsers: React.FC = () => {
   const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [users, setUsers] = useState(USERS);
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
 
   const [adminAccounts, setAdminAccounts] = useState<AdminAccountRow[]>([]);
   const [unlockingId, setUnlockingId] = useState<string | null>(null);
   const [unlockError, setUnlockError] = useState('');
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, user_type, created_at')
+      .in('user_type', ['customer', 'vendor'])
+      .order('created_at', { ascending: false });
+    const rows = profiles || [];
+    const ids = rows.map(p => p.id);
+
+    const [{ data: vendors }, { data: customers }, { data: invitesReceived }, { data: invitesSent }] = await Promise.all([
+      supabase.from('vendors').select('id, company_name, is_verified, is_blacklisted, blacklist_pending, active_contracts_count').in('id', ids),
+      supabase.from('customers').select('id, company_name, is_blacklisted, blacklist_pending, active_projects_count').in('id', ids),
+      supabase.from('partner_invites').select('linked_profile_id, inviter_id, company_name').eq('status', 'accepted').in('linked_profile_id', ids),
+      supabase.from('partner_invites').select('inviter_id, company_name').eq('status', 'accepted').in('inviter_id', ids),
+    ]);
+    const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
+    const cMap = new Map((customers ?? []).map((c: any) => [c.id, c]));
+    const invitedByMap = new Map((invitesReceived ?? []).map((i: any) => [i.linked_profile_id, i]));
+    const invitedCountMap = new Map<string, number>();
+    (invitesSent ?? []).forEach((i: any) => invitedCountMap.set(i.inviter_id, (invitedCountMap.get(i.inviter_id) ?? 0) + 1));
+
+    setUsers(rows.map((p: any) => {
+      const isVendor = p.user_type === 'vendor';
+      const v = vMap.get(p.id);
+      const c = cMap.get(p.id);
+      let status = 'active';
+      if (isVendor) {
+        if (v?.is_blacklisted) status = 'blacklisted';
+        else if (v?.blacklist_pending) status = 'blacklist_pending';
+        else if (!v?.is_verified) status = 'pending_verification';
+      } else {
+        if (c?.is_blacklisted) status = 'blacklisted';
+        else if (c?.blacklist_pending) status = 'blacklist_pending';
+      }
+      const invitedBy = invitedByMap.get(p.id);
+      const invitedCount = invitedCountMap.get(p.id) ?? 0;
+      const linkedNote = invitedBy
+        ? `Invited by ${invitedBy.company_name}`
+        : invitedCount > 0
+        ? `Invited ${invitedCount} linked account${invitedCount > 1 ? 's' : ''}`
+        : null;
+      return {
+        id: p.id,
+        name: p.full_name,
+        email: p.email,
+        role: isVendor ? 'vendor' : 'buyer',
+        company: (isVendor ? v?.company_name : c?.company_name) ?? '—',
+        joined: fmtDate(p.created_at),
+        status,
+        projects: (isVendor ? v?.active_contracts_count : c?.active_projects_count) ?? 0,
+        linkedNote,
+      };
+    }));
+    setUsersLoading(false);
+  }, []);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
 
   const loadAdminAccounts = useCallback(async () => {
     const { data } = await supabase
@@ -224,10 +291,6 @@ const AdminUsers: React.FC = () => {
     (roleFilter === 'all' || u.role === roleFilter) &&
     (search === '' || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
   );
-
-  const toggleSuspend = (id: string) => {
-    setUsers(us => us.map(u => u.id === id ? { ...u, status: u.status === 'suspended' ? 'active' : 'suspended' } : u));
-  };
 
   const lockedAdmins = adminAccounts.filter(a => a.locked_at);
 
@@ -300,14 +363,21 @@ const AdminUsers: React.FC = () => {
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Role</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Company</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Joined</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Projects</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Active Projects</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Linked Account</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Status</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
+            {usersLoading && (
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">Loading users…</td></tr>
+            )}
+            {!usersLoading && filtered.length === 0 && (
+              <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">No users match this view.</td></tr>
+            )}
             {filtered.map(user => {
-              const s = STATUS_MAP[user.status];
+              const s = STATUS_MAP[user.status] ?? STATUS_MAP.active;
               return (
                 <tr key={user.id} className="hover:bg-gray-50/50">
                   <td className="px-5 py-4">
@@ -323,22 +393,18 @@ const AdminUsers: React.FC = () => {
                   <td className="px-5 py-4 text-gray-600">{user.company}</td>
                   <td className="px-5 py-4 text-gray-500">{user.joined}</td>
                   <td className="px-5 py-4 text-gray-600">{user.projects}</td>
+                  <td className="px-5 py-4 text-gray-500 text-xs">
+                    {user.linkedNote ? (
+                      <span className="inline-flex items-center gap-1"><Link2 className="h-3 w-3 text-gray-400" />{user.linkedNote}</span>
+                    ) : '—'}
+                  </td>
                   <td className="px-5 py-4">
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.color}`}>{s.label}</span>
                   </td>
                   <td className="px-5 py-4">
-                    <div className="flex gap-1.5">
-                      <button className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100" title="Send email">
-                        <Mail className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => toggleSuspend(user.id)}
-                        className={`p-1.5 rounded-lg ${user.status === 'suspended' ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
-                        title={user.status === 'suspended' ? 'Reactivate' : 'Suspend'}
-                      >
-                        <Ban className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <a href={`mailto:${user.email}`} className="inline-flex p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100" title="Send email">
+                      <Mail className="h-3.5 w-3.5" />
+                    </a>
                   </td>
                 </tr>
               );
