@@ -3487,6 +3487,10 @@ export type Database = {
     }
     Functions: {
       check_email_exists: { Args: { email_to_check: string }; Returns: boolean }
+      check_vendor_rejected: {
+        Args: { p_company_name: string }
+        Returns: boolean
+      }
       get_login_lock_status: {
         Args: { p_email: string }
         Returns: {
