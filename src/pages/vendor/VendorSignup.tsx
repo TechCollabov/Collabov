@@ -1,9 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import { Globe, Eye, EyeOff, CheckCircle, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/authRedirect';
 import { supabase } from '../../lib/supabase';
+
+type BusinessType = 'msp' | 'agency' | 'staffaug';
+
+const BUSINESS_TYPES: { id: BusinessType; label: string; blurb: string; contract: string }[] = [
+  { id: 'msp', label: 'Managed IT (MSP)', blurb: 'Ongoing managed services — infrastructure, support, monitoring.', contract: 'Managed Service Agreement' },
+  { id: 'agency', label: 'IT Agency', blurb: 'Project-based delivery — builds, launches, and discovery engagements.', contract: 'Project Delivery Contract' },
+  { id: 'staffaug', label: 'Staff Augmentation', blurb: "Placing your own people into a buyer's team.", contract: 'Resource Supply Agreement + IR35 SDS' },
+];
 
 const SERVICE_CATEGORIES = [
   'Software Development', 'Managed IT', 'Staff Augmentation', 'Cybersecurity',
@@ -23,35 +31,39 @@ const COUNTRIES = [
 
 const VendorSignup: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { type: typeParam } = useParams<{ type?: string }>();
   const { signUp, profile, user, loading } = useAuth();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Step 1
+  // Step 1 — pre-select from /vendor/signup/:type (e.g. a "Join as an MSP" landing link) if valid
+  const preselectedType = BUSINESS_TYPES.some(bt => bt.id === typeParam) ? (typeParam as BusinessType) : '';
+  const [businessType, setBusinessType] = useState<BusinessType | ''>(preselectedType);
+
+  // Step 2
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Step 2
+  // Step 3
   const [companyName, setCompanyName] = useState('');
   const [country, setCountry] = useState('United Kingdom');
   const [website, setWebsite] = useState('');
   const [description, setDescription] = useState('');
 
-  // Step 3
+  // Step 4
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedTech, setSelectedTech] = useState<string[]>([]);
   const [techInput, setTechInput] = useState('');
 
-  // Step 4
+  // Step 5
   const [companyRegFile, setCompanyRegFile] = useState<File | null>(null);
   const [vatFile, setVatFile] = useState<File | null>(null);
   const [addressFile, setAddressFile] = useState<File | null>(null);
 
   useEffect(() => {
-    if (!loading && user && profile && step < 5) {
+    if (!loading && user && profile && step < 6) {
       navigate(getRedirectPath(profile.user_type), { replace: true });
     }
   }, [user, profile, loading, step, navigate]);
@@ -64,12 +76,18 @@ const VendorSignup: React.FC = () => {
     return null;
   };
 
+  const handleBusinessTypeContinue = () => {
+    setError(null);
+    if (!businessType) { setError('Select a business type to continue'); return; }
+    setStep(2);
+  };
+
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     const pwErr = validatePassword(password);
     if (pwErr) { setError(pwErr); return; }
-    setStep(2);
+    setStep(3);
   };
 
   const handleStep2 = async (e: React.FormEvent) => {
@@ -88,21 +106,21 @@ const VendorSignup: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-    setStep(3);
+    setStep(4);
   };
 
   const handleStep3 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (selectedServices.length === 0) { setError('Select at least one service category'); return; }
-    setStep(4);
+    setStep(5);
   };
 
   const handleStep4 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!companyRegFile) { setError('Company registration certificate is required'); return; }
-    setStep(5);
+    setStep(6);
   };
 
   const handleFinalSubmit = async () => {
@@ -113,6 +131,7 @@ const VendorSignup: React.FC = () => {
         fullName: companyName,
         userType: 'vendor',
         additionalData: {
+          businessType,
           companyName,
           country,
           website,
@@ -123,7 +142,7 @@ const VendorSignup: React.FC = () => {
       });
     } catch (err: any) {
       setError(err.message || 'Sign up failed. Please try again.');
-      setStep(1);
+      setStep(2);
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +160,7 @@ const VendorSignup: React.FC = () => {
     setTechInput('');
   };
 
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 6;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
@@ -153,22 +172,59 @@ const VendorSignup: React.FC = () => {
       <div className="max-w-lg w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         {step < TOTAL_STEPS && (
           <div className="flex items-center gap-1 mb-8">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <React.Fragment key={s}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${step > s ? 'bg-[#0070F3] text-white' : step === s ? 'bg-[#0070F3] text-white' : 'bg-gray-100 text-gray-400'}`}>
                   {step > s ? <CheckCircle className="h-3 w-3" /> : s}
                 </div>
-                {s < 4 && <div className={`flex-1 h-1 rounded ${step > s ? 'bg-[#0070F3]' : 'bg-gray-100'}`} />}
+                {s < 5 && <div className={`flex-1 h-1 rounded ${step > s ? 'bg-[#0070F3]' : 'bg-gray-100'}`} />}
               </React.Fragment>
             ))}
-            <span className="ml-2 text-xs text-gray-400 flex-shrink-0">Step {step} of 4</span>
+            <span className="ml-2 text-xs text-gray-400 flex-shrink-0">Step {step} of 5</span>
           </div>
         )}
 
         {error && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>}
 
-        {/* Step 1 — Email + Password */}
+        {/* Step 1 — Business Type */}
         {step === 1 && (
+          <>
+            <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">What kind of provider are you?</h1>
+            <p className="text-gray-500 text-sm mb-6">This sets your contract template and how buyers find you — choose before continuing.</p>
+            <div className="space-y-3 mb-6">
+              {BUSINESS_TYPES.map(bt => (
+                <button
+                  key={bt.id}
+                  type="button"
+                  onClick={() => setBusinessType(bt.id)}
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${businessType === bt.id ? 'border-[#0070F3] bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#0B2D59]">{bt.label}</span>
+                    {businessType === bt.id && <CheckCircle className="h-5 w-5 text-[#0070F3]" />}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{bt.blurb}</p>
+                  <p className="text-xs text-gray-400 mt-1">Contract: {bt.contract}</p>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleBusinessTypeContinue}
+              disabled={!businessType}
+              className="w-full py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Continue
+            </button>
+            <p className="text-center text-sm text-gray-400 mt-6">
+              Already have an account?{' '}
+              <Link to="/signin" className="text-[#0070F3] font-medium hover:underline">Sign in</Link>
+            </p>
+          </>
+        )}
+
+        {/* Step 2 — Email + Password */}
+        {step === 2 && (
           <>
             <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Create your provider account</h1>
             <p className="text-gray-500 text-sm mb-6">Join our network of verified IT service providers</p>
@@ -201,8 +257,8 @@ const VendorSignup: React.FC = () => {
           </>
         )}
 
-        {/* Step 2 — Company Basics */}
-        {step === 2 && (
+        {/* Step 3 — Company Basics */}
+        {step === 3 && (
           <>
             <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Company basics</h1>
             <p className="text-gray-500 text-sm mb-6">Tell us about your organisation</p>
@@ -233,7 +289,7 @@ const VendorSignup: React.FC = () => {
                   className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none" />
               </div>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setStep(1)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
+                <button type="button" onClick={() => setStep(2)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
                 <button type="submit" disabled={isLoading} className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60">
                   {isLoading ? 'Checking...' : 'Continue'}
                 </button>
@@ -242,8 +298,8 @@ const VendorSignup: React.FC = () => {
           </>
         )}
 
-        {/* Step 3 — Services & Tech Stack */}
-        {step === 3 && (
+        {/* Step 4 — Services & Tech Stack */}
+        {step === 4 && (
           <>
             <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Services & tech stack</h1>
             <p className="text-gray-500 text-sm mb-6">What do you offer? This helps buyers find you.</p>
@@ -288,15 +344,15 @@ const VendorSignup: React.FC = () => {
                 )}
               </div>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setStep(2)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
+                <button type="button" onClick={() => setStep(3)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
                 <button type="submit" className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Continue</button>
               </div>
             </form>
           </>
         )}
 
-        {/* Step 4 — Documents */}
-        {step === 4 && (
+        {/* Step 5 — Documents */}
+        {step === 5 && (
           <>
             <h1 className="text-2xl font-bold text-[#0B2D59] mb-1">Verification documents</h1>
             <p className="text-gray-500 text-sm mb-2">We review all applications within 2 business days. Documents are kept confidential.</p>
@@ -321,15 +377,15 @@ const VendorSignup: React.FC = () => {
                 </div>
               ))}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setStep(3)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
+                <button type="button" onClick={() => setStep(4)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
                 <button type="submit" className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Submit Application</button>
               </div>
             </form>
           </>
         )}
 
-        {/* Step 5 — Confirmation */}
-        {step === 5 && (
+        {/* Step 6 — Confirmation */}
+        {step === 6 && (
           <div className="text-center py-4">
             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="h-8 w-8 text-[#0070F3]" />
