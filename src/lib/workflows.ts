@@ -109,6 +109,11 @@ export async function hasCompanyProfile(customerId: string): Promise<boolean> {
   return !!(data?.company_name?.trim() && data?.country?.trim());
 }
 
+export async function isCustomerBlacklisted(customerId: string): Promise<boolean> {
+  const { data } = await supabase.from('customers').select('is_blacklisted').eq('id', customerId).maybeSingle();
+  return !!data?.is_blacklisted;
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 export function addDays(base: Date, days: number): Date {
@@ -597,22 +602,29 @@ export async function recordPaymentEvent(customerId: string, onTime: boolean) {
   }).eq('id', customerId);
 }
 
-// ── Vendor blacklist ──────────────────────────────────────────────────────────
+// ── Vendor + buyer blacklist ──────────────────────────────────────────────────
+
+async function hasOpenDispute(entityId: string, role: 'vendor' | 'buyer'): Promise<boolean> {
+  const column = role === 'vendor' ? 'vendor_id' : 'buyer_id';
+  const { data } = await supabase.from('disputes').select('id').eq(column, entityId).neq('status', 'resolved').limit(1);
+  return !!data && data.length > 0;
+}
 
 /**
- * Blacklist a vendor. If a dispute is currently open on the vendor, its
- * resolution proceeds independently — blacklisting does not force any
- * escrow release or refund; that stays gated on the dispute's own outcome.
+ * Blacklist a vendor. If a dispute is currently open on the vendor, the
+ * blacklist takes effect only once every one of their open disputes
+ * resolves — blacklisting never forces an escrow release/refund, and it
+ * shouldn't retroactively colour a resolution still in progress. Until
+ * then blacklist_pending records the decision without touching
+ * is_blacklisted.
  */
 export async function blacklistVendor(vendorId: string, reason: string, adminId: string) {
-  await supabase.from('vendors').update({
-    is_blacklisted: true,
-    blacklist_reason: reason,
-    blacklisted_at: new Date().toISOString(),
-    blacklisted_by: adminId,
-    restoration_approvals: [],
-  }).eq('id', vendorId);
-  await logEvent('vendor_blacklisted', adminId, 'admin', 'vendor', vendorId, { reason });
+  const deferred = await hasOpenDispute(vendorId, 'vendor');
+  const patch = deferred
+    ? { blacklist_pending: true, blacklist_reason: reason, blacklisted_by: adminId }
+    : { is_blacklisted: true, blacklist_pending: false, blacklist_reason: reason, blacklisted_at: new Date().toISOString(), blacklisted_by: adminId, restoration_approvals: [] };
+  await supabase.from('vendors').update(patch).eq('id', vendorId);
+  await logEvent(deferred ? 'vendor_blacklist_deferred' : 'vendor_blacklisted', adminId, 'admin', 'vendor', vendorId, { reason });
 }
 
 /**
@@ -628,6 +640,7 @@ export async function approveVendorRestoration(vendorId: string, adminId: string
   if (next.length >= 2) {
     await supabase.from('vendors').update({
       is_blacklisted: false,
+      blacklist_pending: false,
       blacklist_reason: null,
       blacklisted_at: null,
       blacklisted_by: null,
@@ -638,6 +651,61 @@ export async function approveVendorRestoration(vendorId: string, adminId: string
     await supabase.from('vendors').update({ restoration_approvals: next }).eq('id', vendorId);
   }
   return next.length;
+}
+
+/** Same deferred-effect rule as vendors, extended to buyers. */
+export async function blacklistCustomer(customerId: string, reason: string, adminId: string) {
+  const deferred = await hasOpenDispute(customerId, 'buyer');
+  const patch = deferred
+    ? { blacklist_pending: true, blacklist_reason: reason, blacklisted_by: adminId }
+    : { is_blacklisted: true, blacklist_pending: false, blacklist_reason: reason, blacklisted_at: new Date().toISOString(), blacklisted_by: adminId, restoration_approvals: [] };
+  await supabase.from('customers').update(patch).eq('id', customerId);
+  await logEvent(deferred ? 'customer_blacklist_deferred' : 'customer_blacklisted', adminId, 'admin', 'customer', customerId, { reason });
+}
+
+export async function approveCustomerRestoration(customerId: string, adminId: string): Promise<number> {
+  const { data: c } = await supabase.from('customers').select('restoration_approvals').eq('id', customerId).single();
+  const approvals: string[] = Array.isArray(c?.restoration_approvals) ? c!.restoration_approvals : [];
+  if (approvals.includes(adminId)) return approvals.length;
+  const next = [...approvals, adminId];
+  if (next.length >= 2) {
+    await supabase.from('customers').update({
+      is_blacklisted: false,
+      blacklist_pending: false,
+      blacklist_reason: null,
+      blacklisted_at: null,
+      blacklisted_by: null,
+      restoration_approvals: [],
+    }).eq('id', customerId);
+    await logEvent('customer_restored', adminId, 'admin', 'customer', customerId, { approvedBy: next });
+  } else {
+    await supabase.from('customers').update({ restoration_approvals: next }).eq('id', customerId);
+  }
+  return next.length;
+}
+
+/**
+ * Call after a dispute resolves (or is merged/closed). If the vendor and/or
+ * buyer on that dispute have no other open disputes and a blacklist is
+ * pending, the blacklist now takes effect.
+ */
+export async function finalizeDeferredBlacklists(vendorId: string, buyerId: string) {
+  const [{ data: vendor }, { data: customer }] = await Promise.all([
+    supabase.from('vendors').select('blacklist_pending, blacklist_reason, blacklisted_by').eq('id', vendorId).maybeSingle(),
+    supabase.from('customers').select('blacklist_pending, blacklist_reason, blacklisted_by').eq('id', buyerId).maybeSingle(),
+  ]);
+
+  if (vendor?.blacklist_pending && !(await hasOpenDispute(vendorId, 'vendor'))) {
+    await supabase.from('vendors').update({ is_blacklisted: true, blacklist_pending: false, blacklisted_at: new Date().toISOString() }).eq('id', vendorId);
+    await notify(vendorId, 'system', 'Account blacklisted', `Your account has been blacklisted now that all open disputes are resolved: ${vendor.blacklist_reason ?? ''}`);
+    await logEvent('vendor_blacklist_finalized', vendor.blacklisted_by, 'admin', 'vendor', vendorId, {});
+  }
+
+  if (customer?.blacklist_pending && !(await hasOpenDispute(buyerId, 'buyer'))) {
+    await supabase.from('customers').update({ is_blacklisted: true, blacklist_pending: false, blacklisted_at: new Date().toISOString() }).eq('id', buyerId);
+    await notify(buyerId, 'system', 'Account blacklisted', `Your account has been blacklisted now that all open disputes are resolved: ${customer.blacklist_reason ?? ''}`);
+    await logEvent('customer_blacklist_finalized', customer.blacklisted_by, 'admin', 'customer', buyerId, {});
+  }
 }
 
 // ── Notifications + audit trail ───────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Send, UserPlus, Clock, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, logEvent, hasCompanyProfile } from '../../lib/workflows';
+import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../../lib/workflows';
 import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 interface PendingInvitation {
@@ -65,6 +65,11 @@ const BYOVPage: React.FC = () => {
     try {
       if (!(await hasCompanyProfile(user.id))) {
         setShowProfileGate(true);
+        setLoading(false);
+        return;
+      }
+      if (await isCustomerBlacklisted(user.id)) {
+        setErrors({ blacklist: 'This account is blacklisted and cannot invite new vendors. Contact support@collabov.com.' });
         setLoading(false);
         return;
       }
@@ -182,6 +187,11 @@ const BYOVPage: React.FC = () => {
           ) : (
             /* Form */
             <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              {errors.blacklist && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                  {errors.blacklist}
+                </div>
+              )}
               {duplicateVendorId && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800 space-y-2">
                   <p className="font-medium">This vendor is already on Collabov.</p>

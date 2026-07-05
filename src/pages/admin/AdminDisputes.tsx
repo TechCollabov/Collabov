@@ -9,7 +9,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { platformFee, nextInvoiceNumber, notify, logEvent } from '../../lib/workflows';
+import { platformFee, nextInvoiceNumber, notify, logEvent, finalizeDeferredBlacklists } from '../../lib/workflows';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -261,6 +261,7 @@ const ResolutionPanel: React.FC<ResolutionPanelProps> = ({ dispute, onResolve })
       await notify(d.vendor_id, 'system', 'Dispute resolved by admin', `${summary} The decision is final. ${notes}`, d.engagement_id ? `/engagement/${d.engagement_id}` : undefined);
       await notify(d.buyer_id, 'system', 'Dispute resolved by admin', `${summary} The decision is final. ${notes}`, d.engagement_id ? `/engagement/${d.engagement_id}` : undefined);
       await logEvent('dispute_resolved', d.buyer_id, 'admin', 'dispute', d.id, { resolution, vendorShare });
+      await finalizeDeferredBlacklists(d.vendor_id, d.buyer_id);
     } catch (e) {
       console.error('Dispute resolution failed:', e);
     } finally {
