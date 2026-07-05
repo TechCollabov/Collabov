@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          reason: string | null
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: []
+      }
       case_studies: {
         Row: {
           ai_generated_hash: string | null
@@ -621,6 +654,10 @@ export type Database = {
           active_projects_count: number | null
           address: string | null
           billing_address: string | null
+          blacklist_pending: boolean | null
+          blacklist_reason: string | null
+          blacklisted_at: string | null
+          blacklisted_by: string | null
           city: string | null
           companies_house_number: string | null
           company_name: string
@@ -630,12 +667,14 @@ export type Database = {
           headcount_band: string | null
           id: string
           industry: string | null
+          is_blacklisted: boolean | null
           late_payment_count: number | null
           legal_entity_name: string | null
           logo_url: string | null
           on_time_payment_rate: number | null
           payment_events_count: number | null
           phone: string | null
+          restoration_approvals: Json | null
           state: string | null
           timezone: string | null
           total_spent: number | null
@@ -647,6 +686,10 @@ export type Database = {
           active_projects_count?: number | null
           address?: string | null
           billing_address?: string | null
+          blacklist_pending?: boolean | null
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
           city?: string | null
           companies_house_number?: string | null
           company_name: string
@@ -656,12 +699,14 @@ export type Database = {
           headcount_band?: string | null
           id: string
           industry?: string | null
+          is_blacklisted?: boolean | null
           late_payment_count?: number | null
           legal_entity_name?: string | null
           logo_url?: string | null
           on_time_payment_rate?: number | null
           payment_events_count?: number | null
           phone?: string | null
+          restoration_approvals?: Json | null
           state?: string | null
           timezone?: string | null
           total_spent?: number | null
@@ -673,6 +718,10 @@ export type Database = {
           active_projects_count?: number | null
           address?: string | null
           billing_address?: string | null
+          blacklist_pending?: boolean | null
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
           city?: string | null
           companies_house_number?: string | null
           company_name?: string
@@ -682,12 +731,14 @@ export type Database = {
           headcount_band?: string | null
           id?: string
           industry?: string | null
+          is_blacklisted?: boolean | null
           late_payment_count?: number | null
           legal_entity_name?: string | null
           logo_url?: string | null
           on_time_payment_rate?: number | null
           payment_events_count?: number | null
           phone?: string | null
+          restoration_approvals?: Json | null
           state?: string | null
           timezone?: string | null
           total_spent?: number | null
@@ -716,6 +767,7 @@ export type Database = {
           escrow_amount: number | null
           flag_id: string | null
           id: string
+          merge_log: Json | null
           milestone_id: string | null
           opened_at: string | null
           opened_by: string
@@ -740,6 +792,7 @@ export type Database = {
           escrow_amount?: number | null
           flag_id?: string | null
           id?: string
+          merge_log?: Json | null
           milestone_id?: string | null
           opened_at?: string | null
           opened_by: string
@@ -764,6 +817,7 @@ export type Database = {
           escrow_amount?: number | null
           flag_id?: string | null
           id?: string
+          merge_log?: Json | null
           milestone_id?: string | null
           opened_at?: string | null
           opened_by?: string
@@ -1984,6 +2038,54 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_settings: {
+        Row: {
+          admin_alert_email: string | null
+          auto_release_days: number
+          auto_release_warning_days: number
+          byov_invite_expiry_days: number
+          hourly_invoice_window_days: number
+          id: boolean
+          maintenance_mode: boolean
+          minimum_project_value: number
+          platform_fee_pct: number
+          referral_confirmation_days: number
+          updated_at: string | null
+          updated_by: string | null
+          vendor_verification_sla_days: number
+        }
+        Insert: {
+          admin_alert_email?: string | null
+          auto_release_days?: number
+          auto_release_warning_days?: number
+          byov_invite_expiry_days?: number
+          hourly_invoice_window_days?: number
+          id?: boolean
+          maintenance_mode?: boolean
+          minimum_project_value?: number
+          platform_fee_pct?: number
+          referral_confirmation_days?: number
+          updated_at?: string | null
+          updated_by?: string | null
+          vendor_verification_sla_days?: number
+        }
+        Update: {
+          admin_alert_email?: string | null
+          auto_release_days?: number
+          auto_release_warning_days?: number
+          byov_invite_expiry_days?: number
+          hourly_invoice_window_days?: number
+          id?: boolean
+          maintenance_mode?: boolean
+          minimum_project_value?: number
+          platform_fee_pct?: number
+          referral_confirmation_days?: number
+          updated_at?: string | null
+          updated_by?: string | null
+          vendor_verification_sla_days?: number
+        }
+        Relationships: []
+      }
       portfolio_items: {
         Row: {
           contractor_id: string
@@ -2032,8 +2134,10 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string
+          failed_login_attempts: number | null
           full_name: string
           id: string
+          locked_at: string | null
           onboarding_step: number | null
           profile_completed: boolean | null
           profile_picture_url: string | null
@@ -2047,8 +2151,10 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email: string
+          failed_login_attempts?: number | null
           full_name: string
           id: string
+          locked_at?: string | null
           onboarding_step?: number | null
           profile_completed?: boolean | null
           profile_picture_url?: string | null
@@ -2062,8 +2168,10 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string
+          failed_login_attempts?: number | null
           full_name?: string
           id?: string
+          locked_at?: string | null
           onboarding_step?: number | null
           profile_completed?: boolean | null
           profile_picture_url?: string | null
@@ -2541,6 +2649,27 @@ export type Database = {
           },
         ]
       }
+      site_content: {
+        Row: {
+          key: string
+          updated_at: string | null
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       skills: {
         Row: {
           category: string | null
@@ -2754,31 +2883,37 @@ export type Database = {
       }
       vendor_documents: {
         Row: {
+          admin_notes: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           document_url: string
           id: string
           uploaded_at: string | null
           vendor_id: string
+          verification_status: string | null
           verified: boolean | null
           verified_at: string | null
           verified_by: string | null
         }
         Insert: {
+          admin_notes?: string | null
           document_type: Database["public"]["Enums"]["document_type"]
           document_url: string
           id?: string
           uploaded_at?: string | null
           vendor_id: string
+          verification_status?: string | null
           verified?: boolean | null
           verified_at?: string | null
           verified_by?: string | null
         }
         Update: {
+          admin_notes?: string | null
           document_type?: Database["public"]["Enums"]["document_type"]
           document_url?: string
           id?: string
           uploaded_at?: string | null
           vendor_id?: string
+          verification_status?: string | null
           verified?: boolean | null
           verified_at?: string | null
           verified_by?: string | null
@@ -3090,6 +3225,7 @@ export type Database = {
           availability_status: string | null
           bank_address: string | null
           bank_name: string | null
+          blacklist_pending: boolean | null
           blacklist_reason: string | null
           blacklisted_at: string | null
           blacklisted_by: string | null
@@ -3098,6 +3234,7 @@ export type Database = {
           calendly_url: string | null
           city: string | null
           company_name: string
+          company_registration_number: string | null
           company_size: string | null
           contact_email: string
           contact_name: string
@@ -3133,6 +3270,8 @@ export type Database = {
           referral_count: number | null
           registered_email: string | null
           registered_name: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
           response_time: string | null
           response_time_hours: number | null
           restoration_approvals: Json | null
@@ -3162,6 +3301,7 @@ export type Database = {
           availability_status?: string | null
           bank_address?: string | null
           bank_name?: string | null
+          blacklist_pending?: boolean | null
           blacklist_reason?: string | null
           blacklisted_at?: string | null
           blacklisted_by?: string | null
@@ -3170,6 +3310,7 @@ export type Database = {
           calendly_url?: string | null
           city?: string | null
           company_name: string
+          company_registration_number?: string | null
           company_size?: string | null
           contact_email: string
           contact_name: string
@@ -3205,6 +3346,8 @@ export type Database = {
           referral_count?: number | null
           registered_email?: string | null
           registered_name?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
           response_time?: string | null
           response_time_hours?: number | null
           restoration_approvals?: Json | null
@@ -3234,6 +3377,7 @@ export type Database = {
           availability_status?: string | null
           bank_address?: string | null
           bank_name?: string | null
+          blacklist_pending?: boolean | null
           blacklist_reason?: string | null
           blacklisted_at?: string | null
           blacklisted_by?: string | null
@@ -3242,6 +3386,7 @@ export type Database = {
           calendly_url?: string | null
           city?: string | null
           company_name?: string
+          company_registration_number?: string | null
           company_size?: string | null
           contact_email?: string
           contact_name?: string
@@ -3277,6 +3422,8 @@ export type Database = {
           referral_count?: number | null
           registered_email?: string | null
           registered_name?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
           response_time?: string | null
           response_time_hours?: number | null
           restoration_approvals?: Json | null
@@ -3340,6 +3487,19 @@ export type Database = {
     }
     Functions: {
       check_email_exists: { Args: { email_to_check: string }; Returns: boolean }
+      get_login_lock_status: {
+        Args: { p_email: string }
+        Returns: {
+          is_admin_account: boolean
+          is_locked: boolean
+        }[]
+      }
+      is_admin: { Args: never; Returns: boolean }
+      record_login_attempt: {
+        Args: { p_email: string; p_success: boolean }
+        Returns: undefined
+      }
+      unlock_admin_account: { Args: { p_target_id: string }; Returns: boolean }
     }
     Enums: {
       availability_type:
@@ -3547,5 +3707,5 @@ export const Constants = {
   },
 } as const
 
-// ── Compatibility alias (only symbol imported directly elsewhere in the app) ──
+
 export type UserType = Database['public']['Enums']['user_type']
