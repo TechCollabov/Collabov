@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Search, ShieldCheck, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logEvent, hasCompanyProfile } from '../lib/workflows';
+import { logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../lib/workflows';
 import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 interface PackageRow {
@@ -33,6 +33,7 @@ const PackagesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState<PackageRow | null>(null);
   const [showProfileGate, setShowProfileGate] = useState(false);
+  const [blacklistError, setBlacklistError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +69,10 @@ const PackagesPage: React.FC = () => {
     if (!(await hasCompanyProfile(user.id))) {
       setConfirming(null);
       setShowProfileGate(true);
+      return;
+    }
+    if (await isCustomerBlacklisted(user.id)) {
+      setBlacklistError('This account is blacklisted and cannot purchase packages. Contact support@collabov.com.');
       return;
     }
     await logEvent('package_purchase_started', user.id, 'buyer', 'package', pkg.id, { price: pkg.price });
@@ -171,6 +176,11 @@ const PackagesPage: React.FC = () => {
               <button onClick={() => setConfirming(null)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
             <div className="p-6 space-y-4">
+              {blacklistError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                  {blacklistError}
+                </div>
+              )}
               <div>
                 <div className="font-semibold text-gray-900">{confirming.name}</div>
                 <div className="text-sm text-gray-500">by {confirming.vendor?.company_name}</div>

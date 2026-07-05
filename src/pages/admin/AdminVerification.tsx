@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, Clock, Check, X, MessageSquare, FileText, ExternalLink,
-  CheckCircle, AlertTriangle, AlertCircle, Eye, Loader2, Ban, ShieldOff,
+  CheckCircle, AlertTriangle, Eye, Loader2, Ban, ShieldOff, UserCheck,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { blacklistVendor, approveVendorRestoration } from '../../lib/workflows';
+import { blacklistVendor, approveVendorRestoration, getPlatformSettings } from '../../lib/workflows';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
@@ -15,6 +15,21 @@ type VendorDocument = {
   document_url: string;
   verified: boolean;
   uploaded_at: string;
+  verification_status?: string | null;
+  admin_notes?: string | null;
+};
+
+type VendorReferral = {
+  id: string;
+  contact_name: string;
+  job_title: string;
+  company: string;
+  work_email: string;
+  project_vouched_for: string;
+  confirmed: boolean;
+  confirmed_at: string | null;
+  would_recommend: boolean | null;
+  written_statement: string | null;
 };
 
 type QueueItem = {
@@ -24,12 +39,15 @@ type QueueItem = {
   country?: string;
   created_at?: string;
   is_verified: boolean;
+  rejected_at?: string | null;
+  rejection_reason?: string | null;
   contact_email?: string;
   tagline?: string;
   description?: string;
   monthly_rate?: number;
+  referral_count?: number;
   vendor_documents?: VendorDocument[];
-  // UI-only status field (derived)
+  // UI-only status field (derived from is_verified / rejected_at)
   status: string;
 };
 type DocAdminStatus = 'valid' | 'invalid' | 'cannot_verify' | '';
@@ -52,11 +70,11 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const TABS = [
-  { key: 'all',              label: 'All' },
-  { key: 'submitted',        label: 'Pending' },
-  { key: 'under_review',     label: 'Under Review' },
-  { key: 'approved',         label: 'Approved' },
-  { key: 'rejected',         label: 'Rejected' },
+  { key: 'all',                label: 'All' },
+  { key: 'submitted',          label: 'Pending' },
+  { key: 'changes_requested', label: 'Changes Requested' },
+  { key: 'approved',           label: 'Approved' },
+  { key: 'rejected',           label: 'Rejected' },
 ];
 
 const REJECTION_REASONS = [
@@ -368,6 +386,13 @@ function BlacklistPanel() {
   );
 }
 
+function deriveStatus(v: { is_verified: boolean; rejected_at?: string | null; verification_status?: string | null }): string {
+  if (v.is_verified) return 'approved';
+  if (v.rejected_at) return 'rejected';
+  if (v.verification_status === 'changes_requested') return 'changes_requested';
+  return 'submitted';
+}
+
 const AdminVerification: React.FC = () => {
   const [vendors, setVendors] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -377,9 +402,12 @@ const AdminVerification: React.FC = () => {
   const [docModalOpen, setDocModalOpen] = useState(false);
   const [docModalDoc, setDocModalDoc] = useState<VendorDocument | null>(null);
   const [adminDocStatus, setAdminDocStatus] = useState<Record<string, DocAdminStatus>>({});
+  const [docNotes, setDocNotes] = useState<Record<string, string>>({});
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [referrals, setReferrals] = useState<VendorReferral[]>([]);
+  const [decisionBusy, setDecisionBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -391,11 +419,12 @@ const AdminVerification: React.FC = () => {
           .select(`
             id, company_name, tagline, description, country, city,
             contact_email, monthly_rate, is_verified, created_at,
+            rejected_at, rejection_reason, verification_status, referral_count,
             vendor_documents (
-              id, vendor_id, document_type, document_url, verified, uploaded_at
+              id, vendor_id, document_type, document_url, verified, uploaded_at,
+              verification_status, admin_notes
             )
           `)
-          .eq('is_verified', false)
           .order('created_at', { ascending: true });
 
         if (cancelled) return;
@@ -406,14 +435,28 @@ const AdminVerification: React.FC = () => {
           country: v.country,
           created_at: v.created_at,
           is_verified: v.is_verified,
+          rejected_at: v.rejected_at,
+          rejection_reason: v.rejection_reason,
           contact_email: v.contact_email,
           tagline: v.tagline,
           description: v.description,
           monthly_rate: v.monthly_rate,
+          referral_count: v.referral_count,
           vendor_documents: v.vendor_documents || [],
-          status: 'submitted',
+          status: deriveStatus(v),
         }));
         setVendors(mapped);
+
+        const docStatus: Record<string, DocAdminStatus> = {};
+        const notes: Record<string, string> = {};
+        mapped.forEach(v => (v.vendor_documents || []).forEach(doc => {
+          if (doc.verification_status && doc.verification_status !== 'pending') {
+            docStatus[doc.id] = doc.verification_status as DocAdminStatus;
+          }
+          if (doc.admin_notes) notes[doc.id] = doc.admin_notes;
+        }));
+        setAdminDocStatus(docStatus);
+        setDocNotes(notes);
       } catch {
         setVendors([]);
       } finally {
@@ -426,41 +469,117 @@ const AdminVerification: React.FC = () => {
 
   const selectedVendor = vendors.find(v => v.id === selectedId) ?? null;
 
+  useEffect(() => {
+    if (!selectedVendor) { setReferrals([]); return; }
+    let cancelled = false;
+    supabase
+      .from('vendor_referrals')
+      .select('id, contact_name, job_title, company, work_email, project_vouched_for, confirmed, confirmed_at, would_recommend, written_statement')
+      .eq('vendor_id', selectedVendor.id)
+      .then(({ data }) => { if (!cancelled) setReferrals(data || []); });
+    return () => { cancelled = true; };
+  }, [selectedVendor?.id]);
+
   const filteredQueue = vendors.filter(v =>
     activeTab === 'all' ? true : v.status === activeTab
   );
 
+  const persistDocDecisions = async (vendorId: string) => {
+    const docs = vendors.find(v => v.id === vendorId)?.vendor_documents || [];
+    await Promise.all(docs.map(doc => {
+      const status = adminDocStatus[doc.id];
+      if (!status) return Promise.resolve();
+      return supabase.from('vendor_documents').update({
+        verification_status: status,
+        admin_notes: docNotes[doc.id] || null,
+      }).eq('id', doc.id);
+    }));
+  };
+
+  const notifyVendor = async (vendorId: string, title: string, message: string) => {
+    await supabase.from('notifications').insert({
+      user_id: vendorId, type: 'system', title, message, link_url: '/vendor/dashboard/account-settings',
+    });
+  };
+
+  const auditLog = async (adminId: string, actionType: string, vendorId: string, reason: string) => {
+    await supabase.from('admin_audit_log').insert({
+      admin_id: adminId, action_type: actionType, target_type: 'vendor', target_id: vendorId, reason,
+    });
+  };
+
   const handleApprove = async () => {
     if (!selectedVendor) return;
+    setDecisionBusy(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('vendors')
-        .update({ is_verified: true })
+        .update({ is_verified: true, verification_status: 'verified', rejected_at: null, rejection_reason: null })
         .eq('id', selectedVendor.id);
       if (error) throw error;
-      setVendors(q => q.filter(v => v.id !== selectedVendor.id));
+      await persistDocDecisions(selectedVendor.id);
+      if (user) await auditLog(user.id, 'vendor_verify', selectedVendor.id, adminNotes);
+      await notifyVendor(selectedVendor.id, 'Verification approved', 'Your company profile has been verified. You can now appear in search and receive proposals.');
+      setVendors(q => q.map(v => v.id === selectedVendor.id ? { ...v, is_verified: true, rejected_at: null, rejection_reason: null, status: 'approved' } : v));
       setSelectedId(null);
       setAdminNotes('');
       setToast('Vendor verified successfully.');
     } catch {
       setToast('Error approving vendor — please try again.');
+    } finally {
+      setDecisionBusy(false);
     }
   };
 
-  const handleRequestChanges = () => {
-    if (!selectedVendor) return;
-    setAdminNotes('');
-    setToast('Changes requested. Vendor notified.');
+  const handleRequestChanges = async () => {
+    if (!selectedVendor || adminNotes.trim() === '') return;
+    setDecisionBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('vendors')
+        .update({ verification_status: 'changes_requested' })
+        .eq('id', selectedVendor.id);
+      if (error) throw error;
+      await persistDocDecisions(selectedVendor.id);
+      if (user) await auditLog(user.id, 'vendor_request_changes', selectedVendor.id, adminNotes);
+      await notifyVendor(selectedVendor.id, 'Changes requested on your verification', adminNotes);
+      setVendors(q => q.map(v => v.id === selectedVendor.id ? { ...v, status: 'changes_requested' } : v));
+      setAdminNotes('');
+      setToast('Changes requested. Vendor notified.');
+    } catch {
+      setToast('Error requesting changes — please try again.');
+    } finally {
+      setDecisionBusy(false);
+    }
   };
 
   const handleReject = async () => {
     if (!selectedVendor || !rejectionReason) return;
-    setVendors(q => q.filter(v => v.id !== selectedVendor.id));
-    setSelectedId(null);
-    setAdminNotes('');
-    setRejectionReason('');
-    setShowRejectConfirm(false);
-    setToast('Vendor rejected.');
+    setDecisionBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const fullReason = adminNotes.trim() ? `${rejectionReason} — ${adminNotes.trim()}` : rejectionReason;
+      const { error } = await supabase
+        .from('vendors')
+        .update({ is_verified: false, verification_status: 'rejected', rejected_at: new Date().toISOString(), rejection_reason: fullReason })
+        .eq('id', selectedVendor.id);
+      if (error) throw error;
+      await persistDocDecisions(selectedVendor.id);
+      if (user) await auditLog(user.id, 'vendor_reject', selectedVendor.id, fullReason);
+      await notifyVendor(selectedVendor.id, 'Verification application rejected', fullReason);
+      setVendors(q => q.map(v => v.id === selectedVendor.id ? { ...v, is_verified: false, rejected_at: new Date().toISOString(), rejection_reason: fullReason, status: 'rejected' } : v));
+      setSelectedId(null);
+      setAdminNotes('');
+      setRejectionReason('');
+      setShowRejectConfirm(false);
+      setToast('Vendor rejected.');
+    } catch {
+      setToast('Error rejecting vendor — please try again.');
+    } finally {
+      setDecisionBusy(false);
+    }
   };
 
   const handleDocSave = (docId: string, status: DocAdminStatus) => {
@@ -473,6 +592,7 @@ const AdminVerification: React.FC = () => {
   };
 
   const notesEmpty = adminNotes.trim() === '';
+  const confirmedReferrals = referrals.filter(r => r.confirmed).length;
 
   if (loading) {
     return (
@@ -496,7 +616,7 @@ const AdminVerification: React.FC = () => {
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span className="text-sm font-bold text-[#0B2D59]">Verification Queue</span>
             <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-              {vendors.filter(v => !v.is_verified).length}
+              {vendors.filter(v => v.status === 'submitted').length}
             </span>
           </div>
 
@@ -527,7 +647,8 @@ const AdminVerification: React.FC = () => {
             {filteredQueue.map(v => {
               const dateStr = v.created_at || new Date().toISOString();
               const age = daysAgo(dateStr);
-              const timeColor = age > 7 ? 'text-red-500' : age > 3 ? 'text-amber-500' : 'text-gray-400';
+              const sla = getPlatformSettings().vendorVerificationSlaDays;
+              const timeColor = age > sla ? 'text-red-500' : age > Math.max(1, sla - 2) ? 'text-amber-500' : 'text-gray-400';
               const s = STATUS_MAP[v.status] ?? STATUS_MAP['submitted'];
               return (
                 <div
@@ -642,6 +763,8 @@ const AdminVerification: React.FC = () => {
                           {(adminSt === 'invalid' || adminSt === 'cannot_verify') && (
                             <textarea
                               rows={2}
+                              value={docNotes[doc.id] || ''}
+                              onChange={e => setDocNotes(prev => ({ ...prev, [doc.id]: e.target.value }))}
                               placeholder="Notes on this document…"
                               className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
                             />
@@ -649,6 +772,34 @@ const AdminVerification: React.FC = () => {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </section>
+
+              {/* Section 3 — Referrals */}
+              <section>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <UserCheck className="h-4 w-4" /> Reference Referrals
+                  {referrals.length > 0 && (
+                    <span className="text-xs font-normal text-gray-400">({confirmedReferrals}/{referrals.length} confirmed)</span>
+                  )}
+                </h3>
+                {referrals.length === 0 ? (
+                  <p className="text-sm text-gray-400">No reference contacts submitted.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {referrals.map(r => (
+                      <div key={r.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-gray-800">{r.contact_name} <span className="font-normal text-gray-400">· {r.job_title}, {r.company}</span></div>
+                          <div className="text-xs text-gray-500 mt-0.5">Vouched for: {r.project_vouched_for}</div>
+                          {r.written_statement && <p className="text-xs text-gray-500 mt-1 italic">"{r.written_statement}"</p>}
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${r.confirmed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {r.confirmed ? 'Confirmed' : 'Awaiting confirmation'}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </section>
@@ -683,14 +834,15 @@ const AdminVerification: React.FC = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={handleReject}
-                      disabled={!rejectionReason}
+                      disabled={!rejectionReason || decisionBusy}
                       className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors"
                     >
-                      Confirm Rejection
+                      {decisionBusy ? 'Rejecting...' : 'Confirm Rejection'}
                     </button>
                     <button
                       onClick={() => { setShowRejectConfirm(false); setRejectionReason(''); }}
-                      className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                      disabled={decisionBusy}
+                      className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40"
                     >
                       Cancel
                     </button>
@@ -702,21 +854,21 @@ const AdminVerification: React.FC = () => {
                 <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={handleApprove}
-                    disabled={notesEmpty}
+                    disabled={notesEmpty || decisionBusy}
                     className="flex items-center gap-1.5 py-2.5 px-4 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-40 transition-colors"
                   >
-                    <Check className="h-4 w-4" /> Verify
+                    <Check className="h-4 w-4" /> {decisionBusy ? 'Saving...' : 'Verify'}
                   </button>
                   <button
                     onClick={handleRequestChanges}
-                    disabled={notesEmpty}
+                    disabled={notesEmpty || decisionBusy}
                     className="flex items-center gap-1.5 py-2.5 px-4 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition-colors"
                   >
-                    <AlertTriangle className="h-4 w-4" /> Request Changes
+                    <AlertTriangle className="h-4 w-4" /> {decisionBusy ? 'Saving...' : 'Request Changes'}
                   </button>
                   <button
                     onClick={() => setShowRejectConfirm(true)}
-                    disabled={notesEmpty}
+                    disabled={notesEmpty || decisionBusy}
                     className="flex items-center gap-1.5 py-2.5 px-4 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors"
                   >
                     <X className="h-4 w-4" /> Reject

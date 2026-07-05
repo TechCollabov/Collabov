@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Send, UserPlus, Clock, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, logEvent, hasCompanyProfile } from '../../lib/workflows';
+import { isBusinessEmail, addDays, getPlatformSettings, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../../lib/workflows';
 import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 interface PendingInvitation {
@@ -68,6 +68,11 @@ const BYOVPage: React.FC = () => {
         setLoading(false);
         return;
       }
+      if (await isCustomerBlacklisted(user.id)) {
+        setErrors({ blacklist: 'This account is blacklisted and cannot invite new vendors. Contact support@collabov.com.' });
+        setLoading(false);
+        return;
+      }
       // Dedup: if this vendor is already on Collabov, search and request instead.
       const { data: existing } = await supabase
         .from('vendors')
@@ -88,7 +93,7 @@ const BYOVPage: React.FC = () => {
         contact_email: contactEmail.trim(),
         note: note.trim() || null,
         status: 'pending',
-        expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(),
+        expires_at: addDays(new Date(), getPlatformSettings().byovInviteExpiryDays).toISOString(),
       }).select().single();
       if (error) throw error;
       await logEvent('byov_invite_sent', user.id, 'buyer', 'partner_invite', invite.id, {
@@ -182,6 +187,11 @@ const BYOVPage: React.FC = () => {
           ) : (
             /* Form */
             <form onSubmit={handleSubmit} noValidate className="space-y-5">
+              {errors.blacklist && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                  {errors.blacklist}
+                </div>
+              )}
               {duplicateVendorId && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800 space-y-2">
                   <p className="font-medium">This vendor is already on Collabov.</p>
@@ -308,7 +318,7 @@ const BYOVPage: React.FC = () => {
                         <button
                           onClick={async () => {
                             await supabase.from('partner_invites')
-                              .update({ expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(), status: 'pending' })
+                              .update({ expires_at: addDays(new Date(), getPlatformSettings().byovInviteExpiryDays).toISOString(), status: 'pending' })
                               .eq('id', inv.id);
                           }}
                           className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg transition-colors flex items-center space-x-1"

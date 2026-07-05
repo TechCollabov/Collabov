@@ -2,26 +2,27 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
-  Check,
   CheckCircle,
   Clock,
-  ExternalLink,
   MessageSquare,
   FileText,
   Loader2,
-  X,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { platformFee, nextInvoiceNumber, notify, logEvent } from '../../lib/workflows';
+import { platformFee, nextInvoiceNumber, notify, logEvent, finalizeDeferredBlacklists } from '../../lib/workflows';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Dispute {
   id: string;
   engagement: string;
+  engagement_id: string | null;
   vendor: string;
   buyer: string;
-  opened_by: 'buyer' | 'vendor';
+  vendor_id: string;
+  buyer_id: string;
+  opened_by: string;
+  opened_by_role: 'buyer' | 'vendor' | 'system';
   reason: string;
   description: string;
   escrow_amount: number;
@@ -30,48 +31,34 @@ interface Dispute {
   status: 'bilateral' | 'admin_review' | 'resolved';
   vendor_position: string;
   buyer_position: string;
+  merge_log: { merged_dispute_id: string; reason: string; merged_at: string }[];
 }
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+interface MilestoneRow {
+  id: string;
+  title: string;
+  amount: number;
+  completed: boolean;
+  escrow_status: string | null;
+  due_date: string | null;
+}
 
-const MOCK_DISPUTES: Dispute[] = [
-  {
-    id: 'd1',
-    engagement: 'Payment Gateway Rebuild',
-    vendor: 'TechForge Solutions',
-    buyer: 'Paytrace Financial',
-    opened_by: 'buyer',
-    reason: 'Delivery quality',
-    description:
-      'Milestone 2 does not meet the acceptance criteria. The login flow fails in Firefox and unit test coverage is only 67%, below the agreed 80% threshold.',
-    escrow_amount: 9600,
-    opened_at: '2026-06-08T10:00:00Z',
-    bilateral_deadline: '2026-06-11T10:00:00Z',
-    status: 'bilateral',
-    vendor_position:
-      'We have tested in Firefox and the issue appears to be a cache problem. We are happy to fix this within 2 business days.',
-    buyer_position:
-      'The coverage requirement was clear in the SOW. We need this resolved before releasing payment.',
-  },
-  {
-    id: 'd2',
-    engagement: 'Infrastructure Management',
-    vendor: 'CloudNorth MSP',
-    buyer: 'Morrison Logistics',
-    opened_by: 'vendor',
-    reason: 'Payment dispute',
-    description:
-      'Buyer has not released the February monthly payment despite confirming the check-in.',
-    escrow_amount: 2400,
-    opened_at: '2026-06-01T09:00:00Z',
-    bilateral_deadline: '2026-06-04T09:00:00Z',
-    status: 'admin_review',
-    vendor_position:
-      'We have evidence that the buyer confirmed the February check-in on the platform. Payment should be released.',
-    buyer_position:
-      'There was a billing error on our side. We are not disputing the service, just the charge date.',
-  },
-];
+interface ThreadMessage {
+  id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+}
+
+interface ContractSummary {
+  project_title: string | null;
+  service_type: string | null;
+  total_budget: number | null;
+  payment_model: string | null;
+  working_location: string | null;
+  status: string;
+  milestones: { name: string; amount: number; due_date?: string }[] | null;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -274,6 +261,7 @@ const ResolutionPanel: React.FC<ResolutionPanelProps> = ({ dispute, onResolve })
       await notify(d.vendor_id, 'system', 'Dispute resolved by admin', `${summary} The decision is final. ${notes}`, d.engagement_id ? `/engagement/${d.engagement_id}` : undefined);
       await notify(d.buyer_id, 'system', 'Dispute resolved by admin', `${summary} The decision is final. ${notes}`, d.engagement_id ? `/engagement/${d.engagement_id}` : undefined);
       await logEvent('dispute_resolved', d.buyer_id, 'admin', 'dispute', d.id, { resolution, vendorShare });
+      await finalizeDeferredBlacklists(d.vendor_id, d.buyer_id);
     } catch (e) {
       console.error('Dispute resolution failed:', e);
     } finally {
@@ -333,7 +321,7 @@ const ResolutionPanel: React.FC<ResolutionPanelProps> = ({ dispute, onResolve })
         {/* Resolution type */}
         <div className="space-y-2 mb-4">
           {(['vendor', 'buyer', 'split'] as const).map(type => (
-            <label key={type} className="flex items-center gap-2.5 cursor-pointer">
+            <label key={type} className="flex items-center gap-2.5 cursor-pointer" onClick={() => setResType(type)}>
               <div
                 className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                   resType === type ? 'border-[#0070F3]' : 'border-gray-300'
@@ -350,14 +338,6 @@ const ResolutionPanel: React.FC<ResolutionPanelProps> = ({ dispute, onResolve })
               </span>
             </label>
           ))}
-          <div
-            onClick={e => {
-              const target = e.target as HTMLElement;
-              if (target.tagName !== 'INPUT') {
-                // clicking label area toggles
-              }
-            }}
-          />
         </div>
 
         {/* Split inputs */}
@@ -425,51 +405,111 @@ const ResolutionPanel: React.FC<ResolutionPanelProps> = ({ dispute, onResolve })
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 const AdminDisputes: React.FC = () => {
-  const [disputes, setDisputes] = useState<Dispute[]>(MOCK_DISPUTES);
-  const [selectedId, setSelectedId] = useState<string | null>(MOCK_DISPUTES[0]?.id ?? null);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('all');
-  const [loading, setLoading] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
-  const [tableMissing, setTableMissing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [milestones, setMilestones] = useState<MilestoneRow[]>([]);
+  const [contract, setContract] = useState<ContractSummary | null>(null);
+  const [thread, setThread] = useState<ThreadMessage[]>([]);
+  const [mergeBusy, setMergeBusy] = useState(false);
 
-  useEffect(() => {
-    const fetchDisputes = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('disputes')
-          .select('*, engagements(project_title)')
-          .order('opened_at', { ascending: false });
-        if (error) throw error;
-        if (data && data.length > 0) {
-          // Resolve party names for display.
-          const vendorIds = Array.from(new Set(data.map((d: any) => d.vendor_id)));
-          const buyerIds = Array.from(new Set(data.map((d: any) => d.buyer_id)));
-          const [{ data: vendors }, { data: buyers }] = await Promise.all([
-            supabase.from('vendors').select('id, company_name').in('id', vendorIds),
-            supabase.from('customers').select('id, company_name').in('id', buyerIds),
-          ]);
-          const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v.company_name]));
-          const bMap = new Map((buyers ?? []).map((b: any) => [b.id, b.company_name]));
-          const mapped = data.map((d: any) => ({
-            ...d,
-            engagement: (Array.isArray(d.engagements) ? d.engagements[0] : d.engagements)?.project_title ?? 'Engagement',
-            vendor: vMap.get(d.vendor_id) ?? 'Vendor',
-            buyer: bMap.get(d.buyer_id) ?? 'Buyer',
-            vendor_position: d.vendor_position ?? '',
-            buyer_position: d.buyer_position ?? '',
-          }));
-          setDisputes(mapped as Dispute[]);
-          setSelectedId(mapped[0]?.id ?? null);
-        }
-      } catch {
-        setTableMissing(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDisputes();
+  const fetchDisputes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('disputes')
+        .select('*, engagements(project_title)')
+        .order('opened_at', { ascending: false });
+      if (error) throw error;
+      const rows = data || [];
+      if (rows.length === 0) { setDisputes([]); setSelectedId(null); return; }
+
+      const vendorIds = Array.from(new Set(rows.map((d: any) => d.vendor_id)));
+      const buyerIds = Array.from(new Set(rows.map((d: any) => d.buyer_id)));
+      const [{ data: vendors }, { data: buyers }] = await Promise.all([
+        supabase.from('vendors').select('id, company_name').in('id', vendorIds),
+        supabase.from('customers').select('id, company_name').in('id', buyerIds),
+      ]);
+      const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v.company_name]));
+      const bMap = new Map((buyers ?? []).map((b: any) => [b.id, b.company_name]));
+      const mapped = rows.map((d: any) => ({
+        ...d,
+        engagement: (Array.isArray(d.engagements) ? d.engagements[0] : d.engagements)?.project_title ?? 'Engagement',
+        vendor: vMap.get(d.vendor_id) ?? 'Vendor',
+        buyer: bMap.get(d.buyer_id) ?? 'Buyer',
+        vendor_position: d.vendor_position ?? '',
+        buyer_position: d.buyer_position ?? '',
+        merge_log: Array.isArray(d.merge_log) ? d.merge_log : [],
+      }));
+      setDisputes(mapped as Dispute[]);
+      setSelectedId(prev => (prev && mapped.some((d: any) => d.id === prev)) ? prev : (mapped[0]?.id ?? null));
+    } catch {
+      setDisputes([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => { fetchDisputes(); }, [fetchDisputes]);
+
   const selectedDispute = disputes.find(d => d.id === selectedId) ?? null;
+
+  // Evidence pack: milestones, contract/SOW terms, and the message thread between the two parties.
+  useEffect(() => {
+    if (!selectedDispute) { setMilestones([]); setContract(null); setThread([]); return; }
+    let cancelled = false;
+    (async () => {
+      const engagementId = selectedDispute.engagement_id;
+      const [{ data: sow }, { data: msgs }, { data: ms }] = await Promise.all([
+        engagementId
+          ? supabase.from('sow_documents').select('project_title, service_type, total_budget, payment_model, working_location, status, milestones').eq('engagement_id', engagementId).maybeSingle()
+          : Promise.resolve({ data: null }),
+        engagementId
+          ? supabase.from('messages').select('id, sender_id, content, created_at').eq('engagement_id', engagementId).order('created_at', { ascending: true }).limit(100)
+          : Promise.resolve({ data: [] }),
+        engagementId
+          ? supabase.from('project_milestones').select('id, title, amount, completed, escrow_status, due_date').eq('engagement_id', engagementId).order('due_date', { ascending: true })
+          : Promise.resolve({ data: [] }),
+      ]);
+      if (cancelled) return;
+      setContract(sow as ContractSummary | null);
+      setThread(msgs || []);
+      setMilestones(ms || []);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedDispute?.id]);
+
+  const relatedDisputes = selectedDispute
+    ? disputes.filter(d => d.id !== selectedDispute.id && d.engagement_id && d.engagement_id === selectedDispute.engagement_id && d.status !== 'resolved')
+    : [];
+
+  const mergeDispute = async (other: Dispute) => {
+    if (!selectedDispute) return;
+    setMergeBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('disputes').update({
+        status: 'resolved',
+        resolution_notes: `Merged into dispute ${selectedDispute.id} by admin — reviewed together as one case.`,
+        resolved_by: user?.id ?? null,
+        resolved_at: new Date().toISOString(),
+      }).eq('id', other.id);
+
+      const newLog = [...selectedDispute.merge_log, {
+        merged_dispute_id: other.id, reason: other.reason, merged_at: new Date().toISOString(),
+      }];
+      await supabase.from('disputes').update({ merge_log: newLog }).eq('id', selectedDispute.id);
+
+      setDisputes(prev => prev.map(d => {
+        if (d.id === other.id) return { ...d, status: 'resolved' as const };
+        if (d.id === selectedDispute.id) return { ...d, merge_log: newLog };
+        return d;
+      }));
+    } finally {
+      setMergeBusy(false);
+    }
+  };
 
   const filteredDisputes = disputes.filter(d => {
     if (activeTab === 'all') return true;
@@ -487,13 +527,21 @@ const AdminDisputes: React.FC = () => {
     { key: 'resolved', label: 'Resolved' },
   ];
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Disputes</h1>
 
-      {tableMissing && disputes === MOCK_DISPUTES && (
+      {disputes.length === 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-sm text-blue-700">
-          No disputes yet — dispute table will be populated once engagements are live.
+          No disputes right now.
         </div>
       )}
 
@@ -597,7 +645,7 @@ const AdminDisputes: React.FC = () => {
                     </div>
                     <div className="bg-gray-50 rounded-xl p-3">
                       <p className="text-xs text-gray-400 mb-0.5">Opened by</p>
-                      <p className="text-sm font-semibold text-gray-700 capitalize">{selectedDispute.opened_by}</p>
+                      <p className="text-sm font-semibold text-gray-700 capitalize">{selectedDispute.opened_by_role}</p>
                     </div>
                     <div className="bg-gray-50 rounded-xl p-3">
                       <p className="text-xs text-gray-400 mb-0.5">Opened at</p>
@@ -608,6 +656,43 @@ const AdminDisputes: React.FC = () => {
                   {/* 72hr countdown */}
                   <CountdownBadge deadline={selectedDispute.bilateral_deadline} />
                 </div>
+
+                {/* Related / mergeable disputes on the same engagement */}
+                {relatedDisputes.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-sm font-bold text-amber-800 mb-2">
+                      {relatedDisputes.length} other open dispute{relatedDisputes.length > 1 ? 's' : ''} on this engagement
+                    </p>
+                    <div className="space-y-2">
+                      {relatedDisputes.map(rd => (
+                        <div key={rd.id} className="flex items-center justify-between bg-white rounded-lg border border-amber-100 px-3 py-2">
+                          <div className="text-xs text-gray-600">
+                            <span className="font-semibold">{rd.reason}</span> · opened by {rd.opened_by_role} · {formatDate(rd.opened_at)}
+                          </div>
+                          <button
+                            onClick={() => mergeDispute(rd)}
+                            disabled={mergeBusy}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                          >
+                            Merge into this case
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedDispute.merge_log.length > 0 && (
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Merged disputes</p>
+                    <div className="space-y-1">
+                      {selectedDispute.merge_log.map((m, i) => (
+                        <div key={i} className="text-xs text-gray-500">
+                          {m.reason} — merged {formatDate(m.merged_at)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Section 2 — Positions */}
                 <div className="space-y-3">
@@ -626,28 +711,70 @@ const AdminDisputes: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Section 3 — Evidence */}
+                {/* Section 3 — Evidence pack (read-only) */}
                 <div>
-                  <h3 className="text-sm font-bold text-gray-700 mb-3">Evidence (read-only)</h3>
+                  <h3 className="text-sm font-bold text-gray-700 mb-3">Evidence Pack (read-only)</h3>
                   <div className="bg-gray-50 rounded-xl p-4 mb-3">
                     <p className="text-xs font-semibold text-gray-500 mb-2">Dispute description</p>
                     <p className="text-sm text-gray-700 leading-relaxed">{selectedDispute.description}</p>
                   </div>
-                  <div className="flex gap-3">
-                    <a
-                      href="#"
-                      className="inline-flex items-center gap-1.5 text-xs text-[#0070F3] font-semibold hover:underline"
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      View message thread
-                    </a>
-                    <a
-                      href="#"
-                      className="inline-flex items-center gap-1.5 text-xs text-[#0070F3] font-semibold hover:underline"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      View contract
-                    </a>
+
+                  {/* Contract / SOW render */}
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5" /> Contract Terms
+                    </p>
+                    {!contract ? (
+                      <p className="text-xs text-gray-400 bg-gray-50 rounded-xl p-4">No SOW/contract record found for this engagement.</p>
+                    ) : (
+                      <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
+                        <div><span className="text-xs text-gray-400 block">Service</span>{contract.service_type ?? '—'}</div>
+                        <div><span className="text-xs text-gray-400 block">Total budget</span>{contract.total_budget ? formatCurrency(Number(contract.total_budget)) : '—'}</div>
+                        <div><span className="text-xs text-gray-400 block">Payment model</span>{contract.payment_model ?? '—'}</div>
+                        <div><span className="text-xs text-gray-400 block">Working location</span>{contract.working_location ?? '—'}</div>
+                        <div><span className="text-xs text-gray-400 block">Contract status</span>{contract.status}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Milestone history */}
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Milestone History</p>
+                    {milestones.length === 0 ? (
+                      <p className="text-xs text-gray-400 bg-gray-50 rounded-xl p-4">No milestones recorded.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {milestones.map(m => (
+                          <div key={m.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                            <span className="text-gray-700 font-medium">{m.title}</span>
+                            <span className="text-gray-400">{m.escrow_status ?? (m.completed ? 'completed' : 'pending')}</span>
+                            <span className="font-semibold text-gray-700">{formatCurrency(Number(m.amount) || 0)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Message thread */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5">
+                      <MessageSquare className="h-3.5 w-3.5" /> Message Thread ({thread.length})
+                    </p>
+                    {thread.length === 0 ? (
+                      <p className="text-xs text-gray-400 bg-gray-50 rounded-xl p-4">No messages on this engagement.</p>
+                    ) : (
+                      <div className="bg-gray-50 rounded-xl p-3 max-h-64 overflow-y-auto space-y-2">
+                        {thread.map(m => (
+                          <div key={m.id} className={`text-xs rounded-lg px-3 py-2 ${m.sender_id === selectedDispute.vendor_id ? 'bg-emerald-50 text-emerald-900' : 'bg-blue-50 text-blue-900'}`}>
+                            <div className="flex items-center justify-between mb-0.5 opacity-60">
+                              <span className="font-semibold">{m.sender_id === selectedDispute.vendor_id ? selectedDispute.vendor : selectedDispute.buyer}</span>
+                              <span>{formatDate(m.created_at)}</span>
+                            </div>
+                            {m.content}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 

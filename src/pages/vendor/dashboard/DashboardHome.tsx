@@ -363,7 +363,7 @@ const DashboardHome: React.FC = () => {
         const [vendorRes, enquiryRes, jobRes] = await Promise.all([
           supabase.from('vendors').select('*').eq('id', user!.id).single(),
           supabase.from('enquiries').select('*, profiles(full_name)').eq('vendor_id', user!.id).order('created_at', { ascending: false }).limit(5),
-          supabase.from('jobs').select('id, title, budget, status, created_at').eq('status', 'open').order('created_at', { ascending: false }).limit(5),
+          supabase.from('jobs').select('id, title, budget:budget_amount, status, created_at').eq('status', 'open').eq('admin_status', 'live').order('created_at', { ascending: false }).limit(5),
         ]);
         setVendor(vendorRes.data);
         setRecentEnquiries(enquiryRes.data || []);

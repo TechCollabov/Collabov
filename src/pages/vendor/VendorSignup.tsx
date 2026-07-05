@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Globe, Eye, EyeOff, CheckCircle, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/authRedirect';
+import { supabase } from '../../lib/supabase';
 
 const SERVICE_CATEGORIES = [
   'Software Development', 'Managed IT', 'Staff Augmentation', 'Cybersecurity',
@@ -71,10 +72,22 @@ const VendorSignup: React.FC = () => {
     setStep(2);
   };
 
-  const handleStep2 = (e: React.FormEvent) => {
+  const handleStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!companyName.trim()) { setError('Company name is required'); return; }
+    setIsLoading(true);
+    try {
+      const { data: rejected } = await supabase.rpc('check_vendor_rejected', { p_company_name: companyName.trim() });
+      if (rejected) {
+        setError('This company did not pass verification on a previous application. Contact support@collabov.com if you believe this is an error.');
+        return;
+      }
+    } catch (checkErr) {
+      console.error('[VendorSignup] rejection check failed:', checkErr);
+    } finally {
+      setIsLoading(false);
+    }
     setStep(3);
   };
 
@@ -221,7 +234,9 @@ const VendorSignup: React.FC = () => {
               </div>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setStep(1)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors">Back</button>
-                <button type="submit" className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Continue</button>
+                <button type="submit" disabled={isLoading} className="flex-[2] py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60">
+                  {isLoading ? 'Checking...' : 'Continue'}
+                </button>
               </div>
             </form>
           </>

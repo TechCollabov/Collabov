@@ -92,7 +92,8 @@ describe('Feature: Navbar', () => {
 
     it('should link "Market Insight" to /market-insight', () => {
       renderNavbar();
-      const links = screen.getAllByRole('link', { name: /^market insight$/i });
+      // Name may include a "Soon" badge when the coming-soon flag is on, so match the prefix only.
+      const links = screen.getAllByRole('link', { name: /^market insight/i });
       links.forEach(link => expect(link).toHaveAttribute('href', '/market-insight'));
     });
 
@@ -344,7 +345,7 @@ describe('Feature: Navbar', () => {
 
       expect(within(mobilePanel).getByRole('link', { name: /^packages$/i }))
         .toHaveAttribute('href', '/packages');
-      expect(within(mobilePanel).getByRole('link', { name: /^market insight$/i }))
+      expect(within(mobilePanel).getByRole('link', { name: /^market insight/i }))
         .toHaveAttribute('href', '/market-insight');
     });
 

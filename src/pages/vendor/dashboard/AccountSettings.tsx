@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
-import { isBusinessEmail, addDays, PARTNER_INVITE_EXPIRY_DAYS, NOTIFICATION_EVENTS } from '../../../lib/workflows';
+import { isBusinessEmail, addDays, getPlatformSettings, NOTIFICATION_EVENTS } from '../../../lib/workflows';
 
 interface SettingsSection {
   id: string;
@@ -140,7 +140,7 @@ const AccountSettings: React.FC = () => {
       company_name: byocCompany.trim(),
       contact_email: byocEmail.trim(),
       status: 'pending',
-      expires_at: addDays(new Date(), PARTNER_INVITE_EXPIRY_DAYS).toISOString(),
+      expires_at: addDays(new Date(), getPlatformSettings().byovInviteExpiryDays).toISOString(),
     }).select().single();
     if (error) { setByocError('Could not send the invitation. Please try again.'); return; }
     setByocInvites(prev => [data, ...prev]);

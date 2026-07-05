@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent, hasCompanyProfile } from '../lib/workflows';
+import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../lib/workflows';
 import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -1489,6 +1489,11 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
     try {
       if (!(await hasCompanyProfile(user.id))) {
         setShowProfileGate(true);
+        setSending(false);
+        return;
+      }
+      if (await isCustomerBlacklisted(user.id)) {
+        setError('This account is blacklisted and cannot send new enquiries. Contact support@collabov.com.');
         setSending(false);
         return;
       }

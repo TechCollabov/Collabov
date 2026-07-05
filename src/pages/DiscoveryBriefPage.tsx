@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckSquare, Square } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { notify, logEvent, hasCompanyProfile } from '../lib/workflows';
+import { notify, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../lib/workflows';
 import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 const OUTPUT_OPTIONS = [
@@ -67,6 +67,11 @@ const DiscoveryBriefPage: React.FC = () => {
     try {
       if (!(await hasCompanyProfile(user.id))) {
         setShowProfileGate(true);
+        setSending(false);
+        return;
+      }
+      if (await isCustomerBlacklisted(user.id)) {
+        setError('This account is blacklisted and cannot send new briefs. Contact support@collabov.com.');
         setSending(false);
         return;
       }

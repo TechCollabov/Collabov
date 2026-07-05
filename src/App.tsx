@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { supabase } from './lib/supabase';
+import MaintenanceModePage from './pages/MaintenanceModePage';
 import { CustomerRoute, VendorRoute, AdminRoute, ContractorRoute } from './components/auth/ProtectedRoute';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -79,12 +81,23 @@ const hideNavbarFooterPaths = [
 
 function AppContent() {
   const location = useLocation();
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  useEffect(() => {
+    supabase.from('platform_settings').select('maintenance_mode').eq('id', true).maybeSingle()
+      .then(({ data }) => setMaintenanceMode(!!data?.maintenance_mode));
+  }, []);
+
   const hideChrome = hideNavbarFooterPaths.some(p => location.pathname.startsWith(p));
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
+  if (maintenanceMode && !isAdminRoute) {
+    return <MaintenanceModePage />;
+  }
 
   return (
     <div className="flex flex-col min-h-screen">

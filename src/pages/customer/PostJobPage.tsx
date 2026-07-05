@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { notify, logEvent, hasCompanyProfile } from '../../lib/workflows';
+import { notify, logEvent, hasCompanyProfile, isCustomerBlacklisted, getPlatformSettings } from '../../lib/workflows';
 import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 export interface JobData {
@@ -173,6 +173,17 @@ const PostJobPage: React.FC = () => {
       // Hard gate: no spend before the business is identifiable.
       if (!(await hasCompanyProfile(user.id))) {
         setProfileGate(true);
+        setSubmitting(false);
+        return;
+      }
+      if (await isCustomerBlacklisted(user.id)) {
+        setSubmitError('This account is blacklisted and cannot post new jobs or tenders. Contact support@collabov.com.');
+        setSubmitting(false);
+        return;
+      }
+      const minValue = getPlatformSettings().minimumProjectValue;
+      if (jobData.budget.type === 'fixed' && Number(jobData.budget.amount) < minValue) {
+        setSubmitError(`The platform minimum project value is £${minValue.toLocaleString()}. Increase the budget to continue.`);
         setSubmitting(false);
         return;
       }
