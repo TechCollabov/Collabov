@@ -44,14 +44,6 @@ export function CustomerRoute({ children }: { children: ReactNode }) {
   );
 }
 
-export function ContractorRoute({ children }: { children: ReactNode }) {
-  return (
-    <ProtectedRoute allowedUserTypes={['contractor']}>
-      {children}
-    </ProtectedRoute>
-  );
-}
-
 export function VendorRoute({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute allowedUserTypes={['vendor']}>

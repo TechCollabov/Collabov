@@ -17,6 +17,8 @@ export const ROLE_TO_UI_LABEL: Record<string, string> = {
 export const ROLE_TO_DASHBOARD: Record<string, string> = {
   [ROLE_VENDOR]: '/vendor/dashboard',
   [ROLE_CUSTOMER]: '/customer/dashboard',
-  [ROLE_CONTRACTOR]: '/contractor/dashboard',
+  // No live signup path creates a 'contractor' account and the standalone
+  // contractor dashboard was removed as dead legacy code — fall through home.
+  [ROLE_CONTRACTOR]: '/',
   [ROLE_ADMIN]: '/admin',
 };

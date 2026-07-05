@@ -3,7 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { supabase } from './lib/supabase';
 import MaintenanceModePage from './pages/MaintenanceModePage';
-import { CustomerRoute, VendorRoute, AdminRoute, ContractorRoute } from './components/auth/ProtectedRoute';
+import { CustomerRoute, VendorRoute, AdminRoute } from './components/auth/ProtectedRoute';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import HomePage from './pages/HomePage';
@@ -26,7 +26,6 @@ import JobsPage from './pages/JobsPage';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import PostJobPage from './pages/customer/PostJobPage';
 import BYOVPage from './pages/customer/BYOVPage';
-import ContractorDashboard from './pages/contractor/ContractorDashboard';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -49,14 +48,11 @@ import MessagingPage from './pages/MessagingPage';
 import ProposalTriagePage from './pages/ProposalTriagePage';
 import DiscoveryBriefPage from './pages/DiscoveryBriefPage';
 import SOWWizardPage from './pages/SOWWizardPage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
 import EngagementWorkspacePage from './pages/EngagementWorkspacePage';
-import ReviewPage from './pages/ReviewPage';
 import MyVendorsPage from './pages/customer/MyVendorsPage';
 import CustomerPayments from './pages/customer/CustomerPayments';
 import CustomerGovernance from './pages/customer/CustomerGovernance';
 import CustomerSettings from './pages/customer/CustomerSettings';
-import EvidenceBuilderPage from './pages/vendor/dashboard/EvidenceBuilder';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -66,7 +62,6 @@ const hideNavbarFooterPaths = [
   '/reset-password',
   '/user-type',
   '/signup',
-  '/contractor/dashboard',
   '/customer/post-job',
   '/customer/dashboard',
   '/oauth/consent',
@@ -74,9 +69,7 @@ const hideNavbarFooterPaths = [
   '/proposals',
   '/sow-wizard',
   '/discovery-brief',
-  '/project',
   '/engagement',
-  '/review',
 ];
 
 function AppContent() {
@@ -124,9 +117,7 @@ function AppContent() {
           <Route path="/messages" element={<MessagingPage />} />
 
           {/* Sprint 3 — Engagement flows */}
-          <Route path="/project/:engagementId" element={<ProjectDetailPage />} />
           <Route path="/engagement/:engagementId" element={<EngagementWorkspacePage />} />
-          <Route path="/review" element={<ReviewPage />} />
           <Route path="/customer/my-vendors" element={<CustomerRoute><MyVendorsPage /></CustomerRoute>} />
           <Route path="/customer/payments" element={<CustomerRoute><CustomerPayments /></CustomerRoute>} />
           <Route path="/customer/governance" element={<CustomerRoute><CustomerGovernance /></CustomerRoute>} />
@@ -166,9 +157,6 @@ function AppContent() {
           <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
           <Route path="/customer/post-job" element={<CustomerRoute><PostJobPage /></CustomerRoute>} />
           <Route path="/customer/byov" element={<CustomerRoute><BYOVPage /></CustomerRoute>} />
-
-          {/* Contractor */}
-          <Route path="/contractor/dashboard" element={<ContractorRoute><ContractorDashboard /></ContractorRoute>} />
 
           {/* Vendor */}
           <Route path="/vendor/dashboard/*" element={<VendorRoute><VendorDashboard /></VendorRoute>} />
