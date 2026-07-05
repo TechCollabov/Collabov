@@ -1,41 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { ChevronUp, ChevronDown, Download, ExternalLink } from 'lucide-react';
+import { ChevronUp, ChevronDown, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-const gmvMonthly = [
-  { month: 'Jan', gmv: 42000, fees: 2100 },
-  { month: 'Feb', gmv: 58000, fees: 2900 },
-  { month: 'Mar', gmv: 71000, fees: 3550 },
-  { month: 'Apr', gmv: 89000, fees: 4450 },
-  { month: 'May', gmv: 104000, fees: 5200 },
-  { month: 'Jun', gmv: 127000, fees: 6350 },
-];
+interface VendorRow {
+  id: string;
+  company_name: string;
+  rating: number;
+  projects_completed: number;
+  is_verified: boolean;
+  verified_at: string | null;
+  dispute_outcome_count: number;
+}
 
-const conversionFunnel = [
-  { stage: 'Homepage visits', count: 8420, pct: 100 },
-  { stage: 'Searches performed', count: 3180, pct: 38 },
-  { stage: 'Profile views', count: 1240, pct: 15 },
-  { stage: 'RFPs submitted', count: 187, pct: 2.2 },
-  { stage: 'Contracts signed', count: 43, pct: 0.5 },
-  { stage: 'Milestones completed', count: 89, pct: 1.1 },
-  { stage: 'Contracts completed', count: 18, pct: 0.2 },
-];
+interface BuyerRow {
+  id: string;
+  company_name: string;
+  onTimeRate: number;
+  lateCount: number;
+  disputeRatio: number;
+  badge: 'green' | 'amber' | 'red';
+}
 
-const vendorPerformance = [
-  { company: 'TechForge Solutions', type: 'IT Agency', completed: 12, dispute_rate: '0%', avg_rating: 4.8, verified: '2024-01-15' },
-  { company: 'CloudNorth MSP', type: 'MSP', completed: 8, dispute_rate: '0%', avg_rating: 4.6, verified: '2024-02-20' },
-  { company: 'DevStream Ltd', type: 'IT Agency', completed: 6, dispute_rate: '4%', avg_rating: 4.3, verified: '2024-03-10' },
-  { company: 'DataBridge Analytics', type: 'IT Agency', completed: 4, dispute_rate: '0%', avg_rating: 4.9, verified: '2024-04-05' },
-  { company: 'StaffPro UK', type: 'Staff Aug', completed: 7, dispute_rate: '2%', avg_rating: 4.4, verified: '2024-04-18' },
-];
-
-const paymentReputation = [
-  { company: 'Paytrace Financial', on_time_rate: 98, late_count: 0, failed_count: 0, dispute_ratio: '0%', badge: 'green' },
-  { company: 'Morrison Logistics', on_time_rate: 87, late_count: 2, failed_count: 0, dispute_ratio: '2%', badge: 'amber' },
-  { company: 'CareSync Health', on_time_rate: 100, late_count: 0, failed_count: 0, dispute_ratio: '0%', badge: 'green' },
-  { company: 'ShopBridge Commerce', on_time_rate: 72, late_count: 4, failed_count: 1, dispute_ratio: '8%', badge: 'red' },
-];
+interface FunnelStage {
+  stage: string;
+  count: number;
+}
 
 type SortDir = 'asc' | 'desc';
 
@@ -51,7 +42,7 @@ function StarRating({ rating }: { rating: number }) {
   return (
     <span className="text-amber-400 text-sm">
       {'★'.repeat(Math.floor(rating))}{'☆'.repeat(5 - Math.floor(rating))}
-      <span className="text-slate-400 text-xs ml-1">{rating}</span>
+      <span className="text-slate-400 text-xs ml-1">{rating.toFixed(1)}</span>
     </span>
   );
 }
@@ -75,53 +66,136 @@ function exportCSV(data: Record<string, unknown>[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-const AdminAnalytics: React.FC = () => {
-  const [vendorSort, setVendorSort] = useState<{ key: keyof typeof vendorPerformance[0]; dir: SortDir }>({ key: 'completed', dir: 'desc' });
-  const [paySort, setPaySort] = useState<{ key: keyof typeof paymentReputation[0]; dir: SortDir }>({ key: 'on_time_rate', dir: 'desc' });
-  const [stats, setStats] = useState({ totalVendors: 0, verifiedVendors: 0, totalContracts: 0, activeValue: 0, totalProposals: 0 });
-  const [topVendors, setTopVendors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+const monthKey = (d: Date) => d.toLocaleString('en-GB', { month: 'short', year: '2-digit' });
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [vendorRes, verRes, contractRes, proposalRes, topVRes] = await Promise.all([
-          supabase.from('vendors').select('id', { count: 'exact', head: true }),
-          supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
-          supabase.from('contracts').select('id, total_value, status', { count: 'exact' }),
-          supabase.from('proposals').select('id', { count: 'exact', head: true }),
-          supabase.from('vendors').select('id, company_name, rating, review_count, projects_completed, total_revenue, is_verified').order('projects_completed', { ascending: false }).limit(10),
-        ]);
-        const activeValue = contractRes.data?.filter(c => c.status === 'active').reduce((s, c) => s + (c.total_value || 0), 0) || 0;
-        setStats({ totalVendors: vendorRes.count || 0, verifiedVendors: verRes.count || 0, totalContracts: contractRes.count || 0, activeValue, totalProposals: proposalRes.count || 0 });
-        setTopVendors(topVRes.data || []);
-      } finally {
-        setLoading(false);
-      }
+const AdminAnalytics: React.FC = () => {
+  const [vendorSort, setVendorSort] = useState<{ key: keyof VendorRow; dir: SortDir }>({ key: 'projects_completed', dir: 'desc' });
+  const [paySort, setPaySort] = useState<{ key: keyof BuyerRow; dir: SortDir }>({ key: 'onTimeRate', dir: 'desc' });
+  const [stats, setStats] = useState({ totalVendors: 0, verifiedVendors: 0, totalContracts: 0, activeValue: 0, totalEnquiries: 0 });
+  const [gmvMonthly, setGmvMonthly] = useState<{ month: string; gmv: number; fees: number }[]>([]);
+  const [funnel, setFunnel] = useState<FunnelStage[]>([]);
+  const [vendors, setVendors] = useState<VendorRow[]>([]);
+  const [buyers, setBuyers] = useState<BuyerRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5); sixMonthsAgo.setDate(1); sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    const [
+      vendorRes, verRes, contractRes, enquiryRes, vendorsRes,
+      releasesRes, milestoneRes, customersRes, disputesRes,
+    ] = await Promise.all([
+      supabase.from('vendors').select('id', { count: 'exact', head: true }),
+      supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
+      supabase.from('contracts').select('id, total_value, status', { count: 'exact' }),
+      supabase.from('enquiries').select('id', { count: 'exact', head: true }),
+      supabase.from('vendors').select('id, company_name, rating, projects_completed, is_verified, verified_at, dispute_outcome_count').order('projects_completed', { ascending: false }).limit(10),
+      supabase.from('escrow_transactions').select('amount, platform_fee_amount, created_at').eq('transaction_type', 'release').gte('created_at', sixMonthsAgo.toISOString()),
+      supabase.from('project_milestones').select('engagement_id, escrow_status, due_date, funded_at').not('escrow_status', 'eq', 'unfunded'),
+      supabase.from('customers').select('id, company_name'),
+      supabase.from('disputes').select('buyer_id'),
+    ]);
+
+    const activeValue = contractRes.data?.filter(c => c.status === 'active').reduce((s, c) => s + (c.total_value || 0), 0) || 0;
+    setStats({
+      totalVendors: vendorRes.count || 0,
+      verifiedVendors: verRes.count || 0,
+      totalContracts: contractRes.count || 0,
+      activeValue,
+      totalEnquiries: enquiryRes.count || 0,
+    });
+    setVendors(vendorsRes.data || []);
+
+    // GMV + fees by month, last 6 months.
+    const buckets = new Map<string, { gmv: number; fees: number }>();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(sixMonthsAgo); d.setMonth(d.getMonth() + i);
+      buckets.set(monthKey(d), { gmv: 0, fees: 0 });
     }
-    load();
+    (releasesRes.data || []).forEach((r: any) => {
+      const key = monthKey(new Date(r.created_at));
+      const b = buckets.get(key) ?? { gmv: 0, fees: 0 };
+      b.gmv += Number(r.amount || 0);
+      b.fees += Number(r.platform_fee_amount || 0);
+      buckets.set(key, b);
+    });
+    setGmvMonthly(Array.from(buckets.entries()).map(([month, v]) => ({ month, ...v })));
+
+    // Engagement funnel — starts from enquiries since anonymous top-of-funnel
+    // (homepage visits, searches) isn't instrumented anywhere in this build.
+    const contractsSigned = (contractRes.data || []).filter((c: any) => c.status !== 'pending').length;
+    const milestones = milestoneRes.data || [];
+    const milestonesFunded = milestones.length;
+    const milestonesReleased = milestones.filter((m: any) => m.escrow_status === 'released').length;
+    const contractsCompleted = (contractRes.data || []).filter((c: any) => c.status === 'completed').length;
+    setFunnel([
+      { stage: 'Enquiries submitted', count: enquiryRes.count || 0 },
+      { stage: 'Contracts signed', count: contractsSigned },
+      { stage: 'Milestones funded', count: milestonesFunded },
+      { stage: 'Milestones released', count: milestonesReleased },
+      { stage: 'Contracts completed', count: contractsCompleted },
+    ]);
+
+    // Buyer payment reputation: on-time = funded on/before the milestone's due date.
+    const engagementIds = Array.from(new Set(milestones.map((m: any) => m.engagement_id).filter(Boolean)));
+    const { data: engagements } = engagementIds.length
+      ? await supabase.from('engagements').select('id, buyer_id').in('id', engagementIds)
+      : { data: [] as any[] };
+    const engToBuyer = new Map((engagements ?? []).map((e: any) => [e.id, e.buyer_id]));
+    const disputeCountByBuyer = new Map<string, number>();
+    (disputesRes.data || []).forEach((d: any) => disputeCountByBuyer.set(d.buyer_id, (disputeCountByBuyer.get(d.buyer_id) ?? 0) + 1));
+
+    const perBuyer = new Map<string, { onTime: number; late: number; total: number }>();
+    milestones.forEach((m: any) => {
+      if (!m.funded_at || !m.due_date) return;
+      const buyerId = engToBuyer.get(m.engagement_id);
+      if (!buyerId) return;
+      const cur = perBuyer.get(buyerId) ?? { onTime: 0, late: 0, total: 0 };
+      const onTime = new Date(m.funded_at) <= new Date(m.due_date);
+      cur.total += 1;
+      if (onTime) cur.onTime += 1; else cur.late += 1;
+      perBuyer.set(buyerId, cur);
+    });
+    const custMap = new Map((customersRes.data ?? []).map((c: any) => [c.id, c.company_name]));
+    setBuyers(Array.from(perBuyer.entries()).map(([buyerId, s]) => {
+      const onTimeRate = s.total > 0 ? Math.round((s.onTime / s.total) * 100) : 100;
+      const disputeRatio = s.total > 0 ? Math.round(((disputeCountByBuyer.get(buyerId) ?? 0) / s.total) * 100) : 0;
+      const badge: BuyerRow['badge'] = onTimeRate >= 95 ? 'green' : onTimeRate >= 80 ? 'amber' : 'red';
+      return { id: buyerId, company_name: custMap.get(buyerId) ?? 'Buyer', onTimeRate, lateCount: s.late, disputeRatio, badge };
+    }));
+
+    setLoading(false);
   }, []);
 
-  function sortVendor(key: keyof typeof vendorPerformance[0]) {
+  useEffect(() => { load(); }, [load]);
+
+  function sortVendor(key: keyof VendorRow) {
     setVendorSort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
   }
-  function sortPay(key: keyof typeof paymentReputation[0]) {
+  function sortPay(key: keyof BuyerRow) {
     setPaySort(s => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
   }
 
-  const sortedVendors = [...vendorPerformance].sort((a, b) => {
+  const sortedVendors = [...vendors].sort((a, b) => {
     const av = a[vendorSort.key];
     const bv = b[vendorSort.key];
     if (typeof av === 'number' && typeof bv === 'number') return vendorSort.dir === 'asc' ? av - bv : bv - av;
     return vendorSort.dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
   });
 
-  const sortedPay = [...paymentReputation].sort((a, b) => {
+  const sortedBuyers = [...buyers].sort((a, b) => {
     const av = a[paySort.key];
     const bv = b[paySort.key];
     if (typeof av === 'number' && typeof bv === 'number') return paySort.dir === 'asc' ? av - bv : bv - av;
     return paySort.dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
   });
+
+  const maxFunnelCount = funnel[0]?.count || 1;
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-blue-400" size={32} /></div>;
+  }
 
   return (
     <div className="space-y-8">
@@ -147,8 +221,8 @@ const AdminAnalytics: React.FC = () => {
             <span className="text-xs text-slate-500">All time</span>
           </div>
           <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Proposals</span>
-            <span className="text-4xl font-black text-white">{stats.totalProposals}</span>
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Enquiries</span>
+            <span className="text-4xl font-black text-white">{stats.totalEnquiries}</span>
             <span className="text-xs text-slate-500">All time</span>
           </div>
         </div>
@@ -172,21 +246,22 @@ const AdminAnalytics: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. Conversion Funnel */}
+      {/* 2. Engagement Funnel */}
       <section>
-        <h2 className="text-lg font-bold text-white mb-4">Conversion Funnel — this month</h2>
+        <h2 className="text-lg font-bold text-white mb-1">Engagement Funnel — all time</h2>
+        <p className="text-xs text-slate-500 mb-4">Starts from enquiry submission — anonymous top-of-funnel traffic (homepage visits, searches) isn't instrumented in this build.</p>
         <div className="bg-slate-800 rounded-xl p-6 space-y-3">
-          {conversionFunnel.map(row => (
+          {funnel.map(row => (
             <div key={row.stage} className="flex items-center gap-3">
               <span className="text-sm text-slate-300 w-48 shrink-0">{row.stage}</span>
               <div className="flex-1 bg-slate-700 rounded-full h-8 overflow-hidden">
                 <div
                   className="h-8 rounded-full bg-[#0070F3] transition-all"
-                  style={{ width: `${row.pct}%` }}
+                  style={{ width: `${maxFunnelCount > 0 ? Math.max(2, (row.count / maxFunnelCount) * 100) : 0}%` }}
                 />
               </div>
               <span className="text-sm font-semibold text-white w-16 text-right">{row.count.toLocaleString()}</span>
-              <span className="text-xs text-slate-400 w-12 text-right">{row.pct}%</span>
+              <span className="text-xs text-slate-400 w-12 text-right">{maxFunnelCount > 0 ? Math.round((row.count / maxFunnelCount) * 100) : 0}%</span>
             </div>
           ))}
         </div>
@@ -197,7 +272,7 @@ const AdminAnalytics: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-white">Vendor Performance</h2>
           <button
-            onClick={() => exportCSV(vendorPerformance as unknown as Record<string, unknown>[], 'vendor-performance.csv')}
+            onClick={() => exportCSV(vendors as unknown as Record<string, unknown>[], 'vendor-performance.csv')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 border border-slate-600 rounded-lg hover:border-slate-400 hover:text-white transition-colors"
           >
             <Download className="h-3.5 w-3.5" /> Export CSV
@@ -208,16 +283,15 @@ const AdminAnalytics: React.FC = () => {
             <thead className="bg-slate-900/60 border-b border-slate-700">
               <tr>
                 {[
-                  { label: 'Company', key: 'company' },
-                  { label: 'Type', key: 'type' },
-                  { label: 'Completed', key: 'completed' },
-                  { label: 'Dispute Rate', key: 'dispute_rate' },
-                  { label: 'Avg Rating', key: 'avg_rating' },
-                  { label: 'Verified Date', key: 'verified' },
+                  { label: 'Company', key: 'company_name' },
+                  { label: 'Completed', key: 'projects_completed' },
+                  { label: 'Dispute Rate', key: 'dispute_outcome_count' },
+                  { label: 'Avg Rating', key: 'rating' },
+                  { label: 'Verified Date', key: 'verified_at' },
                 ].map(col => (
                   <th
                     key={col.key}
-                    onClick={() => sortVendor(col.key as keyof typeof vendorPerformance[0])}
+                    onClick={() => sortVendor(col.key as keyof VendorRow)}
                     className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-white select-none"
                   >
                     {col.label}
@@ -228,20 +302,22 @@ const AdminAnalytics: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {(topVendors.length > 0 ? topVendors : sortedVendors).map((v: any) => (
-                <tr key={v.company || v.company_name} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-white">{v.company || v.company_name}</td>
-                  <td className="px-5 py-3.5">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/40 text-blue-300 border border-blue-700/40">{v.type || (v.is_verified ? 'Verified' : 'Unverified')}</span>
+              {sortedVendors.length === 0 && (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500 text-sm">No vendors yet.</td></tr>
+              )}
+              {sortedVendors.map((v) => (
+                <tr key={v.id} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-white">{v.company_name}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{v.projects_completed ?? 0}</td>
+                  <td className="px-5 py-3.5 text-slate-300">
+                    {v.projects_completed > 0 ? `${Math.round((v.dispute_outcome_count / v.projects_completed) * 100)}%` : '—'}
                   </td>
-                  <td className="px-5 py-3.5 text-slate-300">{v.completed ?? v.projects_completed ?? 0}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{v.dispute_rate ?? '—'}</td>
-                  <td className="px-5 py-3.5"><StarRating rating={v.avg_rating ?? v.rating ?? 0} /></td>
-                  <td className="px-5 py-3.5 text-slate-400">{v.verified ?? (v.is_verified ? 'Verified' : 'Pending')}</td>
+                  <td className="px-5 py-3.5"><StarRating rating={v.rating ?? 0} /></td>
+                  <td className="px-5 py-3.5 text-slate-400">{v.verified_at ? new Date(v.verified_at).toLocaleDateString('en-GB') : (v.is_verified ? 'Verified' : 'Pending')}</td>
                   <td className="px-5 py-3.5">
-                    <a href="#" className="flex items-center gap-1 text-[#0070F3] hover:text-blue-300 text-xs font-medium">
+                    <Link to={`/vendor/profile/${v.id}`} className="flex items-center gap-1 text-[#0070F3] hover:text-blue-300 text-xs font-medium">
                       View profile <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -250,12 +326,12 @@ const AdminAnalytics: React.FC = () => {
         </div>
       </section>
 
-      {/* 4. Payment Reputation Table */}
+      {/* 4. Buyer Payment Reputation Table */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-white">Buyer Payment Reputation</h2>
           <button
-            onClick={() => exportCSV(paymentReputation as unknown as Record<string, unknown>[], 'payment-reputation.csv')}
+            onClick={() => exportCSV(buyers as unknown as Record<string, unknown>[], 'payment-reputation.csv')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 border border-slate-600 rounded-lg hover:border-slate-400 hover:text-white transition-colors"
           >
             <Download className="h-3.5 w-3.5" /> Export CSV
@@ -266,15 +342,14 @@ const AdminAnalytics: React.FC = () => {
             <thead className="bg-slate-900/60 border-b border-slate-700">
               <tr>
                 {[
-                  { label: 'Buyer', key: 'company' },
-                  { label: 'On-time Rate', key: 'on_time_rate' },
-                  { label: 'Late Count', key: 'late_count' },
-                  { label: 'Failed Count', key: 'failed_count' },
-                  { label: 'Dispute Ratio', key: 'dispute_ratio' },
+                  { label: 'Buyer', key: 'company_name' },
+                  { label: 'On-time Rate', key: 'onTimeRate' },
+                  { label: 'Late Count', key: 'lateCount' },
+                  { label: 'Dispute Ratio', key: 'disputeRatio' },
                 ].map(col => (
                   <th
                     key={col.key}
-                    onClick={() => sortPay(col.key as keyof typeof paymentReputation[0])}
+                    onClick={() => sortPay(col.key as keyof BuyerRow)}
                     className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-white select-none"
                   >
                     {col.label}
@@ -285,18 +360,20 @@ const AdminAnalytics: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {sortedPay.map(p => (
-                <tr key={p.company} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-white">{p.company}</td>
+              {sortedBuyers.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500 text-sm">No funded milestones with due dates yet.</td></tr>
+              )}
+              {sortedBuyers.map(b => (
+                <tr key={b.id} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-white">{b.company_name}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`font-semibold ${p.on_time_rate >= 95 ? 'text-green-400' : p.on_time_rate >= 80 ? 'text-amber-400' : 'text-red-400'}`}>
-                      {p.on_time_rate}%
+                    <span className={`font-semibold ${b.onTimeRate >= 95 ? 'text-green-400' : b.onTimeRate >= 80 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {b.onTimeRate}%
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-300">{p.late_count}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{p.failed_count}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{p.dispute_ratio}</td>
-                  <td className="px-5 py-3.5"><BadgeChip badge={p.badge} /></td>
+                  <td className="px-5 py-3.5 text-slate-300">{b.lateCount}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{b.disputeRatio}%</td>
+                  <td className="px-5 py-3.5"><BadgeChip badge={b.badge} /></td>
                 </tr>
               ))}
             </tbody>
