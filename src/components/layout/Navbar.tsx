@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Menu, X, Globe, LogIn, ChevronDown, Briefcase, LayoutDashboard, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_TO_DASHBOARD } from '../../constants/roles';
+import { supabase } from '../../lib/supabase';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isOutsourceOpen, setIsOutsourceOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+  const [marketInsightComingSoon, setMarketInsightComingSoon] = useState(true);
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.from('site_content').select('value').eq('key', 'coming_soon_flags').maybeSingle()
+      .then(({ data }) => {
+        if (data?.value && typeof data.value.market_insight === 'boolean') setMarketInsightComingSoon(data.value.market_insight);
+      });
+  }, []);
 
   const closeMenu = () => setIsOpen(false);
   const isCustomer = profile?.user_type === 'customer';
@@ -100,8 +109,11 @@ const Navbar: React.FC = () => {
               <NavLink to="/packages" className={({ isActive }) => `text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200 ${isActive ? 'text-[#0070F3]' : ''}`}>
                 Packages
               </NavLink>
-              <NavLink to="/market-insight" className={({ isActive }) => `text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200 ${isActive ? 'text-[#0070F3]' : ''}`}>
+              <NavLink to="/market-insight" className={({ isActive }) => `flex items-center gap-1.5 text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200 ${isActive ? 'text-[#0070F3]' : ''}`}>
                 Market Insight
+                {marketInsightComingSoon && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Soon</span>
+                )}
               </NavLink>
             </nav>
 
@@ -184,7 +196,12 @@ const Navbar: React.FC = () => {
               {/* Flat links */}
               <div className="mb-6 space-y-1">
                 <Link to="/packages" className="block py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>Packages</Link>
-                <Link to="/market-insight" className="block py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>Market Insight</Link>
+                <Link to="/market-insight" className="flex items-center gap-1.5 py-2 px-3 text-[#0B2D59] font-medium hover:text-[#0070F3] hover:bg-blue-50 rounded-lg" onClick={closeMenu}>
+                  Market Insight
+                  {marketInsightComingSoon && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Soon</span>
+                  )}
+                </Link>
               </div>
 
               {isCustomer && (

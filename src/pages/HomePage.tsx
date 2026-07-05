@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import cities from 'cities.json';
+import { supabase } from '../lib/supabase';
 import {
   Search, MapPin, ArrowRight, Calculator,
   CheckCircle, Users, Briefcase, ShieldCheck,
@@ -28,11 +29,26 @@ const marqueeItems = [
   'Professional services firms',
 ];
 
-const marketStats = [
+const DEFAULT_MARKET_STATS = [
   { value: '$650B+', label: 'Global IT outsourcing market in 2024' },
   { value: '$214B+', label: 'Underserved SME and mid-market opportunity' },
   { value: '63%', label: 'of UK businesses planning to increase outsourcing' },
   { value: '40%', label: 'Average cost reduction vs equivalent UK hire' },
+];
+
+const DEFAULT_TESTIMONIALS = [
+  {
+    quote: "We found a React development team in Poland within three days. The contract was signed on the platform, milestones tracked automatically, and we paid only when each piece of work was delivered. First time outsourcing has ever felt completely under control.",
+    name: "James Whitfield",
+    role: "CTO — Paytrace Financial, London",
+    type: "buyer",
+  },
+  {
+    quote: "As a 12-person agency in Krakow, getting in front of UK clients used to take months of sales effort. Collabov gave us a verified profile and we received our first RFP within two weeks. The escrow payment system means we never have to chase invoices.",
+    name: "Marta Kowalska",
+    role: "MD — CodeForge Solutions, Krakow",
+    type: "vendor",
+  },
 ];
 
 const packageList = [
@@ -52,6 +68,19 @@ const HomePage: React.FC = () => {
   const [location, setLocation] = useState('');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [filteredCities, setFilteredCities] = useState<any[]>([]);
+  const [marketStats, setMarketStats] = useState(DEFAULT_MARKET_STATS);
+  const [testimonials, setTestimonials] = useState(DEFAULT_TESTIMONIALS);
+
+  useEffect(() => {
+    supabase.from('site_content').select('key, value').in('key', ['homepage_stats', 'homepage_testimonials'])
+      .then(({ data }) => {
+        const map = new Map((data ?? []).map((r: any) => [r.key, r.value]));
+        const stats = map.get('homepage_stats');
+        if (Array.isArray(stats) && stats.length > 0) setMarketStats(stats);
+        const testimonialsData = map.get('homepage_testimonials');
+        if (Array.isArray(testimonialsData) && testimonialsData.length > 0) setTestimonials(testimonialsData);
+      });
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -532,20 +561,7 @@ const HomePage: React.FC = () => {
             <p className="text-gray-600">Real results from real businesses.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {[
-              {
-                quote: "We found a React development team in Poland within three days. The contract was signed on the platform, milestones tracked automatically, and we paid only when each piece of work was delivered. First time outsourcing has ever felt completely under control.",
-                name: "James Whitfield",
-                role: "CTO — Paytrace Financial, London",
-                type: "buyer",
-              },
-              {
-                quote: "As a 12-person agency in Krakow, getting in front of UK clients used to take months of sales effort. Collabov gave us a verified profile and we received our first RFP within two weeks. The escrow payment system means we never have to chase invoices.",
-                name: "Marta Kowalska",
-                role: "MD — CodeForge Solutions, Krakow",
-                type: "vendor",
-              },
-            ].map((t) => (
+            {testimonials.map((t) => (
               <div key={t.name} className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                 <div className="flex gap-1 mb-4">
                   {[1,2,3,4,5].map(i => (

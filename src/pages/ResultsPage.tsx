@@ -7,8 +7,8 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
-/* ── Market Insight Data ── */
-const MARKET_INSIGHT_DATA: Record<string, { rate: string; demand: string; tip: string }> = {
+/* ── Market Insight Data (default fallback; overridden by site_content) ── */
+const DEFAULT_MARKET_INSIGHT_DATA: Record<string, { rate: string; demand: string; tip: string }> = {
   'msp': { rate: '£1,200–£3,500/month', demand: 'High demand — 847 active searches this month', tip: 'MSPs with SLA guarantees and sub-4hr response times receive 3× more enquiries.' },
   'agency': { rate: '£8,000–£45,000/project', demand: 'High demand — 1,203 active searches this month', tip: 'Agencies with case studies in your industry receive 4× higher proposal acceptance rates.' },
   'staffaug': { rate: '£2,800–£6,500/month per person', demand: 'Growing demand — 634 active searches this month', tip: 'Staff aug providers with 3+ verified referrals win contracts 60% faster.' },
@@ -243,6 +243,14 @@ const ResultsPage: React.FC = () => {
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [dbVendors, setDbVendors] = useState<Vendor[]>([]);
   const [loadingVendors, setLoadingVendors] = useState(true);
+  const [marketInsightData, setMarketInsightData] = useState(DEFAULT_MARKET_INSIGHT_DATA);
+
+  useEffect(() => {
+    supabase.from('site_content').select('value').eq('key', 'market_insight_table').maybeSingle()
+      .then(({ data }) => {
+        if (data?.value && Object.keys(data.value).length > 0) setMarketInsightData(data.value as typeof DEFAULT_MARKET_INSIGHT_DATA);
+      });
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -472,7 +480,7 @@ const ResultsPage: React.FC = () => {
               const insightKey = typeParam
                 ? typeParam.toLowerCase().replace(/\s+/g, '+')
                 : query.toLowerCase().replace(/\s+/g, '+');
-              const insight = MARKET_INSIGHT_DATA[insightKey];
+              const insight = marketInsightData[insightKey];
               return (
                 <div className="bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-100 rounded-xl p-5 mb-6 relative">
                   <button
