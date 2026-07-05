@@ -1,5 +1,15 @@
-import React, { useState } from 'react';
-import { Search, ShieldCheck, User, Building2, Ban, Mail } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, User, Building2, Ban, Mail, Lock, Unlock } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+
+interface AdminAccountRow {
+  id: string;
+  full_name: string;
+  email: string;
+  failed_login_attempts: number | null;
+  locked_at: string | null;
+}
 
 /* No hardcoded users — data will be loaded from the database */
 const USERS: {
@@ -14,9 +24,45 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const AdminUsers: React.FC = () => {
+  const { profile } = useAuth();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [users, setUsers] = useState(USERS);
+
+  const [adminAccounts, setAdminAccounts] = useState<AdminAccountRow[]>([]);
+  const [unlockingId, setUnlockingId] = useState<string | null>(null);
+  const [unlockError, setUnlockError] = useState('');
+
+  const loadAdminAccounts = useCallback(async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, failed_login_attempts, locked_at')
+      .eq('user_type', 'admin')
+      .order('full_name');
+    setAdminAccounts(data || []);
+  }, []);
+
+  useEffect(() => {
+    loadAdminAccounts();
+  }, [loadAdminAccounts]);
+
+  const handleUnlock = async (targetId: string) => {
+    setUnlockError('');
+    setUnlockingId(targetId);
+    try {
+      const { data, error } = await supabase.rpc('unlock_admin_account', { p_target_id: targetId });
+      if (error) throw error;
+      if (!data) {
+        setUnlockError('Unlock failed — you cannot unlock your own account, and only another admin can perform this action.');
+      } else {
+        await loadAdminAccounts();
+      }
+    } catch (err) {
+      setUnlockError(err instanceof Error ? err.message : 'Unlock failed');
+    } finally {
+      setUnlockingId(null);
+    }
+  };
 
   const filtered = users.filter(u =>
     (roleFilter === 'all' || u.role === roleFilter) &&
@@ -27,9 +73,42 @@ const AdminUsers: React.FC = () => {
     setUsers(us => us.map(u => u.id === id ? { ...u, status: u.status === 'suspended' ? 'active' : 'suspended' } : u));
   };
 
+  const lockedAdmins = adminAccounts.filter(a => a.locked_at);
+
   return (
     <div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">User Management</h1>
+
+      {lockedAdmins.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-2 text-red-700 font-semibold text-sm mb-3">
+            <Lock className="h-4 w-4" /> Locked admin accounts
+          </div>
+          {unlockError && <div className="text-xs text-red-600 mb-2">{unlockError}</div>}
+          <div className="space-y-2">
+            {lockedAdmins.map(a => (
+              <div key={a.id} className="flex items-center justify-between bg-white rounded-lg border border-red-100 px-4 py-2.5">
+                <div>
+                  <div className="text-sm font-medium text-[#0B2D59]">{a.full_name}</div>
+                  <div className="text-xs text-gray-400">{a.email} · locked at {a.locked_at ? new Date(a.locked_at).toLocaleString() : ''}</div>
+                </div>
+                {a.id === profile?.id ? (
+                  <span className="text-xs text-gray-400 italic">Your account — ask another admin to unlock</span>
+                ) : (
+                  <button
+                    onClick={() => handleUnlock(a.id)}
+                    disabled={unlockingId === a.id}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                  >
+                    <Unlock className="h-3.5 w-3.5" />
+                    {unlockingId === a.id ? 'Unlocking...' : 'Unlock'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
         <div className="relative flex-1">

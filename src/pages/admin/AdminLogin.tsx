@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Globe, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Globe, Eye, EyeOff, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+
+const MAX_LOGIN_ATTEMPTS = 3;
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -11,6 +14,7 @@ const AdminLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [locked, setLocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -27,10 +31,39 @@ const AdminLogin: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLocked(false);
     setIsLoading(true);
+
+    try {
+      const { data: lockRows } = await supabase.rpc('get_login_lock_status', { p_email: email });
+      const lockStatus = Array.isArray(lockRows) ? lockRows[0] : lockRows;
+      if (lockStatus?.is_locked) {
+        setLocked(true);
+        setError('This admin account is locked after repeated failed sign-in attempts. Ask another admin to unlock it from User Management.');
+        setIsLoading(false);
+        return;
+      }
+    } catch (lockErr) {
+      console.error('[AdminLogin] lock status check failed:', lockErr);
+    }
+
     try {
       await signIn(email, password);
+      await supabase.rpc('record_login_attempt', { p_email: email, p_success: true });
     } catch (err) {
+      try {
+        await supabase.rpc('record_login_attempt', { p_email: email, p_success: false });
+        const { data: lockRows } = await supabase.rpc('get_login_lock_status', { p_email: email });
+        const lockStatus = Array.isArray(lockRows) ? lockRows[0] : lockRows;
+        if (lockStatus?.is_locked) {
+          setLocked(true);
+          setError(`This admin account is now locked after ${MAX_LOGIN_ATTEMPTS} failed attempts. Ask another admin to unlock it from User Management.`);
+          setIsLoading(false);
+          return;
+        }
+      } catch (recordErr) {
+        console.error('[AdminLogin] record login attempt failed:', recordErr);
+      }
       setError(err instanceof Error ? err.message : 'Invalid email or password');
       setIsLoading(false);
     }
@@ -65,8 +98,9 @@ const AdminLogin: React.FC = () => {
           transition={{ duration: 0.4 }}
         >
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-              {error}
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">
+              {locked && <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0" />}
+              <span>{error}</span>
             </div>
           )}
 
