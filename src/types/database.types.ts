@@ -1473,6 +1473,7 @@ export type Database = {
       }
       jobs: {
         Row: {
+          admin_rejection_reason: string | null
           admin_status: string | null
           budget_amount: number
           budget_from: number | null
@@ -1513,6 +1514,7 @@ export type Database = {
           visibility: string | null
         }
         Insert: {
+          admin_rejection_reason?: string | null
           admin_status?: string | null
           budget_amount: number
           budget_from?: number | null
@@ -1553,6 +1555,7 @@ export type Database = {
           visibility?: string | null
         }
         Update: {
+          admin_rejection_reason?: string | null
           admin_status?: string | null
           budget_amount?: number
           budget_from?: number | null

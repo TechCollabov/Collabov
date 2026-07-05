@@ -55,13 +55,13 @@ const JobBoard: React.FC = () => {
     const myServices: string[] = (vendor?.service_categories as string[]) ?? [];
     const myTech: string[] = (vendor?.tech_stack as string[]) ?? [];
 
-    // Public jobs only — admin approval queue is not built yet, so this
-    // intentionally shows all public jobs regardless of admin_status.
+    // Only admin-approved jobs are visible on the public Job Board.
     const { data: jobRows } = await supabase
       .from('jobs')
       .select('id, title, description, category, service_type, job_kind, budget_amount, budget_from, budget_to, budget_type, tech_stack, submission_deadline, created_at, customer_id')
       .eq('visibility', 'public')
       .eq('status', 'open')
+      .eq('admin_status', 'live')
       .order('created_at', { ascending: false });
 
     const customerIds = Array.from(new Set((jobRows ?? []).map(j => j.customer_id)));
