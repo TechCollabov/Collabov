@@ -25,6 +25,22 @@ interface BlacklistLogRow {
   timestamp: string;
 }
 
+const AI_FEATURE_LABEL: Record<string, string> = {
+  sow_milestones: 'SOW milestone suggestions',
+  sow_obligations_summary: 'SOW obligations summary',
+  case_study_keywords: 'Case study keyword extraction',
+  proposal_draft: 'AI-drafted proposal approach',
+  unspecified: 'Unlabeled',
+};
+
+interface AiUsageRow {
+  feature: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
 interface VendorRow {
   id: string;
   company_name: string;
@@ -99,6 +115,7 @@ const AdminAnalytics: React.FC = () => {
   const [buyers, setBuyers] = useState<BuyerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [blacklistLog, setBlacklistLog] = useState<BlacklistLogRow[]>([]);
+  const [aiUsage, setAiUsage] = useState<AiUsageRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -225,6 +242,22 @@ const AdminAnalytics: React.FC = () => {
       reason: e.payload?.reason ?? null,
       timestamp: e.timestamp,
     })));
+
+    // AI usage & estimated cost, grouped by feature — real token counts and
+    // per-model pricing logged by the anthropic-generate Edge Function.
+    const { data: usageRows } = await supabase
+      .from('ai_usage_log')
+      .select('feature, input_tokens, output_tokens, estimated_cost_usd');
+    const usageByFeature = new Map<string, AiUsageRow>();
+    (usageRows ?? []).forEach((r: { feature: string; input_tokens: number; output_tokens: number; estimated_cost_usd: number }) => {
+      const cur = usageByFeature.get(r.feature) ?? { feature: r.feature, calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
+      cur.calls += 1;
+      cur.inputTokens += r.input_tokens;
+      cur.outputTokens += r.output_tokens;
+      cur.costUsd += Number(r.estimated_cost_usd);
+      usageByFeature.set(r.feature, cur);
+    });
+    setAiUsage(Array.from(usageByFeature.values()).sort((a, b) => b.costUsd - a.costUsd));
 
     setLoading(false);
   }, []);
@@ -471,6 +504,48 @@ const AdminAnalytics: React.FC = () => {
                   <td className="px-5 py-3.5 text-slate-300">{row.reason ?? '—'}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 5b. AI Usage & Cost */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-1">AI Usage &amp; Estimated Cost</h2>
+        <p className="text-xs text-slate-500 mb-4">Every anthropic-generate call, by feature. Cost is estimated from Anthropic's published per-model token pricing.</p>
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/60 border-b border-slate-700">
+              <tr>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Feature</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Calls</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Input tokens</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Output tokens</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Est. cost</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {aiUsage.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500 text-sm">No AI calls logged yet.</td></tr>
+              )}
+              {aiUsage.map(row => (
+                <tr key={row.feature} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-white">{AI_FEATURE_LABEL[row.feature] ?? row.feature}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">{row.calls.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">{row.inputTokens.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">{row.outputTokens.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">${row.costUsd.toFixed(4)}</td>
+                </tr>
+              ))}
+              {aiUsage.length > 0 && (
+                <tr className="bg-slate-900/40 font-semibold">
+                  <td className="px-5 py-3.5 text-white">Total</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.calls, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.inputTokens, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.outputTokens, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">${aiUsage.reduce((s, r) => s + r.costUsd, 0).toFixed(4)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

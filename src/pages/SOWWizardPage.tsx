@@ -345,7 +345,7 @@ Description: ${formData.description}
 Budget: £${formData.budget}
 Format: [{"name": "...", "description": "...", "amount": number, "acceptance_criteria": ["...", "...", "..."]}]`;
       const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
-        body: { prompt, maxTokens: 1000 },
+        body: { prompt, maxTokens: 1000, feature: 'sow_milestones' },
       });
       if (error) throw error;
       const text: string = envelope?.text || '[]';
@@ -1402,7 +1402,7 @@ Payment model: ${model}
 Milestones: ${ms}
 IP ownership: ${formData.ip_ownership}`;
       const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
-        body: { prompt, maxTokens: 400 },
+        body: { prompt, maxTokens: 400, feature: 'sow_obligations_summary' },
       });
       if (error) throw error;
       const text: string = envelope?.text?.trim();

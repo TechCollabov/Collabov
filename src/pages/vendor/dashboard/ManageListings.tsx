@@ -139,7 +139,7 @@ Outcomes: ${caseStudy.outcomes.filter(Boolean).join('. ')}
 Return 3-5 specific keyword tags as a JSON array, e.g. ["fintech", "real-time-payments", "aws-lambda"]`;
 
     const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
-      body: { prompt, maxTokens: 200 },
+      body: { prompt, maxTokens: 200, feature: 'case_study_keywords' },
     });
     if (error) throw error;
     const tags = JSON.parse(envelope?.text || '[]');

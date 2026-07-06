@@ -79,7 +79,7 @@ const ProposalForm: React.FC<ProposalFormProps> = ({ rfp, onSubmit, onCancel }) 
     try {
       const prompt = `Write a professional 150-200 word proposal approach for this RFP: ${rfp.description}. Service: ${rfp.service_type}. Be specific and professional.`;
       const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
-        body: { prompt, maxTokens: 400, model: 'claude-3-haiku-20240307' },
+        body: { prompt, maxTokens: 400, model: 'claude-3-haiku-20240307', feature: 'proposal_draft' },
       });
       if (error) throw error;
       const text: string = envelope?.text || '';
