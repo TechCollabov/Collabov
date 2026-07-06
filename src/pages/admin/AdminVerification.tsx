@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ShieldCheck, Clock, Check, X, MessageSquare, FileText, ExternalLink,
-  CheckCircle, AlertTriangle, Eye, Loader2, Ban, ShieldOff, UserCheck,
+  CheckCircle, AlertTriangle, Eye, Loader2, UserCheck,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { blacklistVendor, approveVendorRestoration, getPlatformSettings } from '../../lib/workflows';
+import { getPlatformSettings } from '../../lib/workflows';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
@@ -251,141 +252,6 @@ function IR35StampQueue() {
   );
 }
 
-/** Blacklist / restore panel for verified vendors. Restoration requires two
- *  distinct admin approvals. Blacklisting a vendor with an open dispute
- *  doesn't touch escrow — that dispute resolves through its own flow. */
-function BlacklistPanel() {
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [blacklisted, setBlacklisted] = useState<any[]>([]);
-  const [reason, setReason] = useState<Record<string, string>>({});
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [openDisputeWarning, setOpenDisputeWarning] = useState<Record<string, number>>({});
-  const [adminId, setAdminId] = useState<string | null>(null);
-
-  const loadBlacklisted = async () => {
-    const { data } = await supabase.from('vendors').select('id, company_name, blacklist_reason, blacklisted_at, restoration_approvals').eq('is_blacklisted', true);
-    setBlacklisted(data ?? []);
-  };
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
-    loadBlacklisted();
-  }, []);
-
-  const runSearch = async (q: string) => {
-    setSearch(q);
-    if (q.trim().length < 2) { setResults([]); return; }
-    const { data } = await supabase
-      .from('vendors')
-      .select('id, company_name, is_blacklisted')
-      .ilike('company_name', `%${q.trim()}%`)
-      .eq('is_verified', true)
-      .eq('is_blacklisted', false)
-      .limit(8);
-    setResults(data ?? []);
-    const ids = (data ?? []).map((v: any) => v.id);
-    if (ids.length) {
-      const { data: disputes } = await supabase.from('disputes').select('vendor_id').in('vendor_id', ids).neq('status', 'resolved');
-      const counts: Record<string, number> = {};
-      (disputes ?? []).forEach((d: any) => { counts[d.vendor_id] = (counts[d.vendor_id] ?? 0) + 1; });
-      setOpenDisputeWarning(counts);
-    }
-  };
-
-  const doBlacklist = async (vendorId: string) => {
-    if (!adminId || !reason[vendorId]?.trim()) return;
-    setBusyId(vendorId);
-    try {
-      await blacklistVendor(vendorId, reason[vendorId].trim(), adminId);
-      setResults(prev => prev.filter(v => v.id !== vendorId));
-      await loadBlacklisted();
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const doApproveRestore = async (vendorId: string) => {
-    if (!adminId) return;
-    setBusyId(vendorId);
-    try {
-      await approveVendorRestoration(vendorId, adminId);
-      await loadBlacklisted();
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-red-200 shadow-sm p-5 mb-6">
-      <h2 className="text-sm font-bold text-[#0B2D59] mb-1 flex items-center gap-2"><Ban className="h-4 w-4 text-red-500" /> Vendor Blacklist</h2>
-      <p className="text-xs text-gray-400 mb-3">Search verified vendors to blacklist. Restoration needs sign-off from two different admins.</p>
-
-      <input
-        value={search}
-        onChange={e => runSearch(e.target.value)}
-        placeholder="Search vendor by name…"
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2"
-      />
-      {results.map(v => (
-        <div key={v.id} className="border border-gray-100 rounded-lg p-3 mb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-gray-900">{v.company_name}</span>
-            {openDisputeWarning[v.id] > 0 && (
-              <span className="text-xs text-amber-600 font-medium">
-                {openDisputeWarning[v.id]} open dispute{openDisputeWarning[v.id] > 1 ? 's' : ''} — resolves independently
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <input
-              value={reason[v.id] ?? ''}
-              onChange={e => setReason(prev => ({ ...prev, [v.id]: e.target.value }))}
-              placeholder="Reason for blacklisting"
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs"
-            />
-            <button
-              disabled={busyId === v.id || !reason[v.id]?.trim()}
-              onClick={() => doBlacklist(v.id)}
-              className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
-            >
-              Blacklist
-            </button>
-          </div>
-        </div>
-      ))}
-
-      {blacklisted.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Currently Blacklisted</h3>
-          <div className="space-y-2">
-            {blacklisted.map(v => {
-              const approvals: string[] = Array.isArray(v.restoration_approvals) ? v.restoration_approvals : [];
-              const alreadyApproved = adminId ? approvals.includes(adminId) : false;
-              return (
-                <div key={v.id} className="flex items-center justify-between border border-gray-100 rounded-lg p-3">
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><ShieldOff className="h-3.5 w-3.5 text-red-400" />{v.company_name}</div>
-                    <div className="text-xs text-gray-400">{v.blacklist_reason} · {fmtDate(v.blacklisted_at)}</div>
-                  </div>
-                  <button
-                    disabled={busyId === v.id || alreadyApproved}
-                    onClick={() => doApproveRestore(v.id)}
-                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
-                    title={alreadyApproved ? 'You already approved — needs a second, different admin' : 'Approve restoration'}
-                  >
-                    {alreadyApproved ? `Approved (${approvals.length}/2)` : `Approve Restore (${approvals.length}/2)`}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function deriveStatus(v: { is_verified: boolean; rejected_at?: string | null; verification_status?: string | null }): string {
   if (v.is_verified) return 'approved';
   if (v.rejected_at) return 'rejected';
@@ -607,7 +473,7 @@ const AdminVerification: React.FC = () => {
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Vendor Verification</h1>
 
       <IR35StampQueue />
-      <BlacklistPanel />
+      <p className="text-xs text-gray-400 mb-4 -mt-2">Vendor blacklist review has moved to <Link to="/admin/users" className="text-[#0070F3] underline">User Management</Link>.</p>
 
       <div className="flex gap-0 flex-1 min-h-0 rounded-xl border border-gray-100 shadow-sm overflow-hidden bg-white">
         {/* ── Left Panel: Queue ── */}
