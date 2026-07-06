@@ -64,6 +64,8 @@ const AdminDashboard: React.FC = () => {
         { data: lockedAdmins },
         { data: pendingRestorations },
         { data: pendingBriefRows },
+        { data: pendingBuyerRestorations },
+        { count: pendingIR35 },
       ] = await Promise.all([
         supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
         supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', false).is('rejected_at', null),
@@ -77,6 +79,8 @@ const AdminDashboard: React.FC = () => {
         supabase.from('profiles').select('id, full_name').eq('user_type', 'admin').not('locked_at', 'is', null),
         supabase.from('vendors').select('id, company_name, restoration_approvals').eq('is_blacklisted', true),
         supabase.from('jobs').select('id, title, tender_title, job_kind').eq('admin_status', 'pending_review').limit(5),
+        supabase.from('customers').select('id, company_name, restoration_approvals').eq('is_blacklisted', true),
+        supabase.from('engagements').select('id', { count: 'exact', head: true }).eq('ir35_status', 'pending').eq('status', 'pending_ir35'),
       ]);
 
       const gmvAllTime = (allReleases || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
@@ -149,7 +153,9 @@ const AdminDashboard: React.FC = () => {
         queue.push({
           id: `locked-${a.id}`,
           type: 'lockout',
-          priority: 'medium',
+          // A locked admin can't unlock themselves or act on anything else in
+          // this queue — that's a blocker on admin capacity, not routine review.
+          priority: 'high',
           title: `${a.full_name}'s admin account is locked`,
           detail: '3 failed sign-in attempts — needs a second admin to unlock',
           href: '/admin/users',
@@ -160,16 +166,42 @@ const AdminDashboard: React.FC = () => {
         const approvals = Array.isArray(v.restoration_approvals) ? v.restoration_approvals.length : 0;
         if (approvals >= 1 && approvals < 2) {
           queue.push({
-            id: `restore-${v.id}`,
+            id: `restore-vendor-${v.id}`,
             type: 'restoration',
             priority: 'low',
             title: `${v.company_name} restoration awaiting second approval`,
             detail: `${approvals}/2 admin approvals recorded`,
-            href: '/admin/verification',
+            href: '/admin/users',
             label: 'Approve',
           });
         }
       });
+      (pendingBuyerRestorations || []).forEach((c: any) => {
+        const approvals = Array.isArray(c.restoration_approvals) ? c.restoration_approvals.length : 0;
+        if (approvals >= 1 && approvals < 2) {
+          queue.push({
+            id: `restore-buyer-${c.id}`,
+            type: 'restoration',
+            priority: 'low',
+            title: `${c.company_name} restoration awaiting second approval`,
+            detail: `${approvals}/2 admin approvals recorded`,
+            href: '/admin/users',
+            label: 'Approve',
+          });
+        }
+      });
+      if ((pendingIR35 || 0) > 0) {
+        queue.push({
+          id: 'pending-ir35',
+          type: 'ir35',
+          // Blocks the contract from going active and payments from starting.
+          priority: 'high',
+          title: `${pendingIR35} staff-aug engagement${pendingIR35 === 1 ? '' : 's'} awaiting IR35 determination`,
+          detail: 'Contract stays inactive until an admin stamps inside/outside IR35',
+          href: '/admin/verification',
+          label: 'Stamp',
+        });
+      }
 
       const priorityRank = { high: 0, medium: 1, low: 2 };
       queue.sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]);
