@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { CreditCard, ArrowDownToLine, CheckCircle, Clock, AlertCircle, Lock, X, TrendingUp, ShieldOff } from 'lucide-react';
+import { CreditCard, ArrowDownToLine, Undo2, CheckCircle, Clock, AlertCircle, Lock, X, TrendingUp, ShieldOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { releaseMilestone, formatGBP } from '../../lib/workflows';
+import { releaseMilestone, refundMilestone, notify, formatGBP } from '../../lib/workflows';
 
 interface EscrowRow {
   id: string;
@@ -120,6 +120,99 @@ function ReauthReleaseModal({ row, adminEmail, onClose, onReleased }: {
   );
 }
 
+/** Manual escrow refund — same reauth control as release, since it's the
+ *  other direction of real money movement, plus a required reason since a
+ *  refund unilaterally overrides the vendor outside the formal dispute flow. */
+function ReauthRefundModal({ row, adminEmail, onClose, onRefunded }: {
+  row: EscrowRow; adminEmail: string; onClose: () => void; onRefunded: (id: string) => void;
+}) {
+  const [password, setPassword] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const confirm = async () => {
+    if (!password || !reason.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email: adminEmail, password });
+      if (authErr) {
+        setError('Incorrect password. Re-enter your admin password to confirm this refund.');
+        setBusy(false);
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      await refundMilestone(
+        { id: row.engagement_id, buyer_id: row.buyer_id, vendor_id: row.vendor_id },
+        row.id, row.amount
+      );
+      await supabase.from('admin_audit_log').insert({
+        admin_id: user?.id ?? null,
+        action_type: 'manual_escrow_refund',
+        target_type: 'project_milestone',
+        target_id: row.id,
+        reason: reason.trim(),
+      });
+      await notify(row.buyer_id, 'payment', 'Milestone refunded',
+        `${formatGBP(row.amount)} for "${row.title}" was refunded to you by Collabov admin: ${reason.trim()}`,
+        `/engagement/${row.engagement_id}`);
+      await notify(row.vendor_id, 'payment', 'Milestone refunded to buyer',
+        `${formatGBP(row.amount)} for "${row.title}" was refunded to the buyer by Collabov admin: ${reason.trim()}`,
+        `/engagement/${row.engagement_id}`);
+      onRefunded(row.id);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Refund failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-bold text-[#0B2D59] flex items-center gap-2"><Lock className="h-4 w-4" /> Confirm Manual Refund</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-gray-600 mb-4">
+          Refunding <strong>{formatGBP(row.amount)}</strong> for "{row.title}" back to the buyer. This bypasses the formal
+          dispute process, immediately returns escrow, and cannot be undone.
+        </p>
+        {error && <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg mb-3">{error}</div>}
+        <label className="block text-xs font-medium text-gray-500 mb-1">Reason for refund <span className="text-red-500">*</span></label>
+        <textarea
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="Why is this milestone being refunded instead of released?"
+          rows={2}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          placeholder="Your admin password"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+        />
+        <div className="flex gap-3">
+          <button
+            onClick={confirm}
+            disabled={busy || !password || !reason.trim()}
+            className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            {busy ? 'Verifying...' : 'Confirm & Refund'}
+          </button>
+          <button onClick={onClose} className="px-5 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const AdminPayments: React.FC = () => {
   const { profile } = useAuth();
   const [escrow, setEscrow] = useState<EscrowRow[]>([]);
@@ -127,16 +220,19 @@ const AdminPayments: React.FC = () => {
   const [feePct, setFeePct] = useState<number>(10);
   const [gmvAllTime, setGmvAllTime] = useState(0);
   const [gmvThisMonth, setGmvThisMonth] = useState(0);
+  const [gmvRefunded, setGmvRefunded] = useState(0);
   const [loading, setLoading] = useState(true);
   const [releasing, setReleasing] = useState<EscrowRow | null>(null);
+  const [refunding, setRefunding] = useState<EscrowRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
 
-    const [{ data: settings }, { data: releases }, { data: milestones }, { data: releasedMilestones }] = await Promise.all([
+    const [{ data: settings }, { data: releases }, { data: refunds }, { data: milestones }, { data: releasedMilestones }] = await Promise.all([
       supabase.from('platform_settings').select('platform_fee_pct').eq('id', true).maybeSingle(),
       supabase.from('escrow_transactions').select('amount, created_at').eq('transaction_type', 'release'),
+      supabase.from('escrow_transactions').select('amount').eq('transaction_type', 'refund'),
       supabase.from('project_milestones')
         .select('id, engagement_id, title, amount, escrow_status, auto_release_at, submitted_at')
         .in('escrow_status', ['funded', 'submitted', 'in_dispute'])
@@ -152,6 +248,7 @@ const AdminPayments: React.FC = () => {
     const all = releases || [];
     setGmvAllTime(all.reduce((s, r) => s + Number(r.amount || 0), 0));
     setGmvThisMonth(all.filter(r => new Date(r.created_at) >= startOfMonth).reduce((s, r) => s + Number(r.amount || 0), 0));
+    setGmvRefunded((refunds || []).reduce((s, r) => s + Number(r.amount || 0), 0));
 
     const engagementIds = Array.from(new Set([
       ...(milestones || []).map((m: any) => m.engagement_id),
@@ -213,6 +310,7 @@ const AdminPayments: React.FC = () => {
     { label: 'Total GMV All Time', value: formatGBP(gmvAllTime) },
     { label: 'GMV This Month', value: formatGBP(gmvThisMonth) },
     { label: 'Total in Escrow', value: formatGBP(totalInEscrow) },
+    { label: 'Total Refunded', value: formatGBP(gmvRefunded) },
     { label: `Platform Fee`, value: `${feePct}%` },
   ];
 
@@ -225,7 +323,7 @@ const AdminPayments: React.FC = () => {
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Payments</h1>
 
       {/* GMV summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {GMV_SUMMARY.map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{s.label}</div>
@@ -275,14 +373,22 @@ const AdminPayments: React.FC = () => {
                   </td>
                   <td className="px-5 py-4">
                     {e.escrow_status !== 'in_dispute' ? (
-                      <button
-                        onClick={() => setReleasing(e)}
-                        className="flex items-center gap-1 text-xs font-semibold text-green-600 border border-green-200 px-2.5 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
-                      >
-                        <ArrowDownToLine className="h-3.5 w-3.5" /> Release
-                      </button>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => setReleasing(e)}
+                          className="flex items-center gap-1 text-xs font-semibold text-green-600 border border-green-200 px-2.5 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
+                        >
+                          <ArrowDownToLine className="h-3.5 w-3.5" /> Release
+                        </button>
+                        <button
+                          onClick={() => setRefunding(e)}
+                          className="flex items-center gap-1 text-xs font-semibold text-red-600 border border-red-200 px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" /> Refund
+                        </button>
+                      </div>
                     ) : (
-                      <span className="text-xs text-red-500 font-medium">Frozen</span>
+                      <span className="text-xs text-red-500 font-medium">Frozen — resolve via Disputes</span>
                     )}
                   </td>
                 </tr>
@@ -338,7 +444,19 @@ const AdminPayments: React.FC = () => {
           row={releasing}
           adminEmail={profile?.email ?? ''}
           onClose={() => setReleasing(null)}
-          onReleased={(id) => setEscrow(prev => prev.map(e => e.id === id ? { ...e, escrow_status: 'released' } : e).filter(e => e.id !== id))}
+          onReleased={(id) => setEscrow(prev => prev.filter(e => e.id !== id))}
+        />
+      )}
+
+      {refunding && (
+        <ReauthRefundModal
+          row={refunding}
+          adminEmail={profile?.email ?? ''}
+          onClose={() => setRefunding(null)}
+          onRefunded={(id) => {
+            setEscrow(prev => prev.filter(e => e.id !== id));
+            setGmvRefunded(prev => prev + refunding.amount);
+          }}
         />
       )}
     </div>
