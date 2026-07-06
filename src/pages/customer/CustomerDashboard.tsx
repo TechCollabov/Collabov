@@ -70,13 +70,12 @@ const EmptyState: React.FC<{ text: string }> = ({ text }) => (
 
 // ─── Module 1 — FIND WITH AI ──────────────────────────────────────────────────
 
-const FindWithAIModule: React.FC = () => {
+const BUSINESS_TYPE_LABEL: Record<string, string> = { msp: 'MSP', agency: 'IT Agency', staffaug: 'Staff Aug' };
+
+interface RecentlyViewedVendor { id: string; name: string; type: string; }
+const FindWithAIModule: React.FC<{ recentlyViewed: RecentlyViewedVendor[] }> = ({ recentlyViewed }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const recentlyViewed = [
-    { name: 'TechForge Solutions', type: 'IT Agency' },
-    { name: 'CloudNorth MSP', type: 'MSP' },
-  ];
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
       {/* Header */}
@@ -109,22 +108,26 @@ const FindWithAIModule: React.FC = () => {
 
       {/* Recently viewed */}
       <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 mb-3">Recently Viewed</p>
-      <div className="space-y-2 flex-1">
-        {recentlyViewed.map((v) => (
-          <div key={v.name} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-            <div className="w-8 h-8 rounded-full bg-[#0B2D59] text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
-              {getInitials(v.name)}
+      {recentlyViewed.length === 0 ? (
+        <div className="flex-1"><EmptyState text="Vendor profiles you view will show up here." /></div>
+      ) : (
+        <div className="space-y-2 flex-1">
+          {recentlyViewed.map((v) => (
+            <div key={v.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-8 h-8 rounded-full bg-[#0B2D59] text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
+                {getInitials(v.name)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{v.name}</p>
+                <p className="text-xs text-gray-400">{v.type}</p>
+              </div>
+              <Link to={`/vendor/profile/${v.id}`} className="text-xs text-[#0070F3] font-medium whitespace-nowrap">
+                View Profile
+              </Link>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{v.name}</p>
-              <p className="text-xs text-gray-400">{v.type}</p>
-            </div>
-            <Link to={`/results?q=${encodeURIComponent(v.name)}`} className="text-xs text-[#0070F3] font-medium whitespace-nowrap">
-              View Profile
-            </Link>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <CardFooter expandTo="/results" />
     </div>
@@ -432,7 +435,9 @@ const CustomerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showPaymentAlert, setShowPaymentAlert] = useState(false);
+  const [showPaymentAlert, setShowPaymentAlert] = useState(true);
+  const [paymentAlert, setPaymentAlert] = useState<{ vendorName: string; projectTitle: string } | null>(null);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedVendor[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [escrowStats, setEscrowStats] = useState({ pendingEscrow: 0, releasedMTD: 0, awaitingReview: 0, unfundedCount: 0 });
   const [workspace, setWorkspace] = useState<{ activeCount: number; engagements: WorkspaceEngagement[] }>({ activeCount: 0, engagements: [] });
@@ -484,6 +489,15 @@ const CustomerDashboard: React.FC = () => {
       const awaitingReview = milestones.filter(m => m.escrow_status === 'submitted').length;
       const unfundedCount = milestones.filter(m => m.escrow_status === 'unfunded').length;
       setEscrowStats({ pendingEscrow, releasedMTD, awaitingReview, unfundedCount });
+
+      // Payment alert: a real overdue-unfunded milestone (not a simulated card decline — money movement stays simulated).
+      const overdueUnfunded = milestones.find(m => m.escrow_status === 'unfunded' && m.due_date && new Date(m.due_date) < now);
+      if (overdueUnfunded) {
+        const eng = engs.find(e => e.id === overdueUnfunded.engagement_id);
+        setPaymentAlert(eng ? { vendorName: vendorMap.get(eng.vendor_id) ?? 'Vendor', projectTitle: eng.project_title ?? 'Engagement' } : null);
+      } else {
+        setPaymentAlert(null);
+      }
 
       // Workspace module: top 2 active engagements with real progress/overdue.
       const workspaceEngs: WorkspaceEngagement[] = activeEngs.slice(0, 2).map(e => {
@@ -547,6 +561,36 @@ const CustomerDashboard: React.FC = () => {
         if (previews.length >= 2) break;
       }
       setMessagePreviews(previews);
+
+      // Recently viewed vendors: last 3 distinct vendor profiles this buyer viewed (platform_event, event_type='profile_view').
+      const { data: viewEvents } = await supabase
+        .from('platform_event')
+        .select('entity_id, timestamp')
+        .eq('event_type', 'profile_view')
+        .eq('entity_type', 'vendor')
+        .eq('actor_id', user!.id)
+        .order('timestamp', { ascending: false })
+        .limit(20);
+      const seenVendors = new Set<string>();
+      const recentVendorIds: string[] = [];
+      for (const ev of viewEvents ?? []) {
+        if (seenVendors.has(ev.entity_id)) continue;
+        seenVendors.add(ev.entity_id);
+        recentVendorIds.push(ev.entity_id);
+        if (recentVendorIds.length >= 3) break;
+      }
+      if (recentVendorIds.length) {
+        const { data: viewedVendors } = await supabase.from('vendors').select('id, company_name, business_type').in('id', recentVendorIds);
+        const viewedMap = new Map((viewedVendors ?? []).map(v => [v.id, v]));
+        setRecentlyViewed(
+          recentVendorIds
+            .map(id => viewedMap.get(id))
+            .filter((v): v is { id: string; company_name: string; business_type: string | null } => !!v)
+            .map(v => ({ id: v.id, name: v.company_name, type: BUSINESS_TYPE_LABEL[v.business_type ?? ''] ?? 'Vendor' }))
+        );
+      } else {
+        setRecentlyViewed([]);
+      }
     }
     load();
   }, [user]);
@@ -721,17 +765,17 @@ const CustomerDashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Payment failure alert */}
-        {showPaymentAlert && (
+        {/* Payment failure alert — real overdue-unfunded milestone, not a simulated Stripe decline */}
+        {paymentAlert && showPaymentAlert && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium text-red-800">
-                Payment failed for CloudNorth MSP engagement — Infrastructure Management. Update your payment method within 48 hours to keep this engagement active.
+                Milestone funding overdue for {paymentAlert.vendorName} — {paymentAlert.projectTitle}. Fund this milestone to keep the engagement active.
               </p>
               <div className="flex gap-3 mt-2">
-                <button className="text-xs bg-red-600 text-white rounded-lg px-3 py-1.5 font-medium">Update card</button>
-                <button className="text-xs text-gray-500">Contact support</button>
+                <Link to="/customer/payments" className="text-xs bg-red-600 text-white rounded-lg px-3 py-1.5 font-medium">Fund now</Link>
+                <Link to="/contact" className="text-xs text-gray-500">Contact support</Link>
               </div>
             </div>
             <button onClick={() => setShowPaymentAlert(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
@@ -740,7 +784,7 @@ const CustomerDashboard: React.FC = () => {
 
         {/* 7-module grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <FindWithAIModule />
+          <FindWithAIModule recentlyViewed={recentlyViewed} />
           <WorkspaceModule activeCount={workspace.activeCount} engagements={workspace.engagements} />
           <MilestonePaymentsModule {...escrowStats} />
           <RiskDashboardModule {...risk} />
