@@ -4,7 +4,7 @@ import {
   Star, ShieldCheck, Bookmark, BookmarkCheck, Share2, Flag, X, Upload,
   ChevronDown, Users, Briefcase, Globe, Clock, CheckCircle, Calendar,
   Code, Cloud, Database, Smartphone, Server, UserCheck, TrendingUp,
-  MessageSquare, Phone, Video, MapPin, Loader2,
+  MessageSquare, Phone, Video, MapPin, Loader2, Check,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -292,6 +292,10 @@ interface DBPackage {
   description: string | null;
   price: number | null;
   delivery_days: number | null;
+  category: string | null;
+  tech_stack: string[] | null;
+  ideal_for: string | null;
+  features: string[] | null;
 }
 
 interface DBPortfolioItem {
@@ -1086,12 +1090,28 @@ function ServicesTab({ vendor, onRFP, packages, serviceCategories }: { vendor: a
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {packages.map(pkg => (
               <div key={pkg.id} className="bg-white rounded-xl border border-gray-100 p-5">
+                {pkg.category && <span className="text-xs bg-blue-50 text-[#0070F3] font-semibold px-2 py-0.5 rounded-full mb-2 inline-block">{pkg.category}</span>}
                 <h3 className="font-bold text-gray-800 text-sm mb-1">{pkg.name}</h3>
                 {pkg.description && <p className="text-gray-500 text-xs leading-relaxed mb-3">{pkg.description}</p>}
+                {pkg.features && pkg.features.length > 0 && (
+                  <ul className="space-y-1 mb-3">
+                    {pkg.features.map(f => (
+                      <li key={f} className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <Check className="h-3.5 w-3.5 text-[#0070F3] flex-shrink-0" />{f}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="flex items-center justify-between mt-2">
                   {pkg.price != null && <span className="font-bold text-[#0B2D59]">£{pkg.price.toLocaleString()}</span>}
                   {pkg.delivery_days != null && <span className="text-xs text-gray-400">{pkg.delivery_days} days delivery</span>}
                 </div>
+                {pkg.tech_stack && pkg.tech_stack.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {pkg.tech_stack.map(t => <span key={t} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t}</span>)}
+                  </div>
+                )}
+                {pkg.ideal_for && <p className="text-xs text-gray-400 mt-2">Ideal for: {pkg.ideal_for}</p>}
                 <button onClick={onRFP} className="mt-3 w-full px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors">
                   Request Quote
                 </button>
@@ -1114,13 +1134,16 @@ type CaseStudy = {
   outcome?: string | null;
   tech_stack?: string[] | null;
   created_at?: string | null;
+  // real case_studies table shape
+  project_title?: string;
+  services_delivered?: string[];
   // demo shape fields
   industry?: string;
   tech?: string[];
   duration?: string;
   team_size?: number;
   services?: string[];
-  outcomes?: { metric: string; description: string }[];
+  outcomes?: ({ metric: string; description: string } | string)[];
   client_quote?: string | null;
 };
 
@@ -1135,15 +1158,20 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
         <p className="text-gray-400 text-sm">No case studies available yet.</p>
       ) : items.map(cs => {
         const isExpanded = expanded[cs.id];
-        // Support both DB shape (challenge/solution/outcome/tech_stack) and demo shape
+        // Support both the real case_studies table shape (project_title, services_delivered,
+        // outcomes as a plain string[]) and the demo shape (title, services, outcomes as
+        // {metric, description}[]).
+        const title = cs.title || cs.project_title || 'Case Study';
         const tech = cs.tech_stack || cs.tech || [];
-        const outcomes = cs.outcomes || (cs.outcome ? [{ metric: 'Outcome', description: cs.outcome }] : []);
+        const services = cs.services || cs.services_delivered || [];
+        const rawOutcomes = cs.outcomes || (cs.outcome ? [cs.outcome] : []);
+        const outcomes = rawOutcomes.map(o => typeof o === 'string' ? { metric: o, description: '' } : o);
         return (
           <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <h3 className="font-bold text-gray-800">{cs.title}</h3>
+                  <h3 className="font-bold text-gray-800">{title}</h3>
                   {cs.industry && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>}
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
@@ -1156,7 +1184,7 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
                     <li key={o.metric} className="flex items-center gap-2 text-sm text-green-600 font-medium">
                       <TrendingUp className="h-4 w-4 flex-shrink-0" />
                       <span>{o.metric}</span>
-                      <span className="text-gray-400 font-normal text-xs">— {o.description}</span>
+                      {o.description && <span className="text-gray-400 font-normal text-xs">— {o.description}</span>}
                     </li>
                   ))}
                 </ul>
@@ -1171,11 +1199,11 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
 
             {isExpanded && (
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-4">
-                {(cs.duration || cs.team_size || cs.services) && (
+                {(cs.duration || cs.team_size || services.length > 0) && (
                   <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-2">
                     {cs.duration && <span><span className="font-semibold text-gray-700">Duration:</span> {cs.duration}</span>}
                     {cs.team_size && <span><span className="font-semibold text-gray-700">Team size:</span> {cs.team_size} people</span>}
-                    {cs.services && <span><span className="font-semibold text-gray-700">Services:</span> {cs.services.join(', ')}</span>}
+                    {services.length > 0 && <span><span className="font-semibold text-gray-700">Services:</span> {services.join(', ')}</span>}
                   </div>
                 )}
                 {cs.challenge && (
@@ -1199,7 +1227,7 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
                           <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                           <span>
                             <span className="font-semibold text-gray-700">{o.metric}</span>
-                            <span className="text-gray-500"> — {o.description}</span>
+                            {o.description && <span className="text-gray-500"> — {o.description}</span>}
                           </span>
                         </li>
                       ))}
