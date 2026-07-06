@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database.types';
@@ -11,10 +11,12 @@ interface AuthContextType {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  needsMfaChallenge: boolean;
   signUp: (email: string, password: string, userData: SignUpData) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  verifyMfaCode: (code: string) => Promise<void>;
 }
 
 interface SignUpData {
@@ -30,6 +32,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsMfaChallenge, setNeedsMfaChallenge] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+
+  // A session can exist at aal1 (password-only) while the account has TOTP
+  // enrolled — Supabase Auth doesn't block that session, so the app has to
+  // gate protected routes on this itself (see ProtectedRoute) until the
+  // second factor is verified via verifyMfaCode.
+  const checkMfaStatus = useCallback(async () => {
+    const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (data && data.nextLevel === 'aal2' && data.currentLevel !== data.nextLevel) {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const totp = factors?.totp?.[0];
+      setMfaFactorId(totp?.id ?? null);
+      setNeedsMfaChallenge(!!totp);
+    } else {
+      setMfaFactorId(null);
+      setNeedsMfaChallenge(false);
+    }
+  }, []);
+
+  const loadUserProfile = useCallback(async (userId: string) => {
+    console.log('[AuthContext] Loading user profile for:', userId);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[AuthContext] Error loading profile:', error);
+        throw error;
+      }
+
+      console.log('[AuthContext] Profile loaded successfully:', {
+        userType: data?.user_type,
+        email: data?.email,
+        profileCompleted: data?.profile_completed
+      });
+      setProfile(data);
+    } catch (error) {
+      console.error('[AuthContext] Failed to load profile:', error);
+    } finally {
+      await checkMfaStatus();
+      setLoading(false);
+    }
+  }, [checkMfaStatus]);
 
   useEffect(() => {
     console.log('[AuthContext] Initializing auth state...');
@@ -62,33 +111,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadUserProfile]);
 
-  const loadUserProfile = async (userId: string) => {
-    console.log('[AuthContext] Loading user profile for:', userId);
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('[AuthContext] Error loading profile:', error);
-        throw error;
-      }
-
-      console.log('[AuthContext] Profile loaded successfully:', {
-        userType: data?.user_type,
-        email: data?.email,
-        profileCompleted: data?.profile_completed
-      });
-      setProfile(data);
-    } catch (error) {
-      console.error('[AuthContext] Failed to load profile:', error);
-    } finally {
-      setLoading(false);
-    }
+  const verifyMfaCode = async (code: string) => {
+    if (!mfaFactorId) throw new Error('No MFA challenge pending');
+    const { data: challenge, error: chErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+    if (chErr) throw chErr;
+    const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code });
+    if (vErr) throw vErr;
+    setNeedsMfaChallenge(false);
+    setMfaFactorId(null);
   };
 
   const signUp = async (email: string, password: string, userData: SignUpData) => {
@@ -116,6 +148,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: userData.fullName,
           user_type: userData.userType,
           company_name: userData.additionalData?.companyName ?? '',
+          business_type: userData.additionalData?.businessType ?? null,
+          country: userData.additionalData?.country ?? null,
+          website_url: userData.additionalData?.website ?? null,
+          description: userData.additionalData?.description ?? null,
+          service_categories: userData.additionalData?.services ?? null,
+          tech_stack: userData.additionalData?.techStack ?? null,
+          legal_entity_name: userData.additionalData?.legalEntityName ?? null,
+          trading_name: userData.additionalData?.tradingName ?? null,
+          industry: userData.additionalData?.industry ?? null,
+          headcount_band: userData.additionalData?.headcountBand ?? null,
         },
       },
     });
@@ -172,6 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setSession(null);
+    setNeedsMfaChallenge(false);
+    setMfaFactorId(null);
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -192,10 +236,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     session,
     loading,
+    needsMfaChallenge,
     signUp,
     signIn,
     signOut,
     updateProfile,
+    verifyMfaCode,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

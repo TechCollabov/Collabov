@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logEvent } from '../lib/workflows';
 
 /* ── Market Insight Data (default fallback; overridden by site_content) ── */
 const DEFAULT_MARKET_INSIGHT_DATA: Record<string, { rate: string; demand: string; tip: string }> = {
@@ -21,12 +22,20 @@ const DEFAULT_MARKET_INSIGHT_DATA: Record<string, { rate: string; demand: string
 type VendorType = 'MSP' | 'Agency' | 'Staff Aug';
 type Availability = 'available' | 'limited' | 'booked';
 
+/** vendors.business_type is the lowercase enum ('msp' | 'agency' | 'staffaug')
+ *  this page's filters/badges display under their existing MSP/Agency/Staff Aug labels. */
+const BUSINESS_TYPE_LABEL: Record<string, VendorType> = {
+  msp: 'MSP',
+  agency: 'Agency',
+  staffaug: 'Staff Aug',
+};
+
 interface Vendor {
   id: string;
   name: string;
   city: string;
   country: string;
-  type: VendorType;
+  type: VendorType | null;
   verified: boolean;
   rating: number;
   reviewCount: number;
@@ -45,8 +54,15 @@ interface Vendor {
   match_score?: number;
 }
 
-/* ── Match scoring ── */
-function calculateMatchScore(vendor: { service_categories?: string[]; tech_stack?: string[]; industry_focus?: string[] }, query: string, type: string): number {
+/* ── Match scoring ──
+ * Weights follow the spec's 100-point model: service 30 / tech 20 /
+ * case-study-industry 25 (proxied by industry_focus until case studies
+ * are real) / case-study-tech 15 / keyword 10. Case-study-tech is 0 for
+ * every vendor today rather than a flat award, since case studies aren't
+ * persisted anywhere yet (see the vendor "My Listing" build-out) — there's
+ * no real tech overlap to score against. It'll start contributing once
+ * that data exists, without needing this function to change. */
+function calculateMatchScore(vendor: { service_categories?: string[]; tech_stack?: string[]; industry_focus?: string[]; tagline?: string }, query: string, type: string): number {
   let score = 0;
   const q = (query + ' ' + type).toLowerCase();
 
@@ -82,75 +98,15 @@ function calculateMatchScore(vendor: { service_categories?: string[]; tech_stack
   if (industryMatch) score += 25;
   else score += 10;
 
-  // Case study tech + outcome (25 pts)
-  score += 15; // base for having case studies
+  // Case study tech match (15 pts) — not scoreable until case studies are real; see note above.
+
+  // Keyword match (10 pts) — query terms found in the vendor's tagline.
+  const keywordTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+  const tagline = (vendor.tagline || '').toLowerCase();
+  if (keywordTerms.length > 0 && keywordTerms.some(t => tagline.includes(t))) score += 10;
 
   return Math.min(100, score);
 }
-
-/* Sample vendor data — will be replaced by database results */
-const MOCK_VENDORS: Vendor[] = [
-  {
-    id: 'v1', name: 'NexaTech Solutions', city: 'London', country: 'UK', type: 'MSP',
-    verified: true, rating: 4.8, reviewCount: 124, engagements: 87, responseTime: '2hrs',
-    tagline: 'Proactive managed IT services keeping your business running 24/7.',
-    techStack: ['Microsoft 365', 'Azure', 'Cisco', 'SentinelOne', 'ConnectWise'],
-    monthlyRate: 2400, availability: 'available', ir35: true, referrals: 12,
-    service_categories: ['Managed IT', 'Cybersecurity'],
-    tech_stack: ['Microsoft 365', 'Azure', 'Cisco', 'SentinelOne', 'ConnectWise'],
-    industry_focus: ['SME', 'Professional Services', 'Finance'],
-  },
-  {
-    id: 'v2', name: 'Brightwave Agency', city: 'Manchester', country: 'UK', type: 'Agency',
-    verified: true, rating: 4.6, reviewCount: 89, engagements: 61, responseTime: '4hrs',
-    tagline: 'Full-stack digital agency delivering scalable web and mobile products.',
-    techStack: ['React', 'Node.js', 'TypeScript', 'AWS', 'PostgreSQL', 'Docker'],
-    monthlyRate: 12000, availability: 'limited', availableFrom: 'Jul 2026', ir35: false, referrals: 7,
-    service_categories: ['Software Development', 'Cloud & Infrastructure'],
-    tech_stack: ['React', 'Node.js', 'TypeScript', 'AWS', 'PostgreSQL', 'Docker'],
-    industry_focus: ['SaaS', 'E-commerce', 'Fintech'],
-  },
-  {
-    id: 'v3', name: 'Apex Staff Augmentation', city: 'Edinburgh', country: 'UK', type: 'Staff Aug',
-    verified: true, rating: 4.5, reviewCount: 56, engagements: 43, responseTime: '6hrs',
-    tagline: 'Highly skilled contractors embedded in your team, exactly when you need them.',
-    techStack: ['Java', 'Spring Boot', 'Kubernetes', 'Terraform', 'Jenkins'],
-    monthlyRate: 4800, availability: 'available', ir35: true, referrals: 9,
-    service_categories: ['Staff Augmentation', 'DevOps'],
-    tech_stack: ['Java', 'Spring Boot', 'Kubernetes', 'Terraform', 'Jenkins'],
-    industry_focus: ['HealthTech', 'Enterprise', 'SaaS'],
-  },
-  {
-    id: 'v4', name: 'CipherShield Security', city: 'Bristol', country: 'UK', type: 'MSP',
-    verified: true, rating: 4.9, reviewCount: 41, engagements: 29, responseTime: '1hr',
-    tagline: 'Enterprise-grade cybersecurity and compliance for UK SMEs and mid-market.',
-    techStack: ['ISO 27001', 'Splunk', 'CrowdStrike', 'Palo Alto', 'Zero Trust'],
-    monthlyRate: 3800, availability: 'available', ir35: true, referrals: 15,
-    service_categories: ['Cybersecurity', 'Managed IT'],
-    tech_stack: ['ISO 27001', 'Splunk', 'CrowdStrike', 'Palo Alto', 'Zero Trust'],
-    industry_focus: ['Finance', 'Legal', 'Healthcare'],
-  },
-  {
-    id: 'v5', name: 'PixelForge Creative', city: 'Leeds', country: 'UK', type: 'Agency',
-    verified: false, rating: 0, reviewCount: 0, engagements: 0, responseTime: '24hrs',
-    tagline: 'Bold branding and UX design for startups and scale-ups.',
-    techStack: ['Figma', 'Webflow', 'Framer', 'Adobe CC'],
-    monthlyRate: 6500, availability: 'available', ir35: false, referrals: 2,
-    service_categories: ['UI/UX Design'],
-    tech_stack: ['Figma', 'Webflow', 'Framer', 'Adobe CC'],
-    industry_focus: ['Startups', 'E-commerce', 'Consumer'],
-  },
-  {
-    id: 'v6', name: 'CloudBridge IT', city: 'Birmingham', country: 'UK', type: 'MSP',
-    verified: true, rating: 4.3, reviewCount: 33, engagements: 27, responseTime: '3hrs',
-    tagline: 'Cloud migration and managed infrastructure specialists for growing businesses.',
-    techStack: ['AWS', 'Azure', 'GCP', 'VMware', 'Veeam', 'Zabbix'],
-    monthlyRate: 1900, availability: 'limited', availableFrom: 'Aug 2026', ir35: true, referrals: 5,
-    service_categories: ['Cloud & Infrastructure', 'Managed IT'],
-    tech_stack: ['AWS', 'Azure', 'GCP', 'VMware', 'Veeam', 'Zabbix'],
-    industry_focus: ['SME', 'Retail', 'Manufacturing'],
-  },
-];
 
 const TYPE_COLOURS: Record<VendorType, string> = {
   'MSP': 'bg-blue-100 text-blue-700',
@@ -233,7 +189,7 @@ const ResultsPage: React.FC = () => {
 
   const [filters, setFilters] = useState<Filters>({
     ...DEFAULT_FILTERS,
-    types: typeParam ? [typeParam.toUpperCase() as VendorType] : [],
+    types: typeParam && BUSINESS_TYPE_LABEL[typeParam.toLowerCase()] ? [BUSINESS_TYPE_LABEL[typeParam.toLowerCase()]] : [],
     location: locationParam,
   });
   const [sort, setSort] = useState('best');
@@ -258,6 +214,16 @@ const ResultsPage: React.FC = () => {
       .then(({ data }) => setSaved((data ?? []).map((r: any) => r.vendor_id).filter(Boolean)));
   }, [user]);
 
+  // Conversion funnel: signed-in search activity, one step above enquiries/proposals
+  // in the funnel Admin Analytics already tracks. Anonymous top-of-funnel traffic
+  // (homepage visits before signup) isn't instrumented — that needs session
+  // tracking this build doesn't have — but a signed-in buyer's own searches
+  // absolutely can be, and weren't.
+  useEffect(() => {
+    if (!user || (!query && !typeParam && !locationParam)) return;
+    logEvent('vendor_search', user.id, 'buyer', 'search', user.id, { query, type: typeParam, location: locationParam }).catch(() => {});
+  }, [user, query, typeParam, locationParam]);
+
   useEffect(() => {
     async function fetchVendors() {
       try {
@@ -265,37 +231,46 @@ const ResultsPage: React.FC = () => {
           .from('vendors')
           .select(`
             id, company_name, tagline, city, country, rating, review_count,
-            projects_completed, response_time, hourly_rate, monthly_rate,
-            employee_count, is_verified,
-            vendor_services ( service_categories ( name ) ),
-            vendor_industries ( industries ( name ) )
+            projects_completed, response_time, response_time_hours,
+            hourly_rate, monthly_rate, monthly_rate_min, monthly_rate_max,
+            employee_count, is_verified, business_type, tech_stack,
+            service_categories, industry_focus, ir35_compliant, referral_count,
+            availability_status, availability_from
           `)
           .eq('is_blacklisted', false)
           .order('rating', { ascending: false });
 
         if (error) throw error;
 
-        const mapped: Vendor[] = (data || []).map((v: any) => ({
-          id: v.id,
-          name: v.company_name,
-          city: v.city || '',
-          country: v.country || 'UK',
-          type: 'MSP' as VendorType, // default; real type stored in vendor_services
-          verified: v.is_verified,
-          rating: v.rating || 0,
-          reviewCount: v.review_count || 0,
-          engagements: v.projects_completed || 0,
-          responseTime: v.response_time || '24hrs',
-          tagline: v.tagline || '',
-          techStack: [],
-          monthlyRate: v.monthly_rate || v.hourly_rate || 0,
-          availability: 'available' as const,
-          ir35: false,
-          referrals: 0,
-          service_categories: (v.vendor_services || []).map((s: any) => s.service_categories?.name).filter(Boolean),
-          tech_stack: [],
-          industry_focus: (v.vendor_industries || []).map((i: any) => i.industries?.name).filter(Boolean),
-        }));
+        const mapped: Vendor[] = (data || []).map((v: any) => {
+          const techStack: string[] = Array.isArray(v.tech_stack) ? v.tech_stack.map(String) : [];
+          const availability: Availability =
+            v.availability_status === 'engaged' || v.availability_status === 'booked' ? 'booked'
+            : v.availability_status === 'limited' ? 'limited'
+            : 'available';
+          return {
+            id: v.id,
+            name: v.company_name,
+            city: v.city || '',
+            country: v.country || 'UK',
+            type: v.business_type ? BUSINESS_TYPE_LABEL[v.business_type] ?? null : null,
+            verified: v.is_verified,
+            rating: v.rating || 0,
+            reviewCount: v.review_count || 0,
+            engagements: v.projects_completed || 0,
+            responseTime: v.response_time_hours ? `${v.response_time_hours}hrs` : (v.response_time || '24hrs'),
+            tagline: v.tagline || '',
+            techStack,
+            monthlyRate: v.monthly_rate_min || v.monthly_rate || v.hourly_rate || 0,
+            availability,
+            availableFrom: v.availability_from ? new Date(v.availability_from).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : undefined,
+            ir35: !!v.ir35_compliant,
+            referrals: v.referral_count || 0,
+            service_categories: Array.isArray(v.service_categories) ? v.service_categories.map(String) : [],
+            tech_stack: techStack,
+            industry_focus: Array.isArray(v.industry_focus) ? v.industry_focus.map(String) : [],
+          };
+        });
 
         setDbVendors(mapped);
       } catch {
@@ -337,7 +312,7 @@ const ResultsPage: React.FC = () => {
     if (filters.verifiedOnly && !v.verified) return false;
     if (filters.availableNow && v.availability !== 'available') return false;
     if (filters.ir35Only && !v.ir35) return false;
-    if (filters.types.length > 0 && !filters.types.some(t => v.type.toLowerCase().includes(t.toLowerCase()))) return false;
+    if (filters.types.length > 0 && (!v.type || !filters.types.includes(v.type))) return false;
     if (filters.rateMin && v.monthlyRate < parseInt(filters.rateMin)) return false;
     if (filters.rateMax && v.monthlyRate > parseInt(filters.rateMax)) return false;
     if (query && !v.name.toLowerCase().includes(query.toLowerCase()) && !v.tagline.toLowerCase().includes(query.toLowerCase()) && !v.techStack.some(t => t.toLowerCase().includes(query.toLowerCase()))) return false;
@@ -497,7 +472,7 @@ const ResultsPage: React.FC = () => {
                           <span className="font-semibold text-[#0B2D59] text-sm">{insight.rate}</span>
                         </div>
                         <p className="text-sm text-blue-700 ml-7">{insight.demand}</p>
-                        <p className="text-sm text-blue-700 ml-7">24 verified vendors match your search</p>
+                        <p className="text-sm text-blue-700 ml-7">{results.length} verified vendor{results.length === 1 ? '' : 's'} match your search</p>
                       </div>
                       <p className="text-sm text-gray-600 italic lg:max-w-xs">{insight.tip}</p>
                     </div>
@@ -505,7 +480,7 @@ const ResultsPage: React.FC = () => {
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 pr-6">
                       <div className="flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-[#0070F3] flex-shrink-0" />
-                        <span className="text-sm text-blue-700 font-medium">24 verified vendors match your search</span>
+                        <span className="text-sm text-blue-700 font-medium">{results.length} verified vendor{results.length === 1 ? '' : 's'} match your search</span>
                       </div>
                       <p className="text-sm text-gray-600 italic">Market data not available for this specific query — filter by service category for benchmark rates.</p>
                     </div>
@@ -586,9 +561,11 @@ const ResultsPage: React.FC = () => {
                           </div>
                           <div className="text-xs text-gray-400 mt-0.5">{vendor.city}, {vendor.country}</div>
                         </div>
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${TYPE_COLOURS[vendor.type]}`}>
-                          {vendor.type}
-                        </span>
+                        {vendor.type && (
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${TYPE_COLOURS[vendor.type]}`}>
+                            {vendor.type}
+                          </span>
+                        )}
                       </div>
 
                       {/* Row 2 — Rating */}

@@ -7,65 +7,11 @@ import {
   FolderOpen, FileCheck, CreditCard, MessageSquare,
   AlertTriangle, HelpCircle, Search,
   Bell, Settings, LogOut, ChevronDown, User, Globe,
-  Edit, CheckCircle, ArrowRight,
+  Edit, CheckCircle,
   Sparkles, ShieldAlert, Scale, Brain, Lock, Info,
-  TrendingUp, UserPlus
+  UserPlus
 } from 'lucide-react';
 import { sweepProposalExpiry, sweepRehirePrompts, sweepPendingEngagementFollowups } from '../../lib/workflows';
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const mockEngagements = [
-  {
-    id: '1',
-    vendor: 'TechForge Solutions',
-    project: 'Payment Gateway Rebuild',
-    status: 'In Progress',
-    progress: 60,
-    milestone_due: '2026-06-20',
-    milestone_due_overdue: false,
-    escrow: 8500,
-  },
-  {
-    id: '2',
-    vendor: 'CloudNorth MSP',
-    project: 'Infrastructure Management',
-    status: 'Active',
-    progress: 40,
-    milestone_due: '2026-06-15',
-    milestone_due_overdue: true,
-    escrow: 1800,
-  },
-];
-
-const mockContracts = [
-  { id: '1', vendor: 'TechForge Solutions', type: 'IT Agency', status: 'Active', value: 32000 },
-  { id: '2', vendor: 'CloudNorth MSP', type: 'MSP', status: 'Active', value: 21600 },
-];
-
-const mockInsights = [
-  { text: 'You have 2 unreviewed proposals on "React Team Hire"', type: 'info' },
-  { text: 'Milestone 2 — TechForge Solutions — 3 days overdue', type: 'warning' },
-];
-
-const mockMessages = [
-  {
-    id: '1',
-    name: 'TechForge Solutions',
-    engagement: 'Payment Gateway Rebuild',
-    preview: 'Milestone 2 evidence has been submitted...',
-    time: '2m ago',
-    unread: true,
-  },
-  {
-    id: '2',
-    name: 'CloudNorth MSP',
-    engagement: 'Infrastructure Management',
-    preview: 'Monthly check-in is ready for your review',
-    time: '1h ago',
-    unread: false,
-  },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +29,17 @@ function getGreeting() {
   if (h < 12) return 'morning';
   if (h < 18) return 'afternoon';
   return 'evening';
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
 
 // ─── Shared card sub-components ───────────────────────────────────────────────
@@ -107,15 +64,18 @@ const V2Placeholder: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
+const EmptyState: React.FC<{ text: string }> = ({ text }) => (
+  <p className="text-sm text-gray-400 py-4 text-center">{text}</p>
+);
+
 // ─── Module 1 — FIND WITH AI ──────────────────────────────────────────────────
 
-const FindWithAIModule: React.FC = () => {
+const BUSINESS_TYPE_LABEL: Record<string, string> = { msp: 'MSP', agency: 'IT Agency', staffaug: 'Staff Aug' };
+
+interface RecentlyViewedVendor { id: string; name: string; type: string; }
+const FindWithAIModule: React.FC<{ recentlyViewed: RecentlyViewedVendor[] }> = ({ recentlyViewed }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const recentlyViewed = [
-    { name: 'TechForge Solutions', type: 'IT Agency' },
-    { name: 'CloudNorth MSP', type: 'MSP' },
-  ];
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
       {/* Header */}
@@ -148,22 +108,26 @@ const FindWithAIModule: React.FC = () => {
 
       {/* Recently viewed */}
       <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 mb-3">Recently Viewed</p>
-      <div className="space-y-2 flex-1">
-        {recentlyViewed.map((v) => (
-          <div key={v.name} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-            <div className="w-8 h-8 rounded-full bg-[#0B2D59] text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
-              {getInitials(v.name)}
+      {recentlyViewed.length === 0 ? (
+        <div className="flex-1"><EmptyState text="Vendor profiles you view will show up here." /></div>
+      ) : (
+        <div className="space-y-2 flex-1">
+          {recentlyViewed.map((v) => (
+            <div key={v.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-8 h-8 rounded-full bg-[#0B2D59] text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
+                {getInitials(v.name)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{v.name}</p>
+                <p className="text-xs text-gray-400">{v.type}</p>
+              </div>
+              <Link to={`/vendor/profile/${v.id}`} className="text-xs text-[#0070F3] font-medium whitespace-nowrap">
+                View Profile
+              </Link>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{v.name}</p>
-              <p className="text-xs text-gray-400">{v.type}</p>
-            </div>
-            <Link to={`/results?q=${encodeURIComponent(v.name)}`} className="text-xs text-[#0070F3] font-medium whitespace-nowrap">
-              View Profile
-            </Link>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <CardFooter expandTo="/results" />
     </div>
@@ -172,9 +136,18 @@ const FindWithAIModule: React.FC = () => {
 
 // ─── Module 2 — WORKSPACE ─────────────────────────────────────────────────────
 
-interface WorkspaceModuleProps { activeProjects: number; }
-const WorkspaceModule: React.FC<WorkspaceModuleProps> = ({ activeProjects }) => {
-  const hasOverdue = mockEngagements.some((e) => e.milestone_due_overdue);
+interface WorkspaceEngagement {
+  id: string;
+  project_title: string;
+  vendorName: string;
+  status: string;
+  progress: number;
+  nextDue: string | null;
+  overdue: boolean;
+}
+interface WorkspaceModuleProps { activeCount: number; engagements: WorkspaceEngagement[]; }
+const WorkspaceModule: React.FC<WorkspaceModuleProps> = ({ activeCount, engagements }) => {
+  const hasOverdue = engagements.some((e) => e.overdue);
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
       <div className="flex items-center gap-3 mb-5">
@@ -182,49 +155,51 @@ const WorkspaceModule: React.FC<WorkspaceModuleProps> = ({ activeProjects }) => 
           <FolderOpen className="h-5 w-5 text-teal-300" />
         </div>
         <span className="text-xs font-bold tracking-[0.15em] uppercase text-gray-900">Workspace</span>
-        {activeProjects > 0 && (
+        {activeCount > 0 && (
           <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium ml-auto">
-            {activeProjects} active
+            {activeCount} active
           </span>
         )}
       </div>
 
       {hasOverdue && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 mb-4">
-          1 milestone overdue — review required
+          {engagements.filter((e) => e.overdue).length} milestone{engagements.filter((e) => e.overdue).length !== 1 ? 's' : ''} overdue — review required
         </div>
       )}
 
-      <div className="space-y-4 flex-1">
-        {mockEngagements.slice(0, 2).map((eng) => (
-          <div key={eng.id} className="border border-gray-100 rounded-xl p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-[#0B2D59] text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
-                {getInitials(eng.vendor)}
+      {engagements.length === 0 ? (
+        <div className="flex-1"><EmptyState text="No active engagements yet." /></div>
+      ) : (
+        <div className="space-y-4 flex-1">
+          {engagements.map((eng) => (
+            <Link key={eng.id} to={`/engagement/${eng.id}`} className="block border border-gray-100 rounded-xl p-4 hover:bg-gray-50 transition-colors">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-full bg-[#0B2D59] text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
+                  {getInitials(eng.vendorName)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{eng.project_title}</p>
+                  <p className="text-xs text-gray-400">{eng.vendorName}</p>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
+                  {eng.status}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{eng.project}</p>
-                <p className="text-xs text-gray-400">{eng.vendor}</p>
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
+                <div className="bg-[#0070F3] h-1.5 rounded-full" style={{ width: `${eng.progress}%` }} />
               </div>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                eng.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-              }`}>
-                {eng.status}
-              </span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
-              <div className="bg-[#0070F3] h-1.5 rounded-full" style={{ width: `${eng.progress}%` }} />
-            </div>
-            <p className={`text-xs ${eng.milestone_due_overdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
-              Milestone due: {eng.milestone_due}{eng.milestone_due_overdue ? ' — OVERDUE' : ''}
-            </p>
-          </div>
-        ))}
+              {eng.nextDue && (
+                <p className={`text-xs ${eng.overdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
+                  Milestone due: {eng.nextDue}{eng.overdue ? ' — OVERDUE' : ''}
+                </p>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
 
-        <V2Placeholder label="Delivery Signals" />
-      </div>
-
-      <CardFooter expandTo="/customer/dashboard" />
+      <CardFooter expandTo="/customer/my-vendors" />
     </div>
   );
 };
@@ -268,13 +243,14 @@ const MilestonePaymentsModule: React.FC<MilestonePaymentsModuleProps> = ({ pendi
       </div>
     )}
 
-    <CardFooter expandTo="/customer/dashboard" />
+    <CardFooter expandTo="/customer/payments" />
   </div>
 );
 
 // ─── Module 4 — RISK DASHBOARD ────────────────────────────────────────────────
 
-const RiskDashboardModule: React.FC = () => (
+interface RiskDashboardModuleProps { activeCount: number; contractsSignedCount: number; pendingIR35Count: number; staffAugCount: number; }
+const RiskDashboardModule: React.FC<RiskDashboardModuleProps> = ({ activeCount, contractsSignedCount, pendingIR35Count, staffAugCount }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
@@ -285,33 +261,41 @@ const RiskDashboardModule: React.FC = () => (
 
     <div className="grid grid-cols-3 gap-2 mb-4">
       <div className="bg-gray-50 rounded-xl p-3 text-center">
-        <p className="text-lg font-black text-[#0B2D59]">2</p>
+        <p className="text-lg font-black text-[#0B2D59]">{activeCount}</p>
         <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Active Engagements</p>
       </div>
       <div className="bg-gray-50 rounded-xl p-3 text-center">
-        <p className="text-lg font-black text-[#0B2D59]">2</p>
+        <p className="text-lg font-black text-[#0B2D59]">{contractsSignedCount}</p>
         <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Contracts Signed</p>
       </div>
-      <div className="bg-green-50 rounded-xl p-3 text-center">
-        <CheckCircle className="h-4 w-4 text-green-500 mx-auto mb-0.5" />
-        <p className="text-[10px] text-green-700 leading-tight font-semibold">IR35 Compliant</p>
-      </div>
-    </div>
-
-    <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2 text-xs text-green-700 mb-4">
-      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-      No compliance documents expiring
+      {staffAugCount === 0 ? (
+        <div className="bg-gray-50 rounded-xl p-3 text-center">
+          <p className="text-[10px] text-gray-400 leading-tight">No staff aug engagements</p>
+        </div>
+      ) : pendingIR35Count === 0 ? (
+        <div className="bg-green-50 rounded-xl p-3 text-center">
+          <CheckCircle className="h-4 w-4 text-green-500 mx-auto mb-0.5" />
+          <p className="text-[10px] text-green-700 leading-tight font-semibold">IR35 Compliant</p>
+        </div>
+      ) : (
+        <div className="bg-amber-50 rounded-xl p-3 text-center">
+          <p className="text-lg font-black text-amber-600">{pendingIR35Count}</p>
+          <p className="text-[10px] text-amber-700 leading-tight font-semibold">IR35 Status Pending</p>
+        </div>
+      )}
     </div>
 
     <V2Placeholder label="Full Risk Score ML" />
 
-    <CardFooter expandTo="/customer/dashboard" />
+    <CardFooter expandTo="/customer/governance" />
   </div>
 );
 
 // ─── Module 5 — GOVERNANCE ────────────────────────────────────────────────────
 
-const GovernanceModule: React.FC = () => (
+interface GovernanceContract { id: string; vendorName: string; status: string; }
+interface GovernanceModuleProps { contracts: GovernanceContract[]; openDisputesCount: number; }
+const GovernanceModule: React.FC<GovernanceModuleProps> = ({ contracts, openDisputesCount }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
@@ -320,45 +304,43 @@ const GovernanceModule: React.FC = () => (
       <span className="text-xs font-bold tracking-[0.15em] uppercase text-gray-900">Governance</span>
     </div>
 
-    <div className="space-y-2 mb-4">
-      {mockContracts.map((c) => (
-        <div key={c.id} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
-          <div>
-            <p className="text-sm font-medium text-gray-900">{c.vendor}</p>
-            <p className="text-xs text-gray-400">{c.type}</p>
+    {contracts.length === 0 ? (
+      <div className="mb-4"><EmptyState text="No contracts yet." /></div>
+    ) : (
+      <div className="space-y-2 mb-4">
+        {contracts.slice(0, 3).map((c) => (
+          <div key={c.id} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
+            <p className="text-sm font-medium text-gray-900">{c.vendorName}</p>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+              {c.status}
+            </span>
           </div>
-          <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-            {c.status}
-          </span>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    )}
 
-    <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2 text-xs text-green-700 mb-4">
-      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-      No open disputes
-    </div>
-
-    <div className="flex gap-3 mb-4">
-      <button className="flex items-center gap-1 text-xs text-[#0070F3] font-medium hover:underline">
-        <FileText className="h-3.5 w-3.5" />
-        IR35 SDS
-      </button>
-      <button className="flex items-center gap-1 text-xs text-[#0070F3] font-medium hover:underline">
-        <FileText className="h-3.5 w-3.5" />
-        GDPR DPA
-      </button>
-    </div>
+    {openDisputesCount === 0 ? (
+      <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2 text-xs text-green-700 mb-4">
+        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+        No open disputes
+      </div>
+    ) : (
+      <Link to="/customer/governance" className="flex items-center gap-2 bg-red-50 rounded-lg px-3 py-2 text-xs text-red-700 mb-4 hover:bg-red-100 transition-colors">
+        <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+        {openDisputesCount} open dispute{openDisputesCount !== 1 ? 's' : ''} — review required
+      </Link>
+    )}
 
     <V2Placeholder label="Access Control" />
 
-    <CardFooter expandTo="/customer/dashboard" />
+    <CardFooter expandTo="/customer/governance" />
   </div>
 );
 
 // ─── Module 6 — INTELLIGENCE ──────────────────────────────────────────────────
 
-const IntelligenceModule: React.FC = () => (
+interface Insight { text: string; type: 'info' | 'warning'; }
+const IntelligenceModule: React.FC<{ insights: Insight[] }> = ({ insights }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
@@ -368,7 +350,9 @@ const IntelligenceModule: React.FC = () => (
     </div>
 
     <div className="space-y-3 mb-4 flex-1">
-      {mockInsights.map((insight, i) => (
+      {insights.length === 0 ? (
+        <EmptyState text="No suggestions right now — you're all caught up." />
+      ) : insights.map((insight, i) => (
         <div
           key={i}
           className={`rounded-lg p-3 text-sm border flex items-start gap-2 ${
@@ -390,15 +374,14 @@ const IntelligenceModule: React.FC = () => (
 
       <V2Placeholder label="AI Intelligence Centre" />
     </div>
-
-    <CardFooter expandTo="/customer/dashboard" />
   </div>
 );
 
 // ─── Module 7 — MESSAGES (spans 2 cols) ───────────────────────────────────────
 
-interface MessagesModuleProps { unreadMessages: number; }
-const MessagesModule: React.FC<MessagesModuleProps> = ({ unreadMessages }) => (
+interface MessagePreview { id: string; name: string; subject: string; preview: string; time: string; unread: boolean; }
+interface MessagesModuleProps { unreadMessages: number; previews: MessagePreview[]; }
+const MessagesModule: React.FC<MessagesModuleProps> = ({ unreadMessages, previews }) => (
   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col lg:col-span-2">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
@@ -415,28 +398,32 @@ const MessagesModule: React.FC<MessagesModuleProps> = ({ unreadMessages }) => (
       )}
     </div>
 
-    <div className="space-y-3 flex-1">
-      {mockMessages.map((msg) => (
-        <div key={msg.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
-          <div className="w-9 h-9 rounded-full bg-[#0070F3] text-white text-sm flex items-center justify-center font-bold flex-shrink-0">
-            {getInitials(msg.name)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900">{msg.name}</p>
-            <p className="text-xs text-gray-400 mb-0.5">{msg.engagement}</p>
-            <p className="text-xs text-gray-500 truncate max-w-[280px]">
-              {msg.preview.length > 60 ? msg.preview.slice(0, 60) + '…' : msg.preview}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-            <span className="text-[10px] text-gray-400">{msg.time}</span>
-            {msg.unread && <div className="w-2 h-2 rounded-full bg-[#0070F3]" />}
-          </div>
-        </div>
-      ))}
-    </div>
+    {previews.length === 0 ? (
+      <div className="flex-1"><EmptyState text="No messages yet. They'll show up here once a conversation starts." /></div>
+    ) : (
+      <div className="space-y-3 flex-1">
+        {previews.map((msg) => (
+          <Link key={msg.id} to="/messages" className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
+            <div className="w-9 h-9 rounded-full bg-[#0070F3] text-white text-sm flex items-center justify-center font-bold flex-shrink-0">
+              {getInitials(msg.name)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900">{msg.name}</p>
+              {msg.subject && <p className="text-xs text-gray-400 mb-0.5">{msg.subject}</p>}
+              <p className="text-xs text-gray-500 truncate max-w-[280px]">
+                {msg.preview.length > 60 ? msg.preview.slice(0, 60) + '…' : msg.preview}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-gray-400">{msg.time}</span>
+              {msg.unread && <div className="w-2 h-2 rounded-full bg-[#0070F3]" />}
+            </div>
+          </Link>
+        ))}
+      </div>
+    )}
 
-    <CardFooter expandTo="/customer/dashboard" />
+    <CardFooter expandTo="/messages" />
   </div>
 );
 
@@ -448,52 +435,161 @@ const CustomerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showPaymentAlert, setShowPaymentAlert] = useState(false);
-  const [stats, setStats] = useState({ activeProjects: 0, pendingMilestones: 0, totalSpent: 0, unreadMessages: 0, openJobs: 0 });
-  const [loadingStats, setLoadingStats] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [showPaymentAlert, setShowPaymentAlert] = useState(true);
+  const [paymentAlert, setPaymentAlert] = useState<{ vendorName: string; projectTitle: string } | null>(null);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedVendor[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [escrowStats, setEscrowStats] = useState({ pendingEscrow: 0, releasedMTD: 0, awaitingReview: 0, unfundedCount: 0 });
+  const [workspace, setWorkspace] = useState<{ activeCount: number; engagements: WorkspaceEngagement[] }>({ activeCount: 0, engagements: [] });
+  const [risk, setRisk] = useState({ activeCount: 0, contractsSignedCount: 0, pendingIR35Count: 0, staffAugCount: 0 });
+  const [governance, setGovernance] = useState<{ contracts: GovernanceContract[]; openDisputesCount: number }>({ contracts: [], openDisputesCount: 0 });
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [messagePreviews, setMessagePreviews] = useState<MessagePreview[]>([]);
 
   useEffect(() => {
     if (!user) return;
     async function load() {
-      try {
-        // Lazy sweeps: proposal expiry, 30-day re-hire prompts, T+1 call follow-ups.
-        sweepProposalExpiry({ customer_id: user!.id }).catch(() => {});
-        sweepRehirePrompts(user!.id).catch(() => {});
-        sweepPendingEngagementFollowups(user!.id).catch(() => {});
-        const [projRes, msgRes, jobRes, contractRes] = await Promise.all([
-          supabase.from('projects').select('id, status').eq('customer_id', user!.id),
-          supabase.from('messages').select('id').eq('recipient_id', user!.id).eq('is_read', false),
-          supabase.from('jobs').select('id, status').eq('customer_id', user!.id).eq('status', 'open'),
-          supabase.from('contracts').select('total_value').eq('customer_id', user!.id).eq('status', 'active'),
-        ]);
-        const active = projRes.data?.filter(p => p.status === 'in-progress').length || 0;
-        const unread = msgRes.data?.length || 0;
-        const openJobs = jobRes.data?.length || 0;
-        const totalSpent = contractRes.data?.reduce((s, c) => s + (c.total_value || 0), 0) || 0;
-        setStats({ activeProjects: active, pendingMilestones: 0, totalSpent, unreadMessages: unread, openJobs });
+      // Lazy sweeps: proposal expiry, 30-day re-hire prompts, T+1 call follow-ups.
+      sweepProposalExpiry({ customer_id: user!.id }).catch(() => {});
+      sweepRehirePrompts(user!.id).catch(() => {});
+      sweepPendingEngagementFollowups(user!.id).catch(() => {});
 
-        // Escrow module: pending in escrow, released this month, milestones awaiting review.
-        const projectIds = (projRes.data ?? []).map(p => p.id);
-        if (projectIds.length > 0) {
-          const { data: milestones } = await supabase
-            .from('project_milestones')
-            .select('amount, escrow_status, released_at')
-            .in('project_id', projectIds);
-          const now = new Date();
-          const pendingEscrow = (milestones ?? [])
-            .filter(m => ['funded', 'in_progress', 'submitted', 'rejected'].includes(m.escrow_status))
-            .reduce((s, m) => s + (m.amount ?? 0), 0);
-          const releasedMTD = (milestones ?? [])
-            .filter(m => m.escrow_status === 'released' && m.released_at &&
-              new Date(m.released_at).getMonth() === now.getMonth() && new Date(m.released_at).getFullYear() === now.getFullYear())
-            .reduce((s, m) => s + (m.amount ?? 0), 0);
-          const awaitingReview = (milestones ?? []).filter(m => m.escrow_status === 'submitted').length;
-          const unfundedCount = (milestones ?? []).filter(m => m.escrow_status === 'unfunded').length;
-          setEscrowStats({ pendingEscrow, releasedMTD, awaitingReview, unfundedCount });
-        }
-      } finally {
-        setLoadingStats(false);
+      const [engRes, contractRes, disputeRes, proposalRes, msgRes] = await Promise.all([
+        supabase.from('engagements').select('id, project_title, vendor_id, status, engagement_type, ir35_status').eq('buyer_id', user!.id),
+        supabase.from('contracts').select('id, vendor_id, status, signed_by_customer, signed_by_vendor').eq('customer_id', user!.id),
+        supabase.from('disputes').select('id, status').eq('buyer_id', user!.id),
+        supabase.from('proposals').select('id, workflow_state, submitted_at, enquiries(title), jobs(title)').eq('customer_id', user!.id).neq('workflow_state', 'draft'),
+        supabase.from('messages').select('id, sender_id, recipient_id, content, is_read, created_at')
+          .or(`sender_id.eq.${user!.id},recipient_id.eq.${user!.id}`).order('created_at', { ascending: false }).limit(30),
+      ]);
+
+      const engs = engRes.data ?? [];
+      const activeEngs = engs.filter(e => e.status === 'active');
+      const engIds = engs.map(e => e.id);
+
+      const vendorIds = Array.from(new Set(engs.map(e => e.vendor_id)));
+      const vendorMap = new Map<string, string>();
+      if (vendorIds.length) {
+        const { data: vendors } = await supabase.from('vendors').select('id, company_name').in('id', vendorIds);
+        (vendors ?? []).forEach(v => vendorMap.set(v.id, v.company_name));
+      }
+
+      let milestones: { engagement_id: string; amount: number; escrow_status: string; due_date: string | null; released_at: string | null }[] = [];
+      if (engIds.length) {
+        const { data } = await supabase.from('project_milestones').select('engagement_id, amount, escrow_status, due_date, released_at').in('engagement_id', engIds);
+        milestones = data ?? [];
+      }
+
+      // Escrow module: pending in escrow, released this month, milestones awaiting review.
+      const now = new Date();
+      const pendingEscrow = milestones.filter(m => ['funded', 'in_progress', 'submitted', 'rejected'].includes(m.escrow_status)).reduce((s, m) => s + (m.amount ?? 0), 0);
+      const releasedMTD = milestones.filter(m => m.escrow_status === 'released' && m.released_at &&
+        new Date(m.released_at).getMonth() === now.getMonth() && new Date(m.released_at).getFullYear() === now.getFullYear())
+        .reduce((s, m) => s + (m.amount ?? 0), 0);
+      const awaitingReview = milestones.filter(m => m.escrow_status === 'submitted').length;
+      const unfundedCount = milestones.filter(m => m.escrow_status === 'unfunded').length;
+      setEscrowStats({ pendingEscrow, releasedMTD, awaitingReview, unfundedCount });
+
+      // Payment alert: a real overdue-unfunded milestone (not a simulated card decline — money movement stays simulated).
+      const overdueUnfunded = milestones.find(m => m.escrow_status === 'unfunded' && m.due_date && new Date(m.due_date) < now);
+      if (overdueUnfunded) {
+        const eng = engs.find(e => e.id === overdueUnfunded.engagement_id);
+        setPaymentAlert(eng ? { vendorName: vendorMap.get(eng.vendor_id) ?? 'Vendor', projectTitle: eng.project_title ?? 'Engagement' } : null);
+      } else {
+        setPaymentAlert(null);
+      }
+
+      // Workspace module: top 2 active engagements with real progress/overdue.
+      const workspaceEngs: WorkspaceEngagement[] = activeEngs.slice(0, 2).map(e => {
+        const ms = milestones.filter(m => m.engagement_id === e.id);
+        const released = ms.filter(m => m.escrow_status === 'released').length;
+        const progress = ms.length > 0 ? Math.round((released / ms.length) * 100) : 0;
+        const upcoming = ms.filter(m => m.due_date && !['released', 'refunded'].includes(m.escrow_status)).sort((a, b) => (a.due_date! > b.due_date! ? 1 : -1))[0];
+        const overdue = !!upcoming && new Date(upcoming.due_date!) < now;
+        return {
+          id: e.id, project_title: e.project_title ?? 'Engagement', vendorName: vendorMap.get(e.vendor_id) ?? 'Vendor',
+          status: e.status, progress, nextDue: upcoming?.due_date ? new Date(upcoming.due_date).toLocaleDateString('en-GB') : null, overdue,
+        };
+      });
+      setWorkspace({ activeCount: activeEngs.length, engagements: workspaceEngs });
+
+      // Risk dashboard: real counts, no invented compliance-doc data.
+      const contracts = contractRes.data ?? [];
+      const contractsSignedCount = contracts.filter(c => c.signed_by_customer && c.signed_by_vendor).length;
+      const staffAugEngs = engs.filter(e => e.engagement_type === 'staff_aug');
+      const pendingIR35Count = staffAugEngs.filter(e => !e.ir35_status || e.ir35_status === 'pending').length;
+      setRisk({ activeCount: activeEngs.length, contractsSignedCount, pendingIR35Count, staffAugCount: staffAugEngs.length });
+
+      // Governance module: real contracts + open disputes.
+      const govContracts: GovernanceContract[] = contracts.slice(0, 3).map(c => ({ id: c.id, vendorName: vendorMap.get(c.vendor_id) ?? 'Vendor', status: c.status }));
+      const openDisputesCount = (disputeRes.data ?? []).filter(d => d.status !== 'resolved').length;
+      setGovernance({ contracts: govContracts, openDisputesCount });
+
+      // Intelligence module: rules-based tips shown only when the underlying condition is true.
+      const proposalRows = (proposalRes.data ?? []) as { id: string; workflow_state: string | null; submitted_at: string; enquiries: { title: string } | null; jobs: { title: string } | null }[];
+      const unreviewed = proposalRows.filter(p => !p.workflow_state);
+      const newInsights: Insight[] = [];
+      if (unreviewed.length > 0) {
+        const latestTitle = unreviewed[0]?.jobs?.title ?? unreviewed[0]?.enquiries?.title ?? 'your request';
+        newInsights.push({ text: `You have ${unreviewed.length} unreviewed proposal${unreviewed.length !== 1 ? 's' : ''} on "${latestTitle}"`, type: 'info' });
+      }
+      const overdueEngagement = workspaceEngs.find(e => e.overdue);
+      if (overdueEngagement) {
+        newInsights.push({ text: `Milestone overdue — ${overdueEngagement.vendorName} — ${overdueEngagement.project_title}`, type: 'warning' });
+      }
+      setInsights(newInsights);
+
+      // Messages module: latest message per conversation, resolved to real profile names.
+      const msgs = msgRes.data ?? [];
+      setUnreadMessages(msgs.filter(m => m.recipient_id === user!.id && !m.is_read).length);
+      const otherIds = Array.from(new Set(msgs.map(m => m.sender_id === user!.id ? m.recipient_id : m.sender_id)));
+      const profileMap = new Map<string, string>();
+      if (otherIds.length) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', otherIds);
+        (profiles ?? []).forEach(p => profileMap.set(p.id, p.full_name ?? p.email ?? 'Unknown'));
+      }
+      const seen = new Set<string>();
+      const previews: MessagePreview[] = [];
+      for (const m of msgs) {
+        const otherId = m.sender_id === user!.id ? m.recipient_id : m.sender_id;
+        if (seen.has(otherId)) continue;
+        seen.add(otherId);
+        previews.push({
+          id: m.id, name: profileMap.get(otherId) ?? 'Unknown', subject: '',
+          preview: m.content, time: timeAgo(m.created_at), unread: !m.is_read && m.recipient_id === user!.id,
+        });
+        if (previews.length >= 2) break;
+      }
+      setMessagePreviews(previews);
+
+      // Recently viewed vendors: last 3 distinct vendor profiles this buyer viewed (platform_event, event_type='profile_view').
+      const { data: viewEvents } = await supabase
+        .from('platform_event')
+        .select('entity_id, timestamp')
+        .eq('event_type', 'profile_view')
+        .eq('entity_type', 'vendor')
+        .eq('actor_id', user!.id)
+        .order('timestamp', { ascending: false })
+        .limit(20);
+      const seenVendors = new Set<string>();
+      const recentVendorIds: string[] = [];
+      for (const ev of viewEvents ?? []) {
+        if (seenVendors.has(ev.entity_id)) continue;
+        seenVendors.add(ev.entity_id);
+        recentVendorIds.push(ev.entity_id);
+        if (recentVendorIds.length >= 3) break;
+      }
+      if (recentVendorIds.length) {
+        const { data: viewedVendors } = await supabase.from('vendors').select('id, company_name, business_type').in('id', recentVendorIds);
+        const viewedMap = new Map((viewedVendors ?? []).map(v => [v.id, v]));
+        setRecentlyViewed(
+          recentVendorIds
+            .map(id => viewedMap.get(id))
+            .filter((v): v is { id: string; company_name: string; business_type: string | null } => !!v)
+            .map(v => ({ id: v.id, name: v.company_name, type: BUSINESS_TYPE_LABEL[v.business_type ?? ''] ?? 'Vendor' }))
+        );
+      } else {
+        setRecentlyViewed([]);
       }
     }
     load();
@@ -541,6 +637,9 @@ const CustomerDashboard: React.FC = () => {
                     else if (tab.id === 'contracts' || tab.id === 'disputes') navigate('/customer/governance');
                     else if (tab.id === 'invoices') navigate('/customer/payments');
                     else if (tab.id === 'settings') navigate('/customer/settings');
+                    else if (tab.id === 'ai-matchmaking') navigate('/results');
+                    else if (tab.id === 'saved-talent') navigate('/customer/shortlist');
+                    else if (tab.id === 'my-projects') navigate('/customer/my-vendors');
                     else setActiveTab(tab.id);
                   }}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -669,17 +768,17 @@ const CustomerDashboard: React.FC = () => {
           </button>
         </div>
 
-        {/* Payment failure alert */}
-        {showPaymentAlert && (
+        {/* Payment failure alert — real overdue-unfunded milestone, not a simulated Stripe decline */}
+        {paymentAlert && showPaymentAlert && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium text-red-800">
-                Payment failed for CloudNorth MSP engagement — Infrastructure Management. Update your payment method within 48 hours to keep this engagement active.
+                Milestone funding overdue for {paymentAlert.vendorName} — {paymentAlert.projectTitle}. Fund this milestone to keep the engagement active.
               </p>
               <div className="flex gap-3 mt-2">
-                <button className="text-xs bg-red-600 text-white rounded-lg px-3 py-1.5 font-medium">Update card</button>
-                <button className="text-xs text-gray-500">Contact support</button>
+                <Link to="/customer/payments" className="text-xs bg-red-600 text-white rounded-lg px-3 py-1.5 font-medium">Fund now</Link>
+                <Link to="/contact" className="text-xs text-gray-500">Contact support</Link>
               </div>
             </div>
             <button onClick={() => setShowPaymentAlert(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
@@ -688,13 +787,13 @@ const CustomerDashboard: React.FC = () => {
 
         {/* 7-module grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <FindWithAIModule />
-          <WorkspaceModule activeProjects={stats.activeProjects} />
+          <FindWithAIModule recentlyViewed={recentlyViewed} />
+          <WorkspaceModule activeCount={workspace.activeCount} engagements={workspace.engagements} />
           <MilestonePaymentsModule {...escrowStats} />
-          <RiskDashboardModule />
-          <GovernanceModule />
-          <IntelligenceModule />
-          <MessagesModule unreadMessages={stats.unreadMessages} />
+          <RiskDashboardModule {...risk} />
+          <GovernanceModule contracts={governance.contracts} openDisputesCount={governance.openDisputesCount} />
+          <IntelligenceModule insights={insights} />
+          <MessagesModule unreadMessages={unreadMessages} previews={messagePreviews} />
         </div>
       </main>
 

@@ -13,6 +13,7 @@ interface Proposal {
   vendor: string;
   vendor_id: string;
   vendor_type: string;
+  verified: boolean;
   vendor_business_type: string;
   country: string;
   rating: number;
@@ -132,6 +133,7 @@ const ProposalTriagePage: React.FC = () => {
           vendor: vendor?.company_name ?? 'Vendor',
           vendor_id: p.vendor_id,
           vendor_type: vendor?.is_verified ? 'Verified Vendor' : 'Vendor',
+          verified: !!vendor?.is_verified,
           vendor_business_type: businessType,
           country: vendor?.country ?? '',
           rating: vendor?.rating ?? 0,
@@ -264,13 +266,23 @@ const ProposalTriagePage: React.FC = () => {
   const maybeProposals = proposals.filter(p => p.triage === 'maybe');
   const declinedProposals = proposals.filter(p => p.triage === 'decline');
 
-  const filteredProposals = proposals.filter(p => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'keep') return p.triage === 'keep';
-    if (activeTab === 'maybe') return p.triage === 'maybe';
-    if (activeTab === 'declined') return p.triage === 'decline';
-    return true;
-  });
+  const comparedVendorIds = Array.from(new Set(proposals.filter(p => compared.has(p.id)).map(p => p.vendor_id)));
+
+  const filteredProposals = proposals
+    .filter(p => {
+      if (activeTab === 'all') return true;
+      if (activeTab === 'keep') return p.triage === 'keep';
+      if (activeTab === 'maybe') return p.triage === 'maybe';
+      if (activeTab === 'declined') return p.triage === 'decline';
+      return true;
+    })
+    // Verified vendors first, then by rating, then most recent — matches the
+    // "Ranking based on verification status" note shown above the list.
+    .sort((a, b) =>
+      (Number(b.verified) - Number(a.verified)) ||
+      (b.rating - a.rating) ||
+      (new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+    );
 
   const getBorderColor = (triage: Triage) => {
     if (triage === 'keep') return 'border-green-200';
@@ -356,7 +368,7 @@ const ProposalTriagePage: React.FC = () => {
           <h1 className="text-2xl font-bold text-[#0B2D59]">Proposal Inbox</h1>
           <div className="flex items-center gap-3 mt-1">
             <span className="text-sm text-gray-500">{proposals.length} proposals received</span>
-            <span className="text-xs text-gray-400 italic">Ranking based on verification status — scores build with history.</span>
+            <span className="text-xs text-gray-400 italic">Ranked by verification status, then rating — most recent first within each tier.</span>
           </div>
         </div>
 
@@ -566,13 +578,18 @@ const ProposalTriagePage: React.FC = () => {
         <div className="fixed bottom-0 left-0 right-0 bg-[#0070F3] text-white px-6 py-4 z-40 shadow-2xl">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div className="text-sm font-semibold">
-              {keepProposals.length} proposals in Keep →{' '}
-              <button
-                onClick={() => navigate('/compare')}
-                className="underline hover:no-underline"
-              >
-                Compare selected
-              </button>
+              {keepProposals.length} proposals in Keep
+              {comparedVendorIds.length >= 2 && (
+                <>
+                  {' '}→{' '}
+                  <button
+                    onClick={() => navigate(`/compare?ids=${comparedVendorIds.join(',')}`)}
+                    className="underline hover:no-underline"
+                  >
+                    Compare {comparedVendorIds.length} selected
+                  </button>
+                </>
+              )}
             </div>
             <button
               onClick={() => {

@@ -3,6 +3,19 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Globe, Eye, EyeOff, CheckCircle, ArrowRight, Search, Briefcase, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getRedirectPath } from '../utils/authRedirect';
+import { isBusinessEmail } from '../lib/workflows';
+
+const STRENGTH_LABEL = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'];
+const STRENGTH_COLOR = ['bg-gray-200', 'bg-red-400', 'bg-amber-400', 'bg-blue-400', 'bg-green-500'];
+
+function passwordStrength(pw: string): number {
+  let score = 0;
+  if (pw.length >= 10) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return score;
+}
 
 const INDUSTRIES = [
   'Technology', 'Financial Services', 'Healthcare', 'E-commerce', 'Manufacturing',
@@ -52,6 +65,7 @@ const CustomerSignup: React.FC = () => {
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!isBusinessEmail(email)) { setError('Please use a business email address — personal addresses (Gmail, Yahoo, Hotmail, Outlook) aren\'t accepted.'); return; }
     const pwError = validatePassword(password);
     if (pwError) { setError(pwError); return; }
     if (password !== confirmPassword) { setError("Passwords don't match"); return; }
@@ -73,7 +87,14 @@ const CustomerSignup: React.FC = () => {
       await signUp(email, password, {
         fullName: name,
         userType: 'customer',
-        additionalData: { companyName: tradingName || legalName },
+        additionalData: {
+          companyName: tradingName || legalName,
+          legalEntityName: legalName,
+          tradingName: tradingName || null,
+          industry,
+          headcountBand: headcount,
+          country,
+        },
       });
       setStep(3);
     } catch (err: any) {
@@ -129,6 +150,16 @@ const CustomerSignup: React.FC = () => {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
+                {password.length > 0 && (
+                  <div className="mt-1.5">
+                    <div className="flex gap-1">
+                      {[0, 1, 2, 3].map(i => (
+                        <div key={i} className={`h-1 flex-1 rounded-full ${i < passwordStrength(password) ? STRENGTH_COLOR[passwordStrength(password)] : 'bg-gray-200'}`} />
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{STRENGTH_LABEL[passwordStrength(password)]}</p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>

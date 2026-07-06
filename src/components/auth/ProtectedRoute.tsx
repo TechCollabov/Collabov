@@ -14,7 +14,7 @@ export function ProtectedRoute({
   allowedUserTypes,
   requireAuth = true
 }: ProtectedRouteProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, needsMfaChallenge } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -29,6 +29,10 @@ export function ProtectedRoute({
     return <Navigate to="/signin" state={{ from: location }} replace />;
   }
 
+  if (requireAuth && user && needsMfaChallenge) {
+    return <Navigate to="/mfa-challenge" state={{ from: location }} replace />;
+  }
+
   if (allowedUserTypes && profile && !allowedUserTypes.includes(profile.user_type)) {
     return <Navigate to="/" replace />;
   }
@@ -39,14 +43,6 @@ export function ProtectedRoute({
 export function CustomerRoute({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute allowedUserTypes={['customer']}>
-      {children}
-    </ProtectedRoute>
-  );
-}
-
-export function ContractorRoute({ children }: { children: ReactNode }) {
-  return (
-    <ProtectedRoute allowedUserTypes={['contractor']}>
       {children}
     </ProtectedRoute>
   );

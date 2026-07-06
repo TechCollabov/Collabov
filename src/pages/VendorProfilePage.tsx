@@ -4,7 +4,7 @@ import {
   Star, ShieldCheck, Bookmark, BookmarkCheck, Share2, Flag, X, Upload,
   ChevronDown, Users, Briefcase, Globe, Clock, CheckCircle, Calendar,
   Code, Cloud, Database, Smartphone, Server, UserCheck, TrendingUp,
-  MessageSquare, Phone, Video, MapPin, Loader2,
+  MessageSquare, Phone, Video, MapPin, Loader2, Check,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -292,6 +292,10 @@ interface DBPackage {
   description: string | null;
   price: number | null;
   delivery_days: number | null;
+  category: string | null;
+  tech_stack: string[] | null;
+  ideal_for: string | null;
+  features: string[] | null;
 }
 
 interface DBPortfolioItem {
@@ -529,14 +533,14 @@ function InterviewModal({ member, vendorId, onClose }: InterviewModalProps) {
 
 // ─── Discovery Call Modal ─────────────────────────────────────────────────────
 
+// Only reachable when the vendor hasn't connected Cal.diy — bookings for a
+// connected vendor happen directly in the embedded widget on the Calendar tab.
 function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const bookingMethod: string = vendor.booking_method ?? 'manual';
   const [msg, setMsg] = useState(
     `Hi ${vendor.company_name}, I'd like to book a discovery call to discuss a potential project.`
   );
-  const [slot, setSlot] = useState('');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -546,32 +550,15 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
     setSending(true);
     setError('');
     try {
-      if (bookingMethod === 'manual') {
-        // Manual: pre-filled message only — no real booking, no pending_engagement.
-        const { error: msgErr } = await supabase.from('messages').insert({
-          sender_id: user.id,
-          recipient_id: vendor.id,
-          content: msg.trim(),
-          thread_type: 'pre_engagement',
-        });
-        if (msgErr) throw msgErr;
-        await notify(vendor.id, 'message', 'Discovery call request',
-          'A buyer wants to arrange a discovery call. Reply with your availability.', '/messages');
-      } else {
-        // Calendly / Google: booking confirmed -> pending_engagement is created and
-        // the T+1 follow-up converts it into a proposal prompt.
-        if (!slot) { setError('Pick a time slot.'); setSending(false); return; }
-        const { error: peErr } = await supabase.from('pending_engagement').insert({
-          buyer_id: user.id,
-          vendor_id: vendor.id,
-          meeting_datetime: new Date(slot).toISOString(),
-          status: 'scheduled',
-        });
-        if (peErr) throw peErr;
-        await notify(vendor.id, 'enquiry', 'Discovery call booked',
-          `A buyer booked a call for ${new Date(slot).toLocaleString('en-GB')}. The meeting link comes from your ${bookingMethod === 'calendly' ? 'Calendly' : 'Google Calendar'} setup.`,
-          '/vendor/dashboard/enquiries');
-      }
+      const { error: msgErr } = await supabase.from('messages').insert({
+        sender_id: user.id,
+        recipient_id: vendor.id,
+        content: msg.trim(),
+        thread_type: 'pre_engagement',
+      });
+      if (msgErr) throw msgErr;
+      await notify(vendor.id, 'message', 'Discovery call request',
+        'A buyer wants to arrange a discovery call. Reply with your availability.', '/messages');
       setDone(true);
     } catch (e) {
       console.error('Booking failed:', e);
@@ -586,14 +573,8 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
         <div className="bg-white rounded-2xl w-full max-w-md p-8 text-center">
           <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
-          <h2 className="text-lg font-bold text-[#0B2D59] mb-1">
-            {bookingMethod === 'manual' ? 'Message sent' : 'Call booked'}
-          </h2>
-          <p className="text-sm text-gray-500 mb-5">
-            {bookingMethod === 'manual'
-              ? 'The vendor will reply with available times.'
-              : 'Collabov tracks that a call was booked but does not host it — your meeting link comes from the vendor’s calendar tool. The day after the call we’ll nudge you to request a proposal.'}
-          </p>
+          <h2 className="text-lg font-bold text-[#0B2D59] mb-1">Message sent</h2>
+          <p className="text-sm text-gray-500 mb-5">The vendor will reply with available times.</p>
           <button onClick={onClose} className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">Done</button>
         </div>
       </div>
@@ -608,36 +589,15 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-6 space-y-4">
-          {bookingMethod === 'manual' ? (
-            <>
-              <p className="text-sm text-gray-500">
-                Send a message to introduce your project. The vendor will respond with available times.
-              </p>
-              <textarea
-                rows={4}
-                value={msg}
-                onChange={e => setMsg(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-gray-500">
-                {bookingMethod === 'calendly'
-                  ? 'This vendor uses Calendly — pick a slot and the video link is generated by Calendly, not Collabov.'
-                  : 'This vendor’s Google Calendar availability is connected — pick a slot and the meeting link comes from Google.'}
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Choose a time</label>
-                <input
-                  type="datetime-local"
-                  value={slot}
-                  onChange={e => setSlot(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
-                />
-              </div>
-            </>
-          )}
+          <p className="text-sm text-gray-500">
+            Send a message to introduce your project. The vendor will respond with available times.
+          </p>
+          <textarea
+            rows={4}
+            value={msg}
+            onChange={e => setMsg(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+          />
           {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-3">
             <button
@@ -645,7 +605,7 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
               disabled={sending}
               className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              {sending ? 'Sending…' : bookingMethod === 'manual' ? 'Send Request' : 'Book Call'}
+              {sending ? 'Sending…' : 'Send Request'}
             </button>
             <button onClick={onClose} className="px-5 py-3 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
@@ -751,6 +711,19 @@ function Sidebar({ vendor, onRFP }: { vendor: any; onRFP: () => void }) {
       >
         Send a Message
       </button>
+      {vendor.business_type === 'agency' && (
+        <>
+          <Link
+            to={`/discovery-brief?vendor=${vendor.id}`}
+            className="block w-full text-center py-2.5 border border-[#0070F3] text-[#0070F3] text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            Start a Discovery
+          </Link>
+          <p className="text-xs text-gray-400">
+            Not sure what you need built yet? A discovery gets you a scoped spec first — request a proposal instead if you already know what to build.
+          </p>
+        </>
+      )}
       <hr className="border-gray-100" />
       <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors w-full">
         <Share2 className="h-4 w-4" /> Copy link
@@ -1086,12 +1059,28 @@ function ServicesTab({ vendor, onRFP, packages, serviceCategories }: { vendor: a
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {packages.map(pkg => (
               <div key={pkg.id} className="bg-white rounded-xl border border-gray-100 p-5">
+                {pkg.category && <span className="text-xs bg-blue-50 text-[#0070F3] font-semibold px-2 py-0.5 rounded-full mb-2 inline-block">{pkg.category}</span>}
                 <h3 className="font-bold text-gray-800 text-sm mb-1">{pkg.name}</h3>
                 {pkg.description && <p className="text-gray-500 text-xs leading-relaxed mb-3">{pkg.description}</p>}
+                {pkg.features && pkg.features.length > 0 && (
+                  <ul className="space-y-1 mb-3">
+                    {pkg.features.map(f => (
+                      <li key={f} className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <Check className="h-3.5 w-3.5 text-[#0070F3] flex-shrink-0" />{f}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="flex items-center justify-between mt-2">
                   {pkg.price != null && <span className="font-bold text-[#0B2D59]">£{pkg.price.toLocaleString()}</span>}
                   {pkg.delivery_days != null && <span className="text-xs text-gray-400">{pkg.delivery_days} days delivery</span>}
                 </div>
+                {pkg.tech_stack && pkg.tech_stack.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {pkg.tech_stack.map(t => <span key={t} className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t}</span>)}
+                  </div>
+                )}
+                {pkg.ideal_for && <p className="text-xs text-gray-400 mt-2">Ideal for: {pkg.ideal_for}</p>}
                 <button onClick={onRFP} className="mt-3 w-full px-4 py-2 border border-[#0070F3] text-[#0070F3] text-xs font-semibold rounded-lg hover:bg-blue-50 transition-colors">
                   Request Quote
                 </button>
@@ -1114,13 +1103,16 @@ type CaseStudy = {
   outcome?: string | null;
   tech_stack?: string[] | null;
   created_at?: string | null;
+  // real case_studies table shape
+  project_title?: string;
+  services_delivered?: string[];
   // demo shape fields
   industry?: string;
   tech?: string[];
   duration?: string;
   team_size?: number;
   services?: string[];
-  outcomes?: { metric: string; description: string }[];
+  outcomes?: ({ metric: string; description: string } | string)[];
   client_quote?: string | null;
 };
 
@@ -1135,15 +1127,20 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
         <p className="text-gray-400 text-sm">No case studies available yet.</p>
       ) : items.map(cs => {
         const isExpanded = expanded[cs.id];
-        // Support both DB shape (challenge/solution/outcome/tech_stack) and demo shape
+        // Support both the real case_studies table shape (project_title, services_delivered,
+        // outcomes as a plain string[]) and the demo shape (title, services, outcomes as
+        // {metric, description}[]).
+        const title = cs.title || cs.project_title || 'Case Study';
         const tech = cs.tech_stack || cs.tech || [];
-        const outcomes = cs.outcomes || (cs.outcome ? [{ metric: 'Outcome', description: cs.outcome }] : []);
+        const services = cs.services || cs.services_delivered || [];
+        const rawOutcomes = cs.outcomes || (cs.outcome ? [cs.outcome] : []);
+        const outcomes = rawOutcomes.map(o => typeof o === 'string' ? { metric: o, description: '' } : o);
         return (
           <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <h3 className="font-bold text-gray-800">{cs.title}</h3>
+                  <h3 className="font-bold text-gray-800">{title}</h3>
                   {cs.industry && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{cs.industry}</span>}
                 </div>
                 <div className="flex flex-wrap gap-1 mb-3">
@@ -1156,7 +1153,7 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
                     <li key={o.metric} className="flex items-center gap-2 text-sm text-green-600 font-medium">
                       <TrendingUp className="h-4 w-4 flex-shrink-0" />
                       <span>{o.metric}</span>
-                      <span className="text-gray-400 font-normal text-xs">— {o.description}</span>
+                      {o.description && <span className="text-gray-400 font-normal text-xs">— {o.description}</span>}
                     </li>
                   ))}
                 </ul>
@@ -1171,11 +1168,11 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
 
             {isExpanded && (
               <div className="mt-5 pt-5 border-t border-gray-100 space-y-4">
-                {(cs.duration || cs.team_size || cs.services) && (
+                {(cs.duration || cs.team_size || services.length > 0) && (
                   <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-2">
                     {cs.duration && <span><span className="font-semibold text-gray-700">Duration:</span> {cs.duration}</span>}
                     {cs.team_size && <span><span className="font-semibold text-gray-700">Team size:</span> {cs.team_size} people</span>}
-                    {cs.services && <span><span className="font-semibold text-gray-700">Services:</span> {cs.services.join(', ')}</span>}
+                    {services.length > 0 && <span><span className="font-semibold text-gray-700">Services:</span> {services.join(', ')}</span>}
                   </div>
                 )}
                 {cs.challenge && (
@@ -1199,7 +1196,7 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
                           <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                           <span>
                             <span className="font-semibold text-gray-700">{o.metric}</span>
-                            <span className="text-gray-500"> — {o.description}</span>
+                            {o.description && <span className="text-gray-500"> — {o.description}</span>}
                           </span>
                         </li>
                       ))}
@@ -1407,56 +1404,54 @@ function ReviewsTab({ vendor, reviews }: { vendor: VendorData; reviews: Review[]
 
 // ─── Tab: Calendar & Availability ─────────────────────────────────────────────
 
-function CalendarTab({ onDiscovery }: { onDiscovery: () => void }) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+const AVAILABILITY_LABEL: Record<string, { label: string; dot: string }> = {
+  available: { label: 'Available for new engagements', dot: 'bg-green-500' },
+  available_from: { label: 'Available soon', dot: 'bg-amber-400' },
+  limited: { label: 'Limited availability', dot: 'bg-amber-400' },
+  booked: { label: 'Fully booked', dot: 'bg-red-400' },
+};
 
-  // Day of week of first day (0=Sun, adjust to Mon-first)
-  const firstDay = new Date(year, month, 1).getDay();
-  const offset = firstDay === 0 ? 6 : firstDay - 1;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  const cells: (number | null)[] = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+function CalendarTab({ vendor, onDiscovery }: { vendor: any; onDiscovery: () => void }) {
+  const connected = vendor.booking_method === 'cal_diy' && !!vendor.cal_diy_url;
+  const avail = AVAILABILITY_LABEL[vendor.availability_status ?? 'available'] ?? AVAILABILITY_LABEL.available;
 
   return (
     <div>
       <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Calendar & Availability</h2>
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <div className="text-sm font-semibold text-gray-700 mb-4">{monthName}</div>
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-            <div key={d} className="font-medium">{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((day, i) =>
-            day === null ? (
-              <div key={`empty-${i}`} />
-            ) : (
-              <div key={day} className="rounded-lg py-2 text-xs font-medium text-center bg-green-100 text-green-700">
-                {day}
-              </div>
-            ),
-          )}
-        </div>
-        <div className="flex gap-4 mt-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 inline-block" /> Available</span>
-        </div>
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <div className="text-sm font-medium text-gray-700 mb-1">Vendor is currently available for new engagements.</div>
-          <div className="text-xs text-gray-400 mb-4">
-            Connect your calendar in vendor settings to enable direct booking.
-          </div>
-          <button
-            onClick={onDiscovery}
-            className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Book a Discovery Call
-          </button>
-        </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        <span className={`w-2.5 h-2.5 rounded-full ${avail.dot}`} />
+        <span className="text-sm font-medium text-gray-700">{avail.label}</span>
+        {vendor.availability_status === 'available_from' && vendor.availability_from && (
+          <span className="text-xs text-gray-400">from {new Date(vendor.availability_from).toLocaleDateString('en-GB')}</span>
+        )}
       </div>
+
+      {connected ? (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <iframe
+            src={vendor.cal_diy_url}
+            title="Book a discovery call with this vendor"
+            className="w-full"
+            style={{ height: 700, border: 0 }}
+          />
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="text-sm font-medium text-gray-700 mb-1">No calendar connected yet.</div>
+            <div className="text-xs text-gray-400 mb-4">
+              Send a message to arrange a discovery call directly with this vendor.
+            </div>
+            <button
+              onClick={onDiscovery}
+              className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Book a Discovery Call
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1855,6 +1850,14 @@ const VendorProfilePage: React.FC = () => {
               <button onClick={openRFP} className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Send Message
               </button>
+              {vendor.business_type === 'agency' && (
+                <Link
+                  to={`/discovery-brief?vendor=${vendor.id}`}
+                  className="px-4 py-2.5 border border-[#0070F3] text-[#0070F3] text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Start a Discovery
+                </Link>
+              )}
               <button
                 onClick={() => setActiveTab('Calendar & Availability')}
                 className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -1899,7 +1902,7 @@ const VendorProfilePage: React.FC = () => {
         {activeTab === 'Case Studies' && <CaseStudiesTab caseStudies={dbCaseStudies} />}
         {activeTab === 'Referrals' && <ReferralsTab referrals={dbReferrals} />}
         {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} reviews={dbReviews} />}
-        {activeTab === 'Calendar & Availability' && <CalendarTab onDiscovery={() => setShowDiscovery(true)} />}
+        {activeTab === 'Calendar & Availability' && <CalendarTab vendor={vendor} onDiscovery={() => setShowDiscovery(true)} />}
       </div>
 
       {/* Modals */}

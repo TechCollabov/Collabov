@@ -6,6 +6,7 @@ import { refreshPlatformSettings } from '../../lib/workflows';
 interface Settings {
   platform_fee_pct: string;
   auto_release_days: string;
+  auto_release_warning_days: string;
   minimum_project_value: string;
   byov_invite_expiry_days: string;
   admin_alert_email: string;
@@ -13,10 +14,41 @@ interface Settings {
   vendor_verification_sla_days: string;
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Mirrors the input min/max shown in the form — enforced here too since
+ *  these are plain buttons, not a <form>, so HTML5 constraint validation
+ *  never actually runs on save. */
+function validateSettings(s: Settings): string | null {
+  const fee = Number(s.platform_fee_pct);
+  if (!Number.isFinite(fee) || fee < 0 || fee > 30) return 'Platform Fee must be between 0 and 30%.';
+
+  const releaseDays = Number(s.auto_release_days);
+  if (!Number.isInteger(releaseDays) || releaseDays < 1 || releaseDays > 30) return 'Auto-Release Days must be a whole number between 1 and 30.';
+
+  const warningDays = Number(s.auto_release_warning_days);
+  if (!Number.isInteger(warningDays) || warningDays < 1 || warningDays > 30) return 'Auto-Release Warning must be a whole number between 1 and 30 days.';
+  if (warningDays >= releaseDays) return 'Auto-Release Warning must be fewer days than Auto-Release Days, or it would never show before release.';
+
+  const minValue = Number(s.minimum_project_value);
+  if (!Number.isFinite(minValue) || minValue < 0) return 'Minimum Project Value cannot be negative.';
+
+  const inviteDays = Number(s.byov_invite_expiry_days);
+  if (!Number.isInteger(inviteDays) || inviteDays < 1 || inviteDays > 90) return 'BYOV/BYOC Invitation Expiry must be a whole number between 1 and 90 days.';
+
+  const slaDays = Number(s.vendor_verification_sla_days);
+  if (!Number.isInteger(slaDays) || slaDays < 1 || slaDays > 14) return 'Verification SLA must be a whole number between 1 and 14 days.';
+
+  if (s.admin_alert_email.trim() && !EMAIL_RE.test(s.admin_alert_email.trim())) return 'Admin Notification Email is not a valid email address.';
+
+  return null;
+}
+
 const AdminSettings: React.FC = () => {
   const [settings, setSettings] = useState<Settings>({
     platform_fee_pct: '10',
     auto_release_days: '7',
+    auto_release_warning_days: '5',
     minimum_project_value: '500',
     byov_invite_expiry_days: '7',
     admin_alert_email: '',
@@ -26,18 +58,20 @@ const AdminSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase
       .from('platform_settings')
-      .select('platform_fee_pct, auto_release_days, minimum_project_value, byov_invite_expiry_days, admin_alert_email, maintenance_mode, vendor_verification_sla_days')
+      .select('platform_fee_pct, auto_release_days, auto_release_warning_days, minimum_project_value, byov_invite_expiry_days, admin_alert_email, maintenance_mode, vendor_verification_sla_days')
       .eq('id', true)
       .maybeSingle();
     if (data) {
       setSettings({
         platform_fee_pct: String(data.platform_fee_pct),
         auto_release_days: String(data.auto_release_days),
+        auto_release_warning_days: String(data.auto_release_warning_days),
         minimum_project_value: String(data.minimum_project_value),
         byov_invite_expiry_days: String(data.byov_invite_expiry_days),
         admin_alert_email: data.admin_alert_email ?? '',
@@ -53,12 +87,20 @@ const AdminSettings: React.FC = () => {
   const update = (key: keyof Settings, value: string | boolean) => setSettings(s => ({ ...s, [key]: value }));
 
   const handleSave = async () => {
+    const validationError = validateSettings(settings);
+    if (validationError) {
+      setError(validationError);
+      setSaved(false);
+      return;
+    }
+    setError(null);
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from('platform_settings').update({
         platform_fee_pct: Number(settings.platform_fee_pct),
         auto_release_days: Number(settings.auto_release_days),
+        auto_release_warning_days: Number(settings.auto_release_warning_days),
         minimum_project_value: Number(settings.minimum_project_value),
         byov_invite_expiry_days: Number(settings.byov_invite_expiry_days),
         admin_alert_email: settings.admin_alert_email || null,
@@ -114,6 +156,21 @@ const AdminSettings: React.FC = () => {
                   max="30"
                   value={settings.auto_release_days}
                   onChange={e => update('auto_release_days', e.target.value)}
+                  className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                />
+                <span className="text-sm text-gray-500">days</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Auto-Release Warning (days before)</label>
+              <p className="text-xs text-gray-400 mb-2">How many days before the auto-release date the milestone review screen highlights it as urgent. Must be fewer than Auto-Release Days.</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={settings.auto_release_warning_days}
+                  onChange={e => update('auto_release_warning_days', e.target.value)}
                   className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
                 />
                 <span className="text-sm text-gray-500">days</span>
@@ -210,6 +267,9 @@ const AdminSettings: React.FC = () => {
         </div>
 
         {/* Save */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>
+        )}
         <button
           onClick={handleSave}
           disabled={saving}

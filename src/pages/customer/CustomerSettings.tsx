@@ -4,8 +4,16 @@ import { ArrowLeft, Users, BellRing, ShieldCheck, UserCircle, Plus, Trash2, Load
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { NOTIFICATION_EVENTS, isBusinessEmail } from '../../lib/workflows';
+import TwoFactorSetup from '../../components/auth/TwoFactorSetup';
 
 type Tab = 'account' | 'team' | 'notifications' | 'privacy';
+
+const INDUSTRIES = [
+  'Technology', 'Financial Services', 'Healthcare', 'E-commerce', 'Manufacturing',
+  'Professional Services', 'Media & Entertainment', 'Education', 'Government', 'Other',
+];
+const HEADCOUNT_BANDS = ['1–10', '11–50', '51–200', '201–1,000', '1,000+'];
+const COUNTRIES = ['United Kingdom', 'Ireland', 'United States', 'Germany', 'France', 'Netherlands', 'Other'];
 
 const ROLES = [
   { value: 'admin', label: 'Admin', desc: 'Full access — spend, sign, review, manage team' },
@@ -20,8 +28,6 @@ const CustomerSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [backupCodes, setBackupCodes] = useState<string[]>([]);
-  const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
 
@@ -35,38 +41,69 @@ const CustomerSettings: React.FC = () => {
 
   const [exportRequested, setExportRequested] = useState(false);
 
+  const [companyProfile, setCompanyProfile] = useState({
+    legal_entity_name: '', trading_name: '', industry: '', headcount_band: '', country: '', company_website: '',
+  });
+  const [companyProfileSaved, setCompanyProfileSaved] = useState(false);
+  const [savingCompanyProfile, setSavingCompanyProfile] = useState(false);
+
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [{ data: prof }, { data: team }, { data: prefsRow }] = await Promise.all([
+    const [{ data: prof }, { data: team }, { data: prefsRow }, { data: customer }] = await Promise.all([
       supabase.from('profiles').select('two_factor_enabled').eq('id', user.id).maybeSingle(),
       supabase.from('customer_team_members').select('*').eq('customer_id', user.id).order('created_at', { ascending: false }),
       supabase.from('notification_prefs').select('prefs').eq('user_id', user.id).maybeSingle(),
+      supabase.from('customers').select('legal_entity_name, trading_name, industry, headcount_band, country, company_website').eq('id', user.id).maybeSingle(),
     ]);
     setTwoFactorEnabled(!!(prof as any)?.two_factor_enabled);
     setTeamMembers(team ?? []);
     const defaults: Record<string, 'realtime' | 'digest' | 'off'> = {};
     NOTIFICATION_EVENTS.forEach(e => { defaults[e.key] = 'realtime'; });
     setNotifPrefs({ ...defaults, ...(prefsRow?.prefs as any ?? {}) });
+    if (customer) {
+      setCompanyProfile({
+        legal_entity_name: customer.legal_entity_name ?? '',
+        trading_name: customer.trading_name ?? '',
+        industry: customer.industry ?? '',
+        headcount_band: customer.headcount_band ?? '',
+        country: customer.country ?? '',
+        company_website: customer.company_website ?? '',
+      });
+    }
     setLoading(false);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
-  const toggleTwoFactor = async () => {
+  const onTwoFactorChange = async (next: boolean) => {
     if (!user) return;
-    const next = !twoFactorEnabled;
-    if (next) {
-      const codes = Array.from({ length: 8 }, () => Math.random().toString(36).slice(2, 8).toUpperCase());
-      await supabase.from('profiles').update({
-        two_factor_enabled: true, two_factor_backup_codes: codes, two_factor_enabled_at: new Date().toISOString(),
-      }).eq('id', user.id);
-      setBackupCodes(codes);
-      setShowBackupCodes(true);
-    } else {
-      await supabase.from('profiles').update({ two_factor_enabled: false, two_factor_backup_codes: null }).eq('id', user.id);
-    }
     setTwoFactorEnabled(next);
+    await supabase.from('profiles').update({
+      two_factor_enabled: next,
+      two_factor_enabled_at: next ? new Date().toISOString() : null,
+    }).eq('id', user.id);
+  };
+
+  const updateCompanyField = (key: keyof typeof companyProfile, value: string) => {
+    setCompanyProfile(prev => ({ ...prev, [key]: value }));
+    setCompanyProfileSaved(false);
+  };
+
+  const saveCompanyProfile = async () => {
+    if (!user) return;
+    setSavingCompanyProfile(true);
+    await supabase.from('customers').update({
+      legal_entity_name: companyProfile.legal_entity_name.trim() || null,
+      trading_name: companyProfile.trading_name.trim() || null,
+      industry: companyProfile.industry || null,
+      headcount_band: companyProfile.headcount_band || null,
+      country: companyProfile.country || null,
+      company_website: companyProfile.company_website.trim() || null,
+      company_name: companyProfile.trading_name.trim() || companyProfile.legal_entity_name.trim() || undefined,
+    }).eq('id', user.id);
+    setSavingCompanyProfile(false);
+    setCompanyProfileSaved(true);
   };
 
   const changePassword = async () => {
@@ -159,6 +196,56 @@ const CustomerSettings: React.FC = () => {
             </div>
 
             <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">Company Profile</h3>
+              <p className="text-xs text-gray-400 mb-3">Required before you can request proposals or fund milestones — used for contract and tax purposes.</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Legal Entity Name</label>
+                  <input value={companyProfile.legal_entity_name} onChange={e => updateCompanyField('legal_entity_name', e.target.value)}
+                    placeholder="e.g. Acme Technologies Ltd" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Trading Name <span className="text-gray-400 font-normal">(if different)</span></label>
+                  <input value={companyProfile.trading_name} onChange={e => updateCompanyField('trading_name', e.target.value)}
+                    placeholder="e.g. Acme Tech" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Industry</label>
+                  <select value={companyProfile.industry} onChange={e => updateCompanyField('industry', e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <option value="">Select industry</option>
+                    {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Company Size</label>
+                  <select value={companyProfile.headcount_band} onChange={e => updateCompanyField('headcount_band', e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <option value="">Select headcount</option>
+                    {HEADCOUNT_BANDS.map(h => <option key={h} value={h}>{h} employees</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Country</label>
+                  <select value={companyProfile.country} onChange={e => updateCompanyField('country', e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <option value="">Select country</option>
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Company Website</label>
+                  <input value={companyProfile.company_website} onChange={e => updateCompanyField('company_website', e.target.value)}
+                    placeholder="https://" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                </div>
+              </div>
+              <button onClick={saveCompanyProfile} disabled={savingCompanyProfile}
+                className="px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg disabled:opacity-60">
+                {savingCompanyProfile ? 'Saving...' : companyProfileSaved ? 'Saved ✓' : 'Save Company Profile'}
+              </button>
+            </div>
+
+            <div className="border-t border-gray-100 pt-5">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Change Password</h3>
               <div className="flex gap-2">
                 <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="New password"
@@ -170,24 +257,7 @@ const CustomerSettings: React.FC = () => {
 
             <div className="border-t border-gray-100 pt-5">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Two-Factor Authentication</h3>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">2FA Status</span>
-                <button onClick={toggleTwoFactor} className={`relative inline-flex h-6 w-11 items-center rounded-full ${twoFactorEnabled ? 'bg-[#0070F3]' : 'bg-gray-200'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-              </div>
-              {twoFactorEnabled && showBackupCodes && backupCodes.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-3">
-                  <p className="text-sm font-semibold text-amber-800 mb-2">Save your backup codes — shown once</p>
-                  <div className="grid grid-cols-4 gap-2 font-mono text-xs text-amber-900">
-                    {backupCodes.map(c => <span key={c} className="bg-white rounded px-2 py-1 text-center">{c}</span>)}
-                  </div>
-                  <button onClick={() => setShowBackupCodes(false)} className="text-xs text-amber-700 underline mt-2">I've saved these codes</button>
-                </div>
-              )}
-              {twoFactorEnabled && !showBackupCodes && (
-                <p className="text-xs text-green-600 flex items-center gap-1 mt-2"><CheckCircle className="h-3.5 w-3.5" /> Two-factor authentication is enabled.</p>
-              )}
+              <TwoFactorSetup enabled={twoFactorEnabled} onChange={onTwoFactorChange} />
             </div>
           </div>
         )}

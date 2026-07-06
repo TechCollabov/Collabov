@@ -48,6 +48,16 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function daysWaiting(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function waitColor(days: number): string {
+  if (days >= 4) return 'bg-red-100 text-red-700';
+  if (days >= 2) return 'bg-amber-100 text-amber-700';
+  return 'bg-gray-100 text-gray-500';
+}
+
 const AdminBriefs: React.FC = () => {
   const [briefs, setBriefs] = useState<BriefRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +85,10 @@ const AdminBriefs: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const filtered = filter === 'all' ? briefs : briefs.filter(b => b.admin_status === filter);
+  // Longest-waiting pending briefs surface first — matches the wait-time coloring.
+  if (filter === 'pending_review') {
+    filtered.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }
 
   const auditAndNotify = async (adminId: string, actionType: string, brief: BriefRow, reason: string, notifyTitle: string, notifyMessage: string) => {
     await supabase.from('admin_audit_log').insert({
@@ -173,6 +187,11 @@ const AdminBriefs: React.FC = () => {
                       <div className="flex items-center gap-2 mt-0.5">
                         {brief.category && <span className="text-xs bg-blue-50 text-[#0070F3] px-2 py-0.5 rounded-full">{brief.category}</span>}
                         <span className="text-xs text-gray-400 capitalize">{brief.job_kind} · {fmtDate(brief.created_at)}</span>
+                        {brief.admin_status === 'pending_review' && (
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${waitColor(daysWaiting(brief.created_at))}`}>
+                            Waiting {daysWaiting(brief.created_at)}d
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-5 py-4 text-gray-600">{brief.company}</td>

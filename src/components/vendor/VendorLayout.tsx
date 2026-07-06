@@ -20,7 +20,7 @@ const VendorLayout: React.FC = () => {
     { name: 'Enquiries', href: '/vendor/dashboard/enquiries', icon: MessageSquare },
     { name: 'Active Contracts', href: '/vendor/dashboard/contracts', icon: ClipboardList },
     { name: 'Job Board', href: '/vendor/dashboard/jobs', icon: Briefcase },
-    { name: 'Inbox', href: '/vendor/dashboard/inbox', icon: Mail },
+    { name: 'Inbox', href: '/messages', icon: Mail },
     { name: 'Payments', href: '/vendor/dashboard/payments', icon: CreditCard },
     { name: 'Analytics', href: '/vendor/dashboard/analytics', icon: BarChart2 },
     { name: 'Notifications', href: '/vendor/dashboard/notifications', icon: Bell },

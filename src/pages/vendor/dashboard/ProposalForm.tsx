@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Sparkles } from 'lucide-react';
+import { supabase } from '../../../lib/supabase';
 
 interface RFP {
   title: string;
@@ -76,36 +77,14 @@ const ProposalForm: React.FC<ProposalFormProps> = ({ rfp, onSubmit, onCancel }) 
   const handleAiDraft = async () => {
     setAiLoading(true);
     try {
-      const apiKey = (import.meta as any).env?.VITE_ANTHROPIC_API_KEY;
-      if (!apiKey) {
-        throw new Error('No API key');
-      }
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 400,
-          messages: [
-            {
-              role: 'user',
-              content: `Write a professional 150-200 word proposal approach for this RFP: ${rfp.description}. Service: ${rfp.service_type}. Be specific and professional.`,
-            },
-          ],
-        }),
-        signal: controller.signal,
+      const prompt = `Write a professional 150-200 word proposal approach for this RFP: ${rfp.description}. Service: ${rfp.service_type}. Be specific and professional.`;
+      const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
+        body: { prompt, maxTokens: 400, model: 'claude-3-haiku-20240307', feature: 'proposal_draft' },
       });
-      clearTimeout(timeout);
-      if (!res.ok) throw new Error('API error');
-      const data = await res.json();
-      const text = data?.content?.[0]?.text || '';
+      if (error) throw error;
+      const text: string = envelope?.text || '';
       if (text) setApproach(text);
+      else throw new Error('Empty response');
     } catch {
       showToast('AI suggestions unavailable — enter manually');
     } finally {

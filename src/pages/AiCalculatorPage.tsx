@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
+import { isBusinessEmail } from '../lib/workflows';
 
 const SERVICES = [
   'Software Development',
@@ -20,17 +21,8 @@ const LOCATION_MULTIPLIER: Record<Location, number> = {
   'No preference': 0.40,
 };
 
-const BLOCKED_DOMAINS = ['gmail', 'yahoo', 'hotmail', 'outlook'];
-
 function formatGBP(value: number): string {
   return '£' + Math.round(value).toLocaleString('en-GB');
-}
-
-function isBusinessEmail(email: string): boolean {
-  const domain = email.split('@')[1];
-  if (!domain) return false;
-  const domainBase = domain.split('.')[0].toLowerCase();
-  return !BLOCKED_DOMAINS.includes(domainBase);
 }
 
 // Total steps: 4 questions + 1 email = 5

@@ -3,6 +3,7 @@ import { Send, Paperclip, AlertTriangle } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { detectOffPlatformContact, OFF_PLATFORM_WARNING } from '../lib/workflows';
 
 // TODO: Replace with Supabase realtime subscription. For MVP, poll Supabase messages table every 30s using setInterval in useEffect.
 
@@ -64,13 +65,6 @@ function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
-}
-
-function hasOffPlatformContent(text: string): boolean {
-  const emailPattern = /@/;
-  const phonePattern = /\d{5,}/;
-  const sortCodePattern = /\d{2}-\d{2}-\d{2}/;
-  return emailPattern.test(text) || phonePattern.test(text) || sortCodePattern.test(text);
 }
 
 function formatDateSeparator(dateStr: string): string {
@@ -215,7 +209,7 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
     const uiMessages: UiMessage[] = (data as DbMessage[]).map(m => {
       const isMe = m.sender_id === user.id;
       const isUrl = /^https?:\/\//.test(m.content.trim());
-      const showWarning = !isMe ? false : hasOffPlatformContent(m.content);
+      const showWarning = !isMe ? false : detectOffPlatformContact(m.content);
       return {
         id: m.id,
         sender: isMe ? 'me' : 'them',
@@ -276,7 +270,7 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
 
     setSending(true);
     const isUrl = /^https?:\/\//.test(text);
-    const showWarning = hasOffPlatformContent(text);
+    const showWarning = detectOffPlatformContact(text);
     const now = new Date().toISOString();
 
     const optimisticMsg: UiMessage = {
@@ -392,7 +386,7 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
             <div className="flex justify-end mb-1">
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-xs text-amber-800 flex gap-2 items-start max-w-sm">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                <span>Sharing contact or payment details outside the platform may void your escrow protection and breach platform terms.</span>
+                <span>{OFF_PLATFORM_WARNING} This notice has been logged for admin visibility.</span>
               </div>
             </div>
           )}

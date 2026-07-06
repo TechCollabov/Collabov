@@ -1,8 +1,45 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { ChevronUp, ChevronDown, Download, ExternalLink, Loader2 } from 'lucide-react';
+import { ChevronUp, ChevronDown, Download, ExternalLink, Loader2, Ban } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+
+const BLACKLIST_EVENT_TYPES = [
+  'vendor_blacklisted', 'vendor_blacklist_deferred', 'vendor_restored',
+  'customer_blacklisted', 'customer_blacklist_deferred', 'customer_restored',
+];
+const BLACKLIST_EVENT_LABEL: Record<string, string> = {
+  vendor_blacklisted: 'Vendor blacklisted',
+  vendor_blacklist_deferred: 'Vendor blacklist deferred (open dispute)',
+  vendor_restored: 'Vendor restored',
+  customer_blacklisted: 'Buyer blacklisted',
+  customer_blacklist_deferred: 'Buyer blacklist deferred (open dispute)',
+  customer_restored: 'Buyer restored',
+};
+
+interface BlacklistLogRow {
+  id: string;
+  event_type: string;
+  entity_name: string;
+  reason: string | null;
+  timestamp: string;
+}
+
+const AI_FEATURE_LABEL: Record<string, string> = {
+  sow_milestones: 'SOW milestone suggestions',
+  sow_obligations_summary: 'SOW obligations summary',
+  case_study_keywords: 'Case study keyword extraction',
+  proposal_draft: 'AI-drafted proposal approach',
+  unspecified: 'Unlabeled',
+};
+
+interface AiUsageRow {
+  feature: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
 
 interface VendorRow {
   id: string;
@@ -77,6 +114,8 @@ const AdminAnalytics: React.FC = () => {
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [buyers, setBuyers] = useState<BuyerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [blacklistLog, setBlacklistLog] = useState<BlacklistLogRow[]>([]);
+  const [aiUsage, setAiUsage] = useState<AiUsageRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,7 +123,7 @@ const AdminAnalytics: React.FC = () => {
 
     const [
       vendorRes, verRes, contractRes, enquiryRes, vendorsRes,
-      releasesRes, milestoneRes, customersRes, disputesRes,
+      releasesRes, milestoneRes, customersRes, disputesRes, searchEventsRes,
     ] = await Promise.all([
       supabase.from('vendors').select('id', { count: 'exact', head: true }),
       supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
@@ -95,6 +134,7 @@ const AdminAnalytics: React.FC = () => {
       supabase.from('project_milestones').select('engagement_id, escrow_status, due_date, funded_at').not('escrow_status', 'eq', 'unfunded'),
       supabase.from('customers').select('id, company_name'),
       supabase.from('disputes').select('buyer_id'),
+      supabase.from('platform_event').select('actor_id').eq('event_type', 'vendor_search'),
     ]);
 
     const activeValue = contractRes.data?.filter(c => c.status === 'active').reduce((s, c) => s + (c.total_value || 0), 0) || 0;
@@ -122,14 +162,18 @@ const AdminAnalytics: React.FC = () => {
     });
     setGmvMonthly(Array.from(buckets.entries()).map(([month, v]) => ({ month, ...v })));
 
-    // Engagement funnel — starts from enquiries since anonymous top-of-funnel
-    // (homepage visits, searches) isn't instrumented anywhere in this build.
+    // Engagement funnel — starts from signed-in buyer searches (logged via
+    // logEvent('vendor_search', ...) on ResultsPage). Anonymous top-of-funnel
+    // traffic (homepage visits before signup) still isn't instrumented — that
+    // needs session tracking this build doesn't have.
+    const distinctSearchers = new Set((searchEventsRes.data || []).map((e: { actor_id: string }) => e.actor_id)).size;
     const contractsSigned = (contractRes.data || []).filter((c: any) => c.status !== 'pending').length;
     const milestones = milestoneRes.data || [];
     const milestonesFunded = milestones.length;
     const milestonesReleased = milestones.filter((m: any) => m.escrow_status === 'released').length;
     const contractsCompleted = (contractRes.data || []).filter((c: any) => c.status === 'completed').length;
     setFunnel([
+      { stage: 'Buyers who searched', count: distinctSearchers },
       { stage: 'Enquiries submitted', count: enquiryRes.count || 0 },
       { stage: 'Contracts signed', count: contractsSigned },
       { stage: 'Milestones funded', count: milestonesFunded },
@@ -164,6 +208,56 @@ const AdminAnalytics: React.FC = () => {
       const badge: BuyerRow['badge'] = onTimeRate >= 95 ? 'green' : onTimeRate >= 80 ? 'amber' : 'red';
       return { id: buyerId, company_name: custMap.get(buyerId) ?? 'Buyer', onTimeRate, lateCount: s.late, disputeRatio, badge };
     }));
+
+    // Trust & Safety log: real blacklist/restore events, resolved to company names.
+    interface PlatformEventRow {
+      event_id: string;
+      event_type: string;
+      entity_type: string;
+      entity_id: string;
+      payload: { reason?: string } | null;
+      timestamp: string;
+    }
+    const { data: events } = await supabase
+      .from('platform_event')
+      .select('event_id, event_type, entity_type, entity_id, payload, timestamp')
+      .in('event_type', BLACKLIST_EVENT_TYPES)
+      .order('timestamp', { ascending: false })
+      .limit(20);
+    const eventRows = (events ?? []) as PlatformEventRow[];
+    const vendorIds = eventRows.filter(e => e.entity_type === 'vendor').map(e => e.entity_id);
+    const customerIds = eventRows.filter(e => e.entity_type === 'customer').map(e => e.entity_id);
+    const [{ data: eventVendors }, { data: eventCustomers }] = await Promise.all([
+      vendorIds.length ? supabase.from('vendors').select('id, company_name').in('id', vendorIds) : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
+      customerIds.length ? supabase.from('customers').select('id, company_name').in('id', customerIds) : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
+    ]);
+    const nameMap = new Map<string, string>([
+      ...(eventVendors ?? []).map((v): [string, string] => [v.id, v.company_name]),
+      ...(eventCustomers ?? []).map((c): [string, string] => [c.id, c.company_name]),
+    ]);
+    setBlacklistLog(eventRows.map(e => ({
+      id: e.event_id,
+      event_type: e.event_type,
+      entity_name: nameMap.get(e.entity_id) ?? (e.entity_type === 'vendor' ? 'Vendor' : 'Buyer'),
+      reason: e.payload?.reason ?? null,
+      timestamp: e.timestamp,
+    })));
+
+    // AI usage & estimated cost, grouped by feature — real token counts and
+    // per-model pricing logged by the anthropic-generate Edge Function.
+    const { data: usageRows } = await supabase
+      .from('ai_usage_log')
+      .select('feature, input_tokens, output_tokens, estimated_cost_usd');
+    const usageByFeature = new Map<string, AiUsageRow>();
+    (usageRows ?? []).forEach((r: { feature: string; input_tokens: number; output_tokens: number; estimated_cost_usd: number }) => {
+      const cur = usageByFeature.get(r.feature) ?? { feature: r.feature, calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
+      cur.calls += 1;
+      cur.inputTokens += r.input_tokens;
+      cur.outputTokens += r.output_tokens;
+      cur.costUsd += Number(r.estimated_cost_usd);
+      usageByFeature.set(r.feature, cur);
+    });
+    setAiUsage(Array.from(usageByFeature.values()).sort((a, b) => b.costUsd - a.costUsd));
 
     setLoading(false);
   }, []);
@@ -249,7 +343,7 @@ const AdminAnalytics: React.FC = () => {
       {/* 2. Engagement Funnel */}
       <section>
         <h2 className="text-lg font-bold text-white mb-1">Engagement Funnel — all time</h2>
-        <p className="text-xs text-slate-500 mb-4">Starts from enquiry submission — anonymous top-of-funnel traffic (homepage visits, searches) isn't instrumented in this build.</p>
+        <p className="text-xs text-slate-500 mb-4">Starts from signed-in buyer searches — anonymous top-of-funnel traffic (homepage visits before signup) still isn't instrumented in this build.</p>
         <div className="bg-slate-800 rounded-xl p-6 space-y-3">
           {funnel.map(row => (
             <div key={row.stage} className="flex items-center gap-3">
@@ -381,7 +475,83 @@ const AdminAnalytics: React.FC = () => {
         </div>
       </section>
 
-      {/* 5. Phase 2 Placeholders */}
+      {/* 5. Trust & Safety Log */}
+      <section>
+        <div className="flex items-center gap-2 mb-1">
+          <Ban className="h-4 w-4 text-red-400" />
+          <h2 className="text-lg font-bold text-white">Trust &amp; Safety Log</h2>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Blacklist and restoration actions from <Link to="/admin/users" className="text-[#0070F3] hover:underline">User Management</Link>, most recent first.</p>
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/60 border-b border-slate-700">
+              <tr>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Date</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Entity</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Event</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {blacklistLog.length === 0 && (
+                <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500 text-sm">No blacklist activity yet.</td></tr>
+              )}
+              {blacklistLog.map(row => (
+                <tr key={row.id} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 text-slate-400">{new Date(row.timestamp).toLocaleDateString('en-GB')}</td>
+                  <td className="px-5 py-3.5 font-medium text-white">{row.entity_name}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{BLACKLIST_EVENT_LABEL[row.event_type] ?? row.event_type}</td>
+                  <td className="px-5 py-3.5 text-slate-300">{row.reason ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 5b. AI Usage & Cost */}
+      <section>
+        <h2 className="text-lg font-bold text-white mb-1">AI Usage &amp; Estimated Cost</h2>
+        <p className="text-xs text-slate-500 mb-4">Every anthropic-generate call, by feature. Cost is estimated from Anthropic's published per-model token pricing.</p>
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-900/60 border-b border-slate-700">
+              <tr>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Feature</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Calls</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Input tokens</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Output tokens</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Est. cost</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-700/50">
+              {aiUsage.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500 text-sm">No AI calls logged yet.</td></tr>
+              )}
+              {aiUsage.map(row => (
+                <tr key={row.feature} className="hover:bg-slate-700/30 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-white">{AI_FEATURE_LABEL[row.feature] ?? row.feature}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">{row.calls.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">{row.inputTokens.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">{row.outputTokens.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-300">${row.costUsd.toFixed(4)}</td>
+                </tr>
+              ))}
+              {aiUsage.length > 0 && (
+                <tr className="bg-slate-900/40 font-semibold">
+                  <td className="px-5 py-3.5 text-white">Total</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.calls, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.inputTokens, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.outputTokens, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-slate-200">${aiUsage.reduce((s, r) => s + r.costUsd, 0).toFixed(4)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 6. Phase 2 Placeholders */}
       <section>
         <h2 className="text-lg font-bold text-white mb-4">Coming in Phase 2</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

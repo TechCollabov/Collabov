@@ -16,7 +16,7 @@ interface Employee {
 interface Vendor {
   id: string;
   company_name: string;
-  business_type: 'agency' | 'msp' | 'independent';
+  business_type: 'agency' | 'msp' | 'staffaug';
   country: string;
   rating: number;
   reviews: number;
@@ -41,14 +41,16 @@ interface SavedVendorRow {
     company_name: string | null;
     logo_url: string | null;
     rating: number | null;
+    country: string | null;
+    business_type: string | null;
   } | null;
 }
 
-interface ProjectRow {
+interface EngagementRow {
   id: string;
-  title: string;
+  project_title: string | null;
   status: string | null;
-  budget: number | null;
+  total_value: number | null;
   vendor_id: string | null;
 }
 
@@ -88,9 +90,16 @@ function statusBadge(status: string) {
   }
 }
 
+/** Maps the real engagements.status enum onto this page's 3-way filter. */
+function mapEngagementStatus(status: string | null): 'active' | 'completed' | 'invited' {
+  if (status === 'active') return 'active';
+  if (status === 'closing' || status === 'closed' || status === 'terminated') return 'completed';
+  return 'invited'; // pending_signature, pending_ir35
+}
+
 function typePill(type: string) {
   const label =
-    type === 'agency' ? 'IT Agency' : type === 'msp' ? 'MSP' : 'Independent';
+    type === 'agency' ? 'IT Agency' : type === 'msp' ? 'MSP' : 'Staff Aug';
   return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#0B2D59]/10 text-[#0B2D59]">
       {label}
@@ -117,7 +126,7 @@ function RehireModal({ vendor, onClose }: RehireModalProps) {
       // Re-use the previous SOW as a template: wizard pre-populated, new engagement record.
       navigate(
         `/sow-wizard?vendorId=${vendor.id}&vendor=${encodeURIComponent(vendor.company_name)}` +
-        `&type=${vendor.business_type === 'independent' ? 'staffaug' : vendor.business_type}` +
+        `&type=${vendor.business_type}` +
         `&budget=${vendor.last_engagement_value}&project=${encodeURIComponent(vendor.last_engagement)}`
       );
     }
@@ -351,7 +360,7 @@ export default function MyVendorsPage() {
         // 1. Fetch saved_vendors joined with vendors table
         const { data: savedData, error: savedError } = await supabase
           .from('saved_vendors')
-          .select('id, vendor_id, contractor_id, vendors(id, company_name, logo_url, rating)')
+          .select('id, vendor_id, contractor_id, vendors(id, company_name, logo_url, rating, country, business_type)')
           .eq('customer_id', user!.id);
 
         if (savedError) throw savedError;
@@ -363,28 +372,29 @@ export default function MyVendorsPage() {
           .map((s) => s.vendor_id)
           .filter((id): id is string => !!id);
 
-        // 2. Fetch projects for this customer with a vendor assigned
-        const { data: projectsData } = await supabase
-          .from('projects')
-          .select('id, title, status, budget, vendor_id')
-          .eq('customer_id', user!.id)
-          .not('vendor_id', 'is', null);
+        // 2. Fetch engagements for this buyer with a vendor assigned (the canonical lifecycle table)
+        const { data: engagementsData } = await supabase
+          .from('engagements')
+          .select('id, project_title, status, total_value, vendor_id')
+          .eq('buyer_id', user!.id)
+          .not('vendor_id', 'is', null)
+          .order('created_at', { ascending: false });
 
-        const projects = (projectsData ?? []) as ProjectRow[];
+        const engagements = (engagementsData ?? []) as EngagementRow[];
 
-        // Build a map: vendor_id -> most recent project
-        const projectByVendor = new Map<string, ProjectRow>();
-        for (const p of projects) {
-          if (p.vendor_id && !projectByVendor.has(p.vendor_id)) {
-            projectByVendor.set(p.vendor_id, p);
+        // Build a map: vendor_id -> most recent engagement
+        const engagementByVendor = new Map<string, EngagementRow>();
+        for (const e of engagements) {
+          if (e.vendor_id && !engagementByVendor.has(e.vendor_id)) {
+            engagementByVendor.set(e.vendor_id, e);
           }
         }
 
         // Count engagements per vendor
         const engagementCount = new Map<string, number>();
-        for (const p of projects) {
-          if (p.vendor_id) {
-            engagementCount.set(p.vendor_id, (engagementCount.get(p.vendor_id) ?? 0) + 1);
+        for (const e of engagements) {
+          if (e.vendor_id) {
+            engagementCount.set(e.vendor_id, (engagementCount.get(e.vendor_id) ?? 0) + 1);
           }
         }
 
@@ -394,23 +404,19 @@ export default function MyVendorsPage() {
           .map((s) => {
             const v = s.vendors!;
             const vendorId = v.id;
-            const project = projectByVendor.get(vendorId);
-
-            const dbStatus = project?.status ?? 'invited';
-            let engStatus: 'active' | 'completed' | 'invited' = 'invited';
-            if (dbStatus === 'active' || dbStatus === 'in_progress') engStatus = 'active';
-            else if (dbStatus === 'completed') engStatus = 'completed';
+            const engagement = engagementByVendor.get(vendorId);
+            const engStatus = mapEngagementStatus(engagement?.status ?? null);
 
             return {
               id: vendorId,
               company_name: v.company_name ?? 'Unknown Vendor',
-              business_type: 'agency' as const,
-              country: '',
+              business_type: (v.business_type as Vendor['business_type']) ?? 'agency',
+              country: v.country ?? '',
               rating: v.rating ?? 0,
               reviews: 0,
-              last_engagement: project?.title ?? 'No engagement yet',
+              last_engagement: engagement?.project_title ?? 'No engagement yet',
               last_engagement_status: engStatus,
-              last_engagement_value: project?.budget ?? 0,
+              last_engagement_value: engagement?.total_value ?? 0,
               engagement_count: engagementCount.get(vendorId) ?? 0,
               available: true,
               rehire_eligible: engStatus === 'completed',
@@ -419,41 +425,37 @@ export default function MyVendorsPage() {
             };
           });
 
-        // Also include vendors from projects that aren't in saved_vendors
-        for (const p of projects) {
-          if (!p.vendor_id) continue;
-          if (vendorIds.includes(p.vendor_id)) continue;
-
-          // Fetch vendor details
-          const { data: vData } = await supabase
+        // Also include vendors from engagements that aren't in saved_vendors
+        const missingVendorIds = Array.from(
+          new Set(engagements.filter((e) => e.vendor_id && !vendorIds.includes(e.vendor_id)).map((e) => e.vendor_id as string))
+        );
+        if (missingVendorIds.length > 0) {
+          const { data: vendorsData } = await supabase
             .from('vendors')
-            .select('id, company_name, logo_url, rating')
-            .eq('id', p.vendor_id)
-            .maybeSingle();
+            .select('id, company_name, logo_url, rating, country, business_type')
+            .in('id', missingVendorIds);
 
-          if (!vData) continue;
+          for (const vData of vendorsData ?? []) {
+            const engagement = engagementByVendor.get(vData.id);
+            const engStatus = mapEngagementStatus(engagement?.status ?? null);
 
-          const dbStatus = p.status ?? 'active';
-          let engStatus: 'active' | 'completed' | 'invited' = 'invited';
-          if (dbStatus === 'active' || dbStatus === 'in_progress') engStatus = 'active';
-          else if (dbStatus === 'completed') engStatus = 'completed';
-
-          built.push({
-            id: vData.id,
-            company_name: vData.company_name ?? 'Unknown Vendor',
-            business_type: 'agency',
-            country: '',
-            rating: vData.rating ?? 0,
-            reviews: 0,
-            last_engagement: p.title,
-            last_engagement_status: engStatus,
-            last_engagement_value: p.budget ?? 0,
-            engagement_count: engagementCount.get(p.vendor_id) ?? 1,
-            available: true,
-            rehire_eligible: engStatus === 'completed',
-            termination_reason: null,
-            employees: [],
-          });
+            built.push({
+              id: vData.id,
+              company_name: vData.company_name ?? 'Unknown Vendor',
+              business_type: (vData.business_type as Vendor['business_type']) ?? 'agency',
+              country: vData.country ?? '',
+              rating: vData.rating ?? 0,
+              reviews: 0,
+              last_engagement: engagement?.project_title ?? 'No engagement yet',
+              last_engagement_status: engStatus,
+              last_engagement_value: engagement?.total_value ?? 0,
+              engagement_count: engagementCount.get(vData.id) ?? 1,
+              available: true,
+              rehire_eligible: engStatus === 'completed',
+              termination_reason: null,
+              employees: [],
+            });
+          }
         }
 
         setVendors(built);

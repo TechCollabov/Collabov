@@ -9,7 +9,9 @@ export const getRedirectPath = (userType: UserType | null): string => {
     case 'vendor':
       return '/vendor/dashboard';
     case 'contractor':
-      return '/contractor/dashboard';
+      // No live signup path creates a 'contractor' account and the standalone
+      // contractor dashboard was removed as dead legacy code — fall through home.
+      return '/';
     case 'customer':
       return '/customer/dashboard';
     case 'admin':

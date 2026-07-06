@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ShieldCheck, Clock, Check, X, MessageSquare, FileText, ExternalLink,
-  CheckCircle, AlertTriangle, Eye, Loader2, Ban, ShieldOff, UserCheck,
+  CheckCircle, AlertTriangle, Eye, Loader2, UserCheck,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { blacklistVendor, approveVendorRestoration, getPlatformSettings } from '../../lib/workflows';
+import { getPlatformSettings, IR35_QUESTIONS } from '../../lib/workflows';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
@@ -60,6 +61,8 @@ const DOC_LABELS: Record<string, string> = {
   addressProof: 'Proof of Business Address',
   vatCert: 'VAT Registration Certificate',
 };
+
+const EXPECTED_DOC_COUNT = 3; // companies_house, address_proof, vat_certificate
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   submitted:          { label: 'Pending Review',      color: 'bg-amber-100 text-amber-700' },
@@ -179,24 +182,64 @@ function DocModal({ doc, adminStatus, onSave, onClose }: DocModalProps) {
 
 /* ─── Main Component ────────────────────────────────────────────── */
 
+// Which answer to each IR35_QUESTIONS index signals "inside IR35" risk.
+// Equipment provision (index 3) is inverted: the worker NOT providing their
+// own equipment is the risk signal, not the reverse.
+const IR35_RISK_ANSWER: ('Yes' | 'No')[] = ['Yes', 'Yes', 'Yes', 'No', 'Yes', 'Yes'];
+
+interface IR35QueueRow {
+  id: string;
+  project_title: string;
+  buyer_id: string;
+  vendor_id: string;
+  working_location: string | null;
+  created_at: string;
+  ir35_answers: Record<string, string>;
+  right_to_work_confirmed: boolean;
+}
+
 /** Staff-aug engagements signed by both parties wait here for the IR35 SDS
- *  stamp — the contract activates only after an admin stamps inside/outside. */
+ *  stamp — the contract activates only after an admin stamps inside/outside.
+ *  Shows the buyer's actual IR35 questionnaire answers and right-to-work
+ *  confirmation from the SOW, rather than asking the admin to stamp blind. */
 function IR35StampQueue() {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<IR35QueueRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = async () => {
+    interface EngRow {
+      id: string; project_title: string; buyer_id: string; vendor_id: string;
+      working_location: string | null; created_at: string; sow_id: string | null;
+    }
+    interface SowRow {
+      id: string; ir35_answers: Record<string, string> | null; right_to_work_confirmed: boolean | null;
+    }
     const { data } = await supabase
       .from('engagements')
-      .select('id, project_title, buyer_id, vendor_id, working_location, status, created_at')
+      .select('id, project_title, buyer_id, vendor_id, working_location, status, created_at, sow_id')
       .eq('ir35_status', 'pending')
       .eq('status', 'pending_ir35')
       .order('created_at', { ascending: true });
-    setRows(data ?? []);
+    const engs = (data ?? []) as EngRow[];
+    const sowIds = engs.map(e => e.sow_id).filter((id): id is string => !!id);
+    const { data: sows } = sowIds.length
+      ? await supabase.from('sow_documents').select('id, ir35_answers, right_to_work_confirmed').in('id', sowIds)
+      : { data: [] as SowRow[] };
+    const sowMap = new Map((sows as SowRow[] ?? []).map(s => [s.id, s]));
+    setRows(engs.map(e => {
+      const sow = e.sow_id ? sowMap.get(e.sow_id) : undefined;
+      return {
+        id: e.id, project_title: e.project_title, buyer_id: e.buyer_id, vendor_id: e.vendor_id,
+        working_location: e.working_location, created_at: e.created_at,
+        ir35_answers: sow?.ir35_answers ?? {},
+        right_to_work_confirmed: !!sow?.right_to_work_confirmed,
+      };
+    }));
   };
   useEffect(() => { load(); }, []);
 
-  const stamp = async (row: any, determination: 'inside' | 'outside') => {
+  const stamp = async (row: IR35QueueRow, determination: 'inside' | 'outside') => {
     setBusyId(row.id);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -223,165 +266,74 @@ function IR35StampQueue() {
 
   if (rows.length === 0) return null;
 
+  const requiresRightToWork = (row: IR35QueueRow) =>
+    row.working_location === 'On-site at buyer premises in UK' || row.working_location === 'Hybrid';
+
   return (
     <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 mb-6">
       <h2 className="text-sm font-bold text-[#0B2D59] mb-1">IR35 SDS Stamp Queue ({rows.length})</h2>
-      <p className="text-xs text-gray-400 mb-3">Staff-aug contracts signed by both parties — stamp the status determination to activate.</p>
+      <p className="text-xs text-gray-400 mb-3">Staff-aug contracts signed by both parties — review the buyer's IR35 indicators before stamping the status determination.</p>
       <div className="space-y-2">
-        {rows.map(row => (
-          <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded-lg p-3">
-            <div>
-              <div className="text-sm font-semibold text-gray-900">{row.project_title}</div>
-              <div className="text-xs text-gray-400">Working location: {row.working_location ?? 'unspecified'} · Signed {fmtDate(row.created_at)}</div>
-            </div>
-            <div className="flex gap-2">
-              <button disabled={busyId === row.id} onClick={() => stamp(row, 'outside')}
-                className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
-                Stamp OUTSIDE IR35
-              </button>
-              <button disabled={busyId === row.id} onClick={() => stamp(row, 'inside')}
-                className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
-                Stamp INSIDE IR35
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Blacklist / restore panel for verified vendors. Restoration requires two
- *  distinct admin approvals. Blacklisting a vendor with an open dispute
- *  doesn't touch escrow — that dispute resolves through its own flow. */
-function BlacklistPanel() {
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [blacklisted, setBlacklisted] = useState<any[]>([]);
-  const [reason, setReason] = useState<Record<string, string>>({});
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [openDisputeWarning, setOpenDisputeWarning] = useState<Record<string, number>>({});
-  const [adminId, setAdminId] = useState<string | null>(null);
-
-  const loadBlacklisted = async () => {
-    const { data } = await supabase.from('vendors').select('id, company_name, blacklist_reason, blacklisted_at, restoration_approvals').eq('is_blacklisted', true);
-    setBlacklisted(data ?? []);
-  };
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setAdminId(data.user?.id ?? null));
-    loadBlacklisted();
-  }, []);
-
-  const runSearch = async (q: string) => {
-    setSearch(q);
-    if (q.trim().length < 2) { setResults([]); return; }
-    const { data } = await supabase
-      .from('vendors')
-      .select('id, company_name, is_blacklisted')
-      .ilike('company_name', `%${q.trim()}%`)
-      .eq('is_verified', true)
-      .eq('is_blacklisted', false)
-      .limit(8);
-    setResults(data ?? []);
-    const ids = (data ?? []).map((v: any) => v.id);
-    if (ids.length) {
-      const { data: disputes } = await supabase.from('disputes').select('vendor_id').in('vendor_id', ids).neq('status', 'resolved');
-      const counts: Record<string, number> = {};
-      (disputes ?? []).forEach((d: any) => { counts[d.vendor_id] = (counts[d.vendor_id] ?? 0) + 1; });
-      setOpenDisputeWarning(counts);
-    }
-  };
-
-  const doBlacklist = async (vendorId: string) => {
-    if (!adminId || !reason[vendorId]?.trim()) return;
-    setBusyId(vendorId);
-    try {
-      await blacklistVendor(vendorId, reason[vendorId].trim(), adminId);
-      setResults(prev => prev.filter(v => v.id !== vendorId));
-      await loadBlacklisted();
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const doApproveRestore = async (vendorId: string) => {
-    if (!adminId) return;
-    setBusyId(vendorId);
-    try {
-      await approveVendorRestoration(vendorId, adminId);
-      await loadBlacklisted();
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-red-200 shadow-sm p-5 mb-6">
-      <h2 className="text-sm font-bold text-[#0B2D59] mb-1 flex items-center gap-2"><Ban className="h-4 w-4 text-red-500" /> Vendor Blacklist</h2>
-      <p className="text-xs text-gray-400 mb-3">Search verified vendors to blacklist. Restoration needs sign-off from two different admins.</p>
-
-      <input
-        value={search}
-        onChange={e => runSearch(e.target.value)}
-        placeholder="Search vendor by name…"
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2"
-      />
-      {results.map(v => (
-        <div key={v.id} className="border border-gray-100 rounded-lg p-3 mb-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-gray-900">{v.company_name}</span>
-            {openDisputeWarning[v.id] > 0 && (
-              <span className="text-xs text-amber-600 font-medium">
-                {openDisputeWarning[v.id]} open dispute{openDisputeWarning[v.id] > 1 ? 's' : ''} — resolves independently
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <input
-              value={reason[v.id] ?? ''}
-              onChange={e => setReason(prev => ({ ...prev, [v.id]: e.target.value }))}
-              placeholder="Reason for blacklisting"
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs"
-            />
-            <button
-              disabled={busyId === v.id || !reason[v.id]?.trim()}
-              onClick={() => doBlacklist(v.id)}
-              className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
-            >
-              Blacklist
-            </button>
-          </div>
-        </div>
-      ))}
-
-      {blacklisted.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Currently Blacklisted</h3>
-          <div className="space-y-2">
-            {blacklisted.map(v => {
-              const approvals: string[] = Array.isArray(v.restoration_approvals) ? v.restoration_approvals : [];
-              const alreadyApproved = adminId ? approvals.includes(adminId) : false;
-              return (
-                <div key={v.id} className="flex items-center justify-between border border-gray-100 rounded-lg p-3">
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900 flex items-center gap-1.5"><ShieldOff className="h-3.5 w-3.5 text-red-400" />{v.company_name}</div>
-                    <div className="text-xs text-gray-400">{v.blacklist_reason} · {fmtDate(v.blacklisted_at)}</div>
+        {rows.map(row => {
+          const answerCount = Object.keys(row.ir35_answers).length;
+          const riskCount = IR35_QUESTIONS.reduce((n, _, idx) => n + (row.ir35_answers[idx] === IR35_RISK_ANSWER[idx] ? 1 : 0), 0);
+          const expanded = expandedId === row.id;
+          return (
+            <div key={row.id} className="border border-gray-100 rounded-lg p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">{row.project_title}</div>
+                  <div className="text-xs text-gray-400">Working location: {row.working_location ?? 'unspecified'} · Signed {fmtDate(row.created_at)}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    {answerCount > 0 ? (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${riskCount >= 4 ? 'bg-red-100 text-red-700' : riskCount >= 2 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                        {riskCount}/{IR35_QUESTIONS.length} indicators suggest inside IR35
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No IR35 answers on file</span>
+                    )}
+                    {requiresRightToWork(row) && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${row.right_to_work_confirmed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {row.right_to_work_confirmed ? 'Right to work confirmed' : 'Right to work NOT confirmed'}
+                      </span>
+                    )}
                   </div>
-                  <button
-                    disabled={busyId === v.id || alreadyApproved}
-                    onClick={() => doApproveRestore(v.id)}
-                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
-                    title={alreadyApproved ? 'You already approved — needs a second, different admin' : 'Approve restoration'}
-                  >
-                    {alreadyApproved ? `Approved (${approvals.length}/2)` : `Approve Restore (${approvals.length}/2)`}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setExpandedId(expanded ? null : row.id)}
+                    className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50">
+                    {expanded ? 'Hide answers' : 'View answers'}
+                  </button>
+                  <button disabled={busyId === row.id} onClick={() => stamp(row, 'outside')}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                    Stamp OUTSIDE IR35
+                  </button>
+                  <button disabled={busyId === row.id} onClick={() => stamp(row, 'inside')}
+                    className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                    Stamp INSIDE IR35
                   </button>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              </div>
+              {expanded && (
+                <div className="mt-3 pt-3 border-t border-gray-100 overflow-hidden rounded-lg border border-gray-100">
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {IR35_QUESTIONS.map((q, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                          <td className="px-3 py-2 text-gray-600">{q}</td>
+                          <td className={`px-3 py-2 font-semibold w-16 text-center ${row.ir35_answers[idx] === IR35_RISK_ANSWER[idx] ? 'text-amber-600' : 'text-green-600'}`}>
+                            {row.ir35_answers[idx] || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -408,6 +360,7 @@ const AdminVerification: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [referrals, setReferrals] = useState<VendorReferral[]>([]);
   const [decisionBusy, setDecisionBusy] = useState(false);
+  const [referralStatus, setReferralStatus] = useState<Record<string, { confirmed: number; total: number }>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -457,6 +410,25 @@ const AdminVerification: React.FC = () => {
         }));
         setAdminDocStatus(docStatus);
         setDocNotes(notes);
+
+        // Referral confirmation counts, for the queue-row summary — computed
+        // from real vendor_referrals rows rather than the vendors.referral_count
+        // trust-badge column, which nothing in the app keeps in sync.
+        const vendorIds = mapped.map(v => v.id);
+        if (vendorIds.length > 0) {
+          const { data: allReferrals } = await supabase
+            .from('vendor_referrals')
+            .select('vendor_id, confirmed')
+            .in('vendor_id', vendorIds);
+          const statusMap: Record<string, { confirmed: number; total: number }> = {};
+          (allReferrals ?? []).forEach((r: { vendor_id: string; confirmed: boolean }) => {
+            const cur = statusMap[r.vendor_id] ?? { confirmed: 0, total: 0 };
+            cur.total += 1;
+            if (r.confirmed) cur.confirmed += 1;
+            statusMap[r.vendor_id] = cur;
+          });
+          if (!cancelled) setReferralStatus(statusMap);
+        }
       } catch {
         setVendors([]);
       } finally {
@@ -607,7 +579,7 @@ const AdminVerification: React.FC = () => {
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Vendor Verification</h1>
 
       <IR35StampQueue />
-      <BlacklistPanel />
+      <p className="text-xs text-gray-400 mb-4 -mt-2">Vendor blacklist review has moved to <Link to="/admin/users" className="text-[#0070F3] underline">User Management</Link>.</p>
 
       <div className="flex gap-0 flex-1 min-h-0 rounded-xl border border-gray-100 shadow-sm overflow-hidden bg-white">
         {/* ── Left Panel: Queue ── */}
@@ -650,6 +622,11 @@ const AdminVerification: React.FC = () => {
               const sla = getPlatformSettings().vendorVerificationSlaDays;
               const timeColor = age > sla ? 'text-red-500' : age > Math.max(1, sla - 2) ? 'text-amber-500' : 'text-gray-400';
               const s = STATUS_MAP[v.status] ?? STATUS_MAP['submitted'];
+              const docCount = v.vendor_documents?.length ?? 0;
+              const validDocCount = (v.vendor_documents ?? []).filter(d => adminDocStatus[d.id] === 'valid').length;
+              const docColor = docCount === 0 ? 'bg-red-100 text-red-700' : docCount < EXPECTED_DOC_COUNT ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+              const ref = referralStatus[v.id];
+              const refColor = !ref || ref.total === 0 ? 'bg-red-100 text-red-700' : ref.confirmed < ref.total ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
               return (
                 <div
                   key={v.id}
@@ -663,8 +640,16 @@ const AdminVerification: React.FC = () => {
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
                       {v.country && <span>{v.country}</span>}
                     </div>
-                    <div className={`flex items-center gap-1 text-xs mb-2 ${timeColor}`}>
+                    <div className={`flex items-center gap-1 text-xs mb-1.5 ${timeColor}`}>
                       <Clock className="h-3 w-3" /> {fmtDate(dateStr)} ({age}d ago)
+                    </div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${docColor}`} title={`${validDocCount} of ${docCount} uploaded documents marked valid`}>
+                        Docs {docCount}/{EXPECTED_DOC_COUNT}
+                      </span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${refColor}`}>
+                        Referrals {ref ? `${ref.confirmed}/${ref.total}` : '0/0'}
+                      </span>
                     </div>
                     <button
                       onClick={() => { setSelectedId(v.id); setAdminNotes(''); setShowRejectConfirm(false); }}

@@ -56,7 +56,8 @@ const DiscoveryBriefPage: React.FC = () => {
     });
   };
 
-  const canSubmit = description.length >= 100 && outputs.size >= 1 && budget.trim() !== '' && !!vendorId && !sending;
+  const isAgency = !vendorId || vendorType === 'agency';
+  const canSubmit = isAgency && description.length >= 100 && outputs.size >= 1 && budget.trim() !== '' && !!vendorId && !sending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +136,7 @@ const DiscoveryBriefPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-2xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold text-[#0B2D59] mb-2">Start with a Discovery</h1>
           <p className="text-sm text-gray-600 leading-relaxed">
             Commission a technical specification from a verified IT agency.{' '}
@@ -143,6 +144,25 @@ const DiscoveryBriefPage: React.FC = () => {
             Deliverable: full project specification.
           </p>
         </div>
+
+        {/* Decision guide: when a discovery is the right call vs. requesting a proposal directly */}
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-8 text-sm text-blue-900">
+          <p className="font-semibold mb-1.5">Is a discovery right for you?</p>
+          <ul className="space-y-1 text-blue-800">
+            <li>• <strong>Use a discovery</strong> if you know the problem but not yet how to build it — you'll get a spec, prototype, or feasibility report to scope the real project from.</li>
+            <li>• <strong>Skip straight to Request a Proposal</strong> if you already have a clear spec or requirements — a discovery would just add cost and time.</li>
+            <li>• Discoveries are only offered by IT agencies, since MSPs and staff augmentation vendors deliver against a spec rather than write one.</li>
+          </ul>
+        </div>
+
+        {vendorId && !isAgency && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6 text-sm text-red-800">
+            {vendorName || 'This vendor'} is {vendorType === 'msp' ? 'an MSP' : vendorType === 'staffaug' ? 'a staff augmentation vendor' : 'not an IT agency'} — discovery
+            engagements are only available from IT agencies.{' '}
+            <Link to="/results?type=agency" className="font-semibold underline">Find an agency</Link> instead, or{' '}
+            <Link to={`/vendor/profile/${vendorId}`} className="font-semibold underline">request a proposal directly</Link> from {vendorName || 'this vendor'}.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Description */}
@@ -231,11 +251,6 @@ const DiscoveryBriefPage: React.FC = () => {
               Discovery briefs go to a specific project agency.{' '}
               <Link to="/results" className="font-semibold underline">Find an agency</Link> and start the
               discovery from their profile.
-            </div>
-          )}
-          {vendorId && vendorType && vendorType !== 'agency' && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-              Note: discovery engagements are designed for project agencies.
             </div>
           )}
           {vendorId && vendorName && (

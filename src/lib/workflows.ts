@@ -24,7 +24,6 @@ export const PROPOSAL_WARNING_DAY = 25;
 export const INTERVIEW_RESPONSE_HOURS = 48;
 export const REVIEW_WINDOW_DAYS = 14;
 export const DEFECT_LIABILITY_DAYS = 30;
-export const REPLACEMENT_SLA_BUSINESS_DAYS = 10;
 export const REHIRE_PROMPT_DAYS = 30;
 export const PARTNER_INVITE_EXPIRY_DAYS = 7;
 
@@ -82,6 +81,19 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { key: 'message', label: 'New message', forced: false },
   { key: 'milestone', label: 'Milestone status change', forced: false },
   { key: 'review', label: 'New review', forced: false },
+];
+
+/** The 6 IR35 status indicators a buyer answers in the SOW Wizard for staff-aug
+ *  engagements, persisted verbatim to sow_documents.ir35_answers (index-keyed)
+ *  and read back by the admin IR35 SDS stamp queue so the determination isn't
+ *  made blind. */
+export const IR35_QUESTIONS = [
+  'Does the buyer control how and when the work is done (not just what is delivered)?',
+  'Is the worker required to do the work personally, with no right to send a substitute?',
+  'Does the buyer guarantee a minimum amount of work?',
+  'Does the worker provide their own equipment and tools?',
+  'Is the worker financially dependent on this single engagement?',
+  'Is the worker integrated into the buyer\'s organisation (permanent desk, company email, line management)?',
 ];
 
 export const DISPUTE_REASONS = [
@@ -201,10 +213,6 @@ refreshPlatformSettings().catch(() => {});
 
 export function platformFee(gross: number): number {
   return Math.round(gross * getPlatformSettings().platformFeePct) / 100;
-}
-
-export function netToVendor(gross: number): number {
-  return Math.round((gross - platformFee(gross)) * 100) / 100;
 }
 
 export function formatGBP(amount: number): string {

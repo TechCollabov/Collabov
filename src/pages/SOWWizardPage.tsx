@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { notify, logEvent, NOTICE_PERIOD_DAYS, VENDOR_CONTRACT_TEMPLATE } from '../lib/workflows';
+import { logEvent, NOTICE_PERIOD_DAYS, VENDOR_CONTRACT_TEMPLATE, IR35_QUESTIONS } from '../lib/workflows';
 import {
   Loader2,
   CheckCircle,
@@ -61,6 +61,7 @@ interface FormData {
   ip_shared_terms: string;
   working_location: string;
   ir35_answers: Record<string, string>;
+  right_to_work_confirmed: boolean;
   response_time_slo: string;
   uptime_slo: string;
 }
@@ -85,15 +86,6 @@ const SERVICE_TYPES = [
   'DevOps',
   'Data & Analytics',
   'UI/UX Design',
-];
-
-const IR35_QUESTIONS = [
-  'Does the buyer control how and when the work is done (not just what is delivered)?',
-  'Is the worker required to do the work personally, with no right to send a substitute?',
-  'Does the buyer guarantee a minimum amount of work?',
-  'Does the worker provide their own equipment and tools?',
-  'Is the worker financially dependent on this single engagement?',
-  'Is the worker integrated into the buyer\'s organisation (permanent desk, company email, line management)?',
 ];
 
 const DEFAULT_MSP_DELIVERABLES = [
@@ -140,6 +132,7 @@ function buildDefaultFormData(
     ip_shared_terms: '',
     working_location: 'Remote from home country',
     ir35_answers: {},
+    right_to_work_confirmed: false,
     response_time_slo: '',
     uptime_slo: '',
   };
@@ -344,46 +337,18 @@ function Step2({
 
   const generateDeliverables = async () => {
     setGenerating(true);
-    const apiKey = (import.meta as any).env?.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      setMilestones([
-        { id: uid(), name: 'Discovery & Architecture', description: 'Technical architecture document and project plan', amount: Math.round(formData.budget * 0.2), due_date: '', acceptance_criteria: ['Architecture document delivered', 'Technology stack confirmed', 'Project plan approved'] },
-        { id: uid(), name: 'Core Development', description: 'Main application features built and tested', amount: Math.round(formData.budget * 0.5), due_date: '', acceptance_criteria: ['All core features functional', 'Unit tests passing (>80% coverage)', 'Staging environment deployed'] },
-        { id: uid(), name: 'Testing & Launch', description: 'UAT, bug fixes, and production deployment', amount: Math.round(formData.budget * 0.3), due_date: '', acceptance_criteria: ['UAT sign-off from buyer', 'Production deployment complete', 'Handover documentation delivered'] },
-      ]);
-      setGenerating(false);
-      return;
-    }
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: `Create 3-4 project milestones for this IT project SOW. Return ONLY valid JSON array.
+      const prompt = `Create 3-4 project milestones for this IT project SOW. Return ONLY valid JSON array.
 Project: ${formData.project_title}
 Service: ${formData.service_type}
 Description: ${formData.description}
 Budget: £${formData.budget}
-Format: [{"name": "...", "description": "...", "amount": number, "acceptance_criteria": ["...", "...", "..."]}]`,
-            },
-          ],
-        }),
-        signal: controller.signal,
+Format: [{"name": "...", "description": "...", "amount": number, "acceptance_criteria": ["...", "...", "..."]}]`;
+      const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
+        body: { prompt, maxTokens: 1000, feature: 'sow_milestones' },
       });
-      clearTimeout(timer);
-      const data = await res.json();
-      const text = data.content?.[0]?.text || '[]';
+      if (error) throw error;
+      const text: string = envelope?.text || '[]';
       // Extract JSON array from possible surrounding text
       const match = text.match(/\[[\s\S]*\]/);
       const parsed = JSON.parse(match ? match[0] : text);
@@ -392,9 +357,9 @@ Format: [{"name": "...", "description": "...", "amount": number, "acceptance_cri
       );
     } catch {
       setMilestones([
-        { id: uid(), name: 'Milestone 1', description: 'First deliverable', amount: Math.round(formData.budget / 3), due_date: '', acceptance_criteria: ['Deliverable complete', 'Accepted by buyer'] },
-        { id: uid(), name: 'Milestone 2', description: 'Second deliverable', amount: Math.round(formData.budget / 3), due_date: '', acceptance_criteria: ['Deliverable complete'] },
-        { id: uid(), name: 'Final Delivery', description: 'Project completion', amount: formData.budget - Math.round(formData.budget / 3) * 2, due_date: '', acceptance_criteria: ['All deliverables accepted', 'Production deployment complete'] },
+        { id: uid(), name: 'Discovery & Architecture', description: 'Technical architecture document and project plan', amount: Math.round(formData.budget * 0.2), due_date: '', acceptance_criteria: ['Architecture document delivered', 'Technology stack confirmed', 'Project plan approved'] },
+        { id: uid(), name: 'Core Development', description: 'Main application features built and tested', amount: Math.round(formData.budget * 0.5), due_date: '', acceptance_criteria: ['All core features functional', 'Unit tests passing (>80% coverage)', 'Staging environment deployed'] },
+        { id: uid(), name: 'Testing & Launch', description: 'UAT, bug fixes, and production deployment', amount: Math.round(formData.budget * 0.3), due_date: '', acceptance_criteria: ['UAT sign-off from buyer', 'Production deployment complete', 'Handover documentation delivered'] },
       ]);
     }
     setGenerating(false);
@@ -911,11 +876,20 @@ function Step4({
           {showRightToWork && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mt-3 text-sm text-amber-800">
               <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <p className="font-semibold mb-1">Right to Work Check Required</p>
-                <p className="leading-relaxed">
+                <p className="leading-relaxed mb-3">
                   You are required to verify this person's right to work in the UK before they begin. This is a legal obligation under the Immigration, Asylum and Nationality Act 2006. Collabov does not conduct this check — it is your responsibility.
                 </p>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.right_to_work_confirmed}
+                    onChange={(e) => onChange({ right_to_work_confirmed: e.target.checked })}
+                    className="mt-0.5 accent-amber-600"
+                  />
+                  <span className="font-medium">I confirm I will complete this right-to-work check before the worker begins.</span>
+                </label>
               </div>
             </div>
           )}
@@ -1005,6 +979,9 @@ function Step5({
   buyerSigned,
   signingInProgress,
   obligations,
+  openSignUrl,
+  openSignError,
+  onRefreshStatus,
 }: {
   formData: FormData;
   vendor: string;
@@ -1019,6 +996,9 @@ function Step5({
   buyerSigned: boolean;
   signingInProgress: boolean;
   obligations: string;
+  openSignUrl: string | null;
+  openSignError: string | null;
+  onRefreshStatus: () => void;
 }) {
   const navigate = useNavigate();
 
@@ -1157,7 +1137,7 @@ function Step5({
         </div>
       )}
 
-      {/* E-Signature Modal (simulated in-platform signing) */}
+      {/* E-Signature Modal — real OpenSign signing, not an in-app flip */}
       {showESignatureModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
@@ -1171,7 +1151,7 @@ function Step5({
               <p className="text-sm text-gray-600">
                 {buyerSigned
                   ? 'Waiting for the vendor to counter-sign. Both parties sign independently — the contract activates once both signatures are in.'
-                  : 'Signing is parallel: you sign here, the vendor signs from their Active Contracts screen. The contract activates when both have signed.'}
+                  : 'Signing happens in OpenSign, which opens in a new tab. The vendor signs separately from their Active Contracts screen. The contract activates when both have signed.'}
               </p>
 
               <div className="space-y-2 mt-4">
@@ -1194,15 +1174,27 @@ function Step5({
                 </p>
               )}
 
+              {openSignError && <p className="text-xs text-red-600 mt-2">{openSignError}</p>}
+
               {!buyerSigned ? (
-                <button
-                  type="button"
-                  onClick={onBuyerSign}
-                  disabled={signingInProgress}
-                  className="w-full bg-[#0070F3] hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-xl mt-2 transition-colors"
-                >
-                  {signingInProgress ? 'Signing…' : 'Sign Contract'}
-                </button>
+                <div className="space-y-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={onBuyerSign}
+                    disabled={!openSignUrl}
+                    className="w-full bg-[#0070F3] hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-xl transition-colors"
+                  >
+                    {openSignUrl ? 'Sign with OpenSign →' : 'Preparing signing link…'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRefreshStatus}
+                    disabled={signingInProgress}
+                    className="w-full border border-blue-200 text-blue-700 font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    {signingInProgress ? 'Checking…' : "I've signed — refresh status"}
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -1222,7 +1214,7 @@ function Step5({
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-function validateStep(step: number, formData: FormData): string | null {
+function validateStep(step: number, formData: FormData, vendorType: string): string | null {
   if (step === 1) {
     if (!formData.project_title || formData.project_title.length < 5) return 'Project title must be at least 5 characters.';
     if (!formData.service_type) return 'Please select a service type.';
@@ -1241,6 +1233,11 @@ function validateStep(step: number, formData: FormData): string | null {
     if (!formData.ip_ownership) return 'Please select IP ownership.';
     if (formData.ip_ownership === 'Shared IP (specify terms)' && !formData.ip_shared_terms.trim()) {
       return 'Please specify the shared IP terms.';
+    }
+    const showRightToWork = vendorType === 'staffaug' &&
+      (formData.working_location === 'On-site at buyer premises in UK' || formData.working_location === 'Hybrid');
+    if (showRightToWork && !formData.right_to_work_confirmed) {
+      return 'Please confirm you will complete the right-to-work check before proceeding.';
     }
   }
   return null;
@@ -1276,6 +1273,8 @@ export default function SOWWizardPage() {
   const [signing, setSigning] = useState(false);
   const [buyerSigned, setBuyerSigned] = useState(false);
   const [persistedIds, setPersistedIds] = useState<{ engagementId: string; contractId: string; sowId: string } | null>(null);
+  const [openSignBuyerUrl, setOpenSignBuyerUrl] = useState<string | null>(null);
+  const [openSignError, setOpenSignError] = useState<string | null>(null);
 
   // Pre-fill from the accepted proposal or purchased package.
   useEffect(() => {
@@ -1368,7 +1367,7 @@ export default function SOWWizardPage() {
   };
 
   const goNext = () => {
-    const err = validateStep(step, formData);
+    const err = validateStep(step, formData, vendorType);
     if (err) { setError(err); return; }
     setError(null);
     setStep((s) => Math.min(s + 1, 5));
@@ -1381,19 +1380,46 @@ export default function SOWWizardPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  /** Plain-English obligations summary (AI-assisted in production; deterministic fallback). */
-  const obligationsSummary = () => {
+  /** Plain-English obligations summary — AI-synthesized from the actual SOW
+   *  terms via the anthropic-generate Edge Function, falling back to a
+   *  deterministic template when generation is unavailable or fails. */
+  const obligationsSummary = useCallback(async (): Promise<string> => {
     const ms = formData.milestones.length;
     const model = formData.payment_model;
-    return (
+    const fallback =
       `The buyer funds each ${model === 'Monthly Recurring' ? 'monthly period' : 'milestone'} into escrow before work starts, ` +
       `reviews delivery against ${ms > 0 ? `${ms} milestone(s) with agreed acceptance criteria` : 'the agreed acceptance criteria'}, ` +
       `and releases payment on acceptance (or automatically after 7 days of silence). ` +
       `The vendor delivers to the agreed scope, submits evidence for review, and responds to flagged criteria within 5 days. ` +
       `IP: ${formData.ip_ownership}. Disputes freeze escrow and follow a 72-hour bilateral window before admin resolution. ` +
-      `UK law governs; a 12-month mutual non-solicitation applies.`
-    );
-  };
+      `UK law governs; a 12-month mutual non-solicitation applies.`;
+    try {
+      const prompt = `Write a concise (120-180 word) plain-English "obligations summary" for a Statement of Work, as a single flowing paragraph with no headings or bullet points. Cover: payment/escrow mechanics, delivery and acceptance review, IP ownership, and dispute handling.
+Project: ${formData.project_title}
+Service: ${formData.service_type}
+Description: ${formData.description}
+Payment model: ${model}
+Milestones: ${ms}
+IP ownership: ${formData.ip_ownership}`;
+      const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
+        body: { prompt, maxTokens: 400, feature: 'sow_obligations_summary' },
+      });
+      if (error) throw error;
+      const text: string = envelope?.text?.trim();
+      return text || fallback;
+    } catch {
+      return fallback;
+    }
+  }, [formData]);
+
+  const [obligationsPreview, setObligationsPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (step !== 5) return;
+    let cancelled = false;
+    setObligationsPreview(null);
+    obligationsSummary().then(text => { if (!cancelled) setObligationsPreview(text); });
+    return () => { cancelled = true; };
+  }, [step, obligationsSummary]);
 
   /** Persist the full SOW graph: engagement, contract, sow_documents, milestones. */
   const handleGenerate = async () => {
@@ -1497,7 +1523,8 @@ export default function SOWWizardPage() {
         ip_shared_terms: formData.ip_shared_terms || null,
         working_location: vendorType === 'staffaug' ? formData.working_location : null,
         ir35_answers: vendorType === 'staffaug' ? formData.ir35_answers : null,
-        obligations_summary: obligationsSummary(),
+        right_to_work_confirmed: vendorType === 'staffaug' ? formData.right_to_work_confirmed : false,
+        obligations_summary: obligationsPreview ?? await obligationsSummary(),
         status: 'generated',
         generated_at: new Date().toISOString(),
       }).select().single();
@@ -1543,6 +1570,18 @@ export default function SOWWizardPage() {
       await logEvent('sow_generated', user.id, 'buyer', 'sow', sow.id, { total: formData.budget });
       setPersistedIds({ engagementId: eng.id, contractId: contract.id, sowId: sow.id });
       setGenerated(true);
+
+      // Real e-signature request — replaces the old in-app "click to sign"
+      // flip. Failure here isn't fatal to SOW generation; the buyer can retry
+      // from the e-signature step.
+      try {
+        const { data: envelope, error: envelopeErr } = await supabase.functions.invoke('opensign-create-envelope', { body: { sowId: sow.id } });
+        if (envelopeErr) throw envelopeErr;
+        setOpenSignBuyerUrl(envelope?.buyerSignUrl ?? null);
+      } catch (envelopeErr) {
+        console.error('OpenSign envelope creation failed:', envelopeErr);
+        setOpenSignError('Could not prepare the e-signature request. You can retry from the e-signature step.');
+      }
     } catch (e) {
       console.error('SOW generation failed:', e);
       setError('Could not generate the SOW. Please check the form and try again.');
@@ -1551,24 +1590,21 @@ export default function SOWWizardPage() {
     }
   };
 
-  /** Buyer signs in-app (parallel signing: the vendor signs from Active Contracts). */
-  const handleBuyerSign = async () => {
-    if (!persistedIds || !user) return;
+  /** Opens the real OpenSign signing page — the actual signature happens
+   *  there, not in this app. buyer_signed_at is only ever set by the
+   *  opensign-webhook Edge Function once OpenSign reports it's complete. */
+  const handleBuyerSign = () => {
+    if (!openSignBuyerUrl) return;
+    window.open(openSignBuyerUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  /** Re-fetches the SOW to pick up a signature the webhook has since recorded. */
+  const refreshSignStatus = async () => {
+    if (!persistedIds) return;
     setSigning(true);
     try {
-      const now = new Date().toISOString();
-      await supabase.from('contracts').update({
-        signed_by_customer: true,
-        customer_signature_date: now,
-      }).eq('id', persistedIds.contractId);
-      await supabase.from('sow_documents').update({ buyer_signed_at: now, status: 'signing' }).eq('id', persistedIds.sowId);
-      await notify(vendorId, 'contract', 'Your contract is ready — sign now',
-        `The SOW for "${formData.project_title}" is generated and the buyer has signed. Review and counter-sign from Active Contracts.`,
-        '/vendor/dashboard/contracts');
-      await logEvent('contract_signed', user.id, 'buyer', 'contract', persistedIds.contractId, {});
-      setBuyerSigned(true);
-    } catch (e) {
-      console.error('Signing failed:', e);
+      const { data } = await supabase.from('sow_documents').select('buyer_signed_at').eq('id', persistedIds.sowId).maybeSingle();
+      setBuyerSigned(!!data?.buyer_signed_at);
     } finally {
       setSigning(false);
     }
@@ -1631,7 +1667,10 @@ export default function SOWWizardPage() {
               onBuyerSign={handleBuyerSign}
               buyerSigned={buyerSigned}
               signingInProgress={signing}
-              obligations={obligationsSummary()}
+              obligations={obligationsPreview ?? 'Generating obligations summary…'}
+              openSignUrl={openSignBuyerUrl}
+              openSignError={openSignError}
+              onRefreshStatus={refreshSignStatus}
             />
           )}
 
