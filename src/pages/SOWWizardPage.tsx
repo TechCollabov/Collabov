@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -1380,19 +1380,46 @@ export default function SOWWizardPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  /** Plain-English obligations summary (AI-assisted in production; deterministic fallback). */
-  const obligationsSummary = () => {
+  /** Plain-English obligations summary — AI-synthesized from the actual SOW
+   *  terms via the anthropic-generate Edge Function, falling back to a
+   *  deterministic template when generation is unavailable or fails. */
+  const obligationsSummary = useCallback(async (): Promise<string> => {
     const ms = formData.milestones.length;
     const model = formData.payment_model;
-    return (
+    const fallback =
       `The buyer funds each ${model === 'Monthly Recurring' ? 'monthly period' : 'milestone'} into escrow before work starts, ` +
       `reviews delivery against ${ms > 0 ? `${ms} milestone(s) with agreed acceptance criteria` : 'the agreed acceptance criteria'}, ` +
       `and releases payment on acceptance (or automatically after 7 days of silence). ` +
       `The vendor delivers to the agreed scope, submits evidence for review, and responds to flagged criteria within 5 days. ` +
       `IP: ${formData.ip_ownership}. Disputes freeze escrow and follow a 72-hour bilateral window before admin resolution. ` +
-      `UK law governs; a 12-month mutual non-solicitation applies.`
-    );
-  };
+      `UK law governs; a 12-month mutual non-solicitation applies.`;
+    try {
+      const prompt = `Write a concise (120-180 word) plain-English "obligations summary" for a Statement of Work, as a single flowing paragraph with no headings or bullet points. Cover: payment/escrow mechanics, delivery and acceptance review, IP ownership, and dispute handling.
+Project: ${formData.project_title}
+Service: ${formData.service_type}
+Description: ${formData.description}
+Payment model: ${model}
+Milestones: ${ms}
+IP ownership: ${formData.ip_ownership}`;
+      const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
+        body: { prompt, maxTokens: 400 },
+      });
+      if (error) throw error;
+      const text: string = envelope?.text?.trim();
+      return text || fallback;
+    } catch {
+      return fallback;
+    }
+  }, [formData]);
+
+  const [obligationsPreview, setObligationsPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (step !== 5) return;
+    let cancelled = false;
+    setObligationsPreview(null);
+    obligationsSummary().then(text => { if (!cancelled) setObligationsPreview(text); });
+    return () => { cancelled = true; };
+  }, [step, obligationsSummary]);
 
   /** Persist the full SOW graph: engagement, contract, sow_documents, milestones. */
   const handleGenerate = async () => {
@@ -1497,7 +1524,7 @@ export default function SOWWizardPage() {
         working_location: vendorType === 'staffaug' ? formData.working_location : null,
         ir35_answers: vendorType === 'staffaug' ? formData.ir35_answers : null,
         right_to_work_confirmed: vendorType === 'staffaug' ? formData.right_to_work_confirmed : false,
-        obligations_summary: obligationsSummary(),
+        obligations_summary: obligationsPreview ?? await obligationsSummary(),
         status: 'generated',
         generated_at: new Date().toISOString(),
       }).select().single();
@@ -1640,7 +1667,7 @@ export default function SOWWizardPage() {
               onBuyerSign={handleBuyerSign}
               buyerSigned={buyerSigned}
               signingInProgress={signing}
-              obligations={obligationsSummary()}
+              obligations={obligationsPreview ?? 'Generating obligations summary…'}
               openSignUrl={openSignBuyerUrl}
               openSignError={openSignError}
               onRefreshStatus={refreshSignStatus}
