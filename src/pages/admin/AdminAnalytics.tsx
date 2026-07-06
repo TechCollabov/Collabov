@@ -106,7 +106,7 @@ const AdminAnalytics: React.FC = () => {
 
     const [
       vendorRes, verRes, contractRes, enquiryRes, vendorsRes,
-      releasesRes, milestoneRes, customersRes, disputesRes,
+      releasesRes, milestoneRes, customersRes, disputesRes, searchEventsRes,
     ] = await Promise.all([
       supabase.from('vendors').select('id', { count: 'exact', head: true }),
       supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
@@ -117,6 +117,7 @@ const AdminAnalytics: React.FC = () => {
       supabase.from('project_milestones').select('engagement_id, escrow_status, due_date, funded_at').not('escrow_status', 'eq', 'unfunded'),
       supabase.from('customers').select('id, company_name'),
       supabase.from('disputes').select('buyer_id'),
+      supabase.from('platform_event').select('actor_id').eq('event_type', 'vendor_search'),
     ]);
 
     const activeValue = contractRes.data?.filter(c => c.status === 'active').reduce((s, c) => s + (c.total_value || 0), 0) || 0;
@@ -144,14 +145,18 @@ const AdminAnalytics: React.FC = () => {
     });
     setGmvMonthly(Array.from(buckets.entries()).map(([month, v]) => ({ month, ...v })));
 
-    // Engagement funnel — starts from enquiries since anonymous top-of-funnel
-    // (homepage visits, searches) isn't instrumented anywhere in this build.
+    // Engagement funnel — starts from signed-in buyer searches (logged via
+    // logEvent('vendor_search', ...) on ResultsPage). Anonymous top-of-funnel
+    // traffic (homepage visits before signup) still isn't instrumented — that
+    // needs session tracking this build doesn't have.
+    const distinctSearchers = new Set((searchEventsRes.data || []).map((e: { actor_id: string }) => e.actor_id)).size;
     const contractsSigned = (contractRes.data || []).filter((c: any) => c.status !== 'pending').length;
     const milestones = milestoneRes.data || [];
     const milestonesFunded = milestones.length;
     const milestonesReleased = milestones.filter((m: any) => m.escrow_status === 'released').length;
     const contractsCompleted = (contractRes.data || []).filter((c: any) => c.status === 'completed').length;
     setFunnel([
+      { stage: 'Buyers who searched', count: distinctSearchers },
       { stage: 'Enquiries submitted', count: enquiryRes.count || 0 },
       { stage: 'Contracts signed', count: contractsSigned },
       { stage: 'Milestones funded', count: milestonesFunded },
@@ -305,7 +310,7 @@ const AdminAnalytics: React.FC = () => {
       {/* 2. Engagement Funnel */}
       <section>
         <h2 className="text-lg font-bold text-white mb-1">Engagement Funnel — all time</h2>
-        <p className="text-xs text-slate-500 mb-4">Starts from enquiry submission — anonymous top-of-funnel traffic (homepage visits, searches) isn't instrumented in this build.</p>
+        <p className="text-xs text-slate-500 mb-4">Starts from signed-in buyer searches — anonymous top-of-funnel traffic (homepage visits before signup) still isn't instrumented in this build.</p>
         <div className="bg-slate-800 rounded-xl p-6 space-y-3">
           {funnel.map(row => (
             <div key={row.stage} className="flex items-center gap-3">

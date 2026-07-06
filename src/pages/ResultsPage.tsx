@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { logEvent } from '../lib/workflows';
 
 /* ── Market Insight Data (default fallback; overridden by site_content) ── */
 const DEFAULT_MARKET_INSIGHT_DATA: Record<string, { rate: string; demand: string; tip: string }> = {
@@ -212,6 +213,16 @@ const ResultsPage: React.FC = () => {
     supabase.from('saved_vendors').select('vendor_id').eq('customer_id', user.id).is('contractor_id', null)
       .then(({ data }) => setSaved((data ?? []).map((r: any) => r.vendor_id).filter(Boolean)));
   }, [user]);
+
+  // Conversion funnel: signed-in search activity, one step above enquiries/proposals
+  // in the funnel Admin Analytics already tracks. Anonymous top-of-funnel traffic
+  // (homepage visits before signup) isn't instrumented — that needs session
+  // tracking this build doesn't have — but a signed-in buyer's own searches
+  // absolutely can be, and weren't.
+  useEffect(() => {
+    if (!user || (!query && !typeParam && !locationParam)) return;
+    logEvent('vendor_search', user.id, 'buyer', 'search', user.id, { query, type: typeParam, location: locationParam }).catch(() => {});
+  }, [user, query, typeParam, locationParam]);
 
   useEffect(() => {
     async function fetchVendors() {
