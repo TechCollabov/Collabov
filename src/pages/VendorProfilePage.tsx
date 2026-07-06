@@ -533,14 +533,14 @@ function InterviewModal({ member, vendorId, onClose }: InterviewModalProps) {
 
 // ─── Discovery Call Modal ─────────────────────────────────────────────────────
 
+// Only reachable when the vendor hasn't connected Cal.diy — bookings for a
+// connected vendor happen directly in the embedded widget on the Calendar tab.
 function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const bookingMethod: string = vendor.booking_method ?? 'manual';
   const [msg, setMsg] = useState(
     `Hi ${vendor.company_name}, I'd like to book a discovery call to discuss a potential project.`
   );
-  const [slot, setSlot] = useState('');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -550,32 +550,15 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
     setSending(true);
     setError('');
     try {
-      if (bookingMethod === 'manual') {
-        // Manual: pre-filled message only — no real booking, no pending_engagement.
-        const { error: msgErr } = await supabase.from('messages').insert({
-          sender_id: user.id,
-          recipient_id: vendor.id,
-          content: msg.trim(),
-          thread_type: 'pre_engagement',
-        });
-        if (msgErr) throw msgErr;
-        await notify(vendor.id, 'message', 'Discovery call request',
-          'A buyer wants to arrange a discovery call. Reply with your availability.', '/messages');
-      } else {
-        // Calendly / Google: booking confirmed -> pending_engagement is created and
-        // the T+1 follow-up converts it into a proposal prompt.
-        if (!slot) { setError('Pick a time slot.'); setSending(false); return; }
-        const { error: peErr } = await supabase.from('pending_engagement').insert({
-          buyer_id: user.id,
-          vendor_id: vendor.id,
-          meeting_datetime: new Date(slot).toISOString(),
-          status: 'scheduled',
-        });
-        if (peErr) throw peErr;
-        await notify(vendor.id, 'enquiry', 'Discovery call booked',
-          `A buyer booked a call for ${new Date(slot).toLocaleString('en-GB')}. The meeting link comes from your ${bookingMethod === 'calendly' ? 'Calendly' : 'Google Calendar'} setup.`,
-          '/vendor/dashboard/enquiries');
-      }
+      const { error: msgErr } = await supabase.from('messages').insert({
+        sender_id: user.id,
+        recipient_id: vendor.id,
+        content: msg.trim(),
+        thread_type: 'pre_engagement',
+      });
+      if (msgErr) throw msgErr;
+      await notify(vendor.id, 'message', 'Discovery call request',
+        'A buyer wants to arrange a discovery call. Reply with your availability.', '/messages');
       setDone(true);
     } catch (e) {
       console.error('Booking failed:', e);
@@ -590,14 +573,8 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
         <div className="bg-white rounded-2xl w-full max-w-md p-8 text-center">
           <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
-          <h2 className="text-lg font-bold text-[#0B2D59] mb-1">
-            {bookingMethod === 'manual' ? 'Message sent' : 'Call booked'}
-          </h2>
-          <p className="text-sm text-gray-500 mb-5">
-            {bookingMethod === 'manual'
-              ? 'The vendor will reply with available times.'
-              : 'Collabov tracks that a call was booked but does not host it — your meeting link comes from the vendor’s calendar tool. The day after the call we’ll nudge you to request a proposal.'}
-          </p>
+          <h2 className="text-lg font-bold text-[#0B2D59] mb-1">Message sent</h2>
+          <p className="text-sm text-gray-500 mb-5">The vendor will reply with available times.</p>
           <button onClick={onClose} className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">Done</button>
         </div>
       </div>
@@ -612,36 +589,15 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-6 space-y-4">
-          {bookingMethod === 'manual' ? (
-            <>
-              <p className="text-sm text-gray-500">
-                Send a message to introduce your project. The vendor will respond with available times.
-              </p>
-              <textarea
-                rows={4}
-                value={msg}
-                onChange={e => setMsg(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
-              />
-            </>
-          ) : (
-            <>
-              <p className="text-sm text-gray-500">
-                {bookingMethod === 'calendly'
-                  ? 'This vendor uses Calendly — pick a slot and the video link is generated by Calendly, not Collabov.'
-                  : 'This vendor’s Google Calendar availability is connected — pick a slot and the meeting link comes from Google.'}
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Choose a time</label>
-                <input
-                  type="datetime-local"
-                  value={slot}
-                  onChange={e => setSlot(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
-                />
-              </div>
-            </>
-          )}
+          <p className="text-sm text-gray-500">
+            Send a message to introduce your project. The vendor will respond with available times.
+          </p>
+          <textarea
+            rows={4}
+            value={msg}
+            onChange={e => setMsg(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+          />
           {error && <p className="text-xs text-red-600">{error}</p>}
           <div className="flex gap-3">
             <button
@@ -649,7 +605,7 @@ function DiscoveryModal({ vendor, onClose }: { vendor: any; onClose: () => void 
               disabled={sending}
               className="flex-1 py-3 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              {sending ? 'Sending…' : bookingMethod === 'manual' ? 'Send Request' : 'Book Call'}
+              {sending ? 'Sending…' : 'Send Request'}
             </button>
             <button onClick={onClose} className="px-5 py-3 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
               Cancel
@@ -1448,56 +1404,54 @@ function ReviewsTab({ vendor, reviews }: { vendor: VendorData; reviews: Review[]
 
 // ─── Tab: Calendar & Availability ─────────────────────────────────────────────
 
-function CalendarTab({ onDiscovery }: { onDiscovery: () => void }) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+const AVAILABILITY_LABEL: Record<string, { label: string; dot: string }> = {
+  available: { label: 'Available for new engagements', dot: 'bg-green-500' },
+  available_from: { label: 'Available soon', dot: 'bg-amber-400' },
+  limited: { label: 'Limited availability', dot: 'bg-amber-400' },
+  booked: { label: 'Fully booked', dot: 'bg-red-400' },
+};
 
-  // Day of week of first day (0=Sun, adjust to Mon-first)
-  const firstDay = new Date(year, month, 1).getDay();
-  const offset = firstDay === 0 ? 6 : firstDay - 1;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  const cells: (number | null)[] = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+function CalendarTab({ vendor, onDiscovery }: { vendor: any; onDiscovery: () => void }) {
+  const connected = vendor.booking_method === 'cal_diy' && !!vendor.cal_diy_url;
+  const avail = AVAILABILITY_LABEL[vendor.availability_status ?? 'available'] ?? AVAILABILITY_LABEL.available;
 
   return (
     <div>
       <h2 className="text-xl font-bold text-[#0B2D59] mb-4">Calendar & Availability</h2>
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <div className="text-sm font-semibold text-gray-700 mb-4">{monthName}</div>
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-400 mb-2">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
-            <div key={d} className="font-medium">{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map((day, i) =>
-            day === null ? (
-              <div key={`empty-${i}`} />
-            ) : (
-              <div key={day} className="rounded-lg py-2 text-xs font-medium text-center bg-green-100 text-green-700">
-                {day}
-              </div>
-            ),
-          )}
-        </div>
-        <div className="flex gap-4 mt-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 inline-block" /> Available</span>
-        </div>
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <div className="text-sm font-medium text-gray-700 mb-1">Vendor is currently available for new engagements.</div>
-          <div className="text-xs text-gray-400 mb-4">
-            Connect your calendar in vendor settings to enable direct booking.
-          </div>
-          <button
-            onClick={onDiscovery}
-            className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Book a Discovery Call
-          </button>
-        </div>
+
+      <div className="flex items-center gap-2 mb-4">
+        <span className={`w-2.5 h-2.5 rounded-full ${avail.dot}`} />
+        <span className="text-sm font-medium text-gray-700">{avail.label}</span>
+        {vendor.availability_status === 'available_from' && vendor.availability_from && (
+          <span className="text-xs text-gray-400">from {new Date(vendor.availability_from).toLocaleDateString('en-GB')}</span>
+        )}
       </div>
+
+      {connected ? (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <iframe
+            src={vendor.cal_diy_url}
+            title="Book a discovery call with this vendor"
+            className="w-full"
+            style={{ height: 700, border: 0 }}
+          />
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="text-sm font-medium text-gray-700 mb-1">No calendar connected yet.</div>
+            <div className="text-xs text-gray-400 mb-4">
+              Send a message to arrange a discovery call directly with this vendor.
+            </div>
+            <button
+              onClick={onDiscovery}
+              className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Book a Discovery Call
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1948,7 +1902,7 @@ const VendorProfilePage: React.FC = () => {
         {activeTab === 'Case Studies' && <CaseStudiesTab caseStudies={dbCaseStudies} />}
         {activeTab === 'Referrals' && <ReferralsTab referrals={dbReferrals} />}
         {activeTab === 'Reviews' && <ReviewsTab vendor={vendor} reviews={dbReviews} />}
-        {activeTab === 'Calendar & Availability' && <CalendarTab onDiscovery={() => setShowDiscovery(true)} />}
+        {activeTab === 'Calendar & Availability' && <CalendarTab vendor={vendor} onDiscovery={() => setShowDiscovery(true)} />}
       </div>
 
       {/* Modals */}

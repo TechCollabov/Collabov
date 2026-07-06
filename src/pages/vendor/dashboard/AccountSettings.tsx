@@ -43,8 +43,8 @@ const AccountSettings: React.FC = () => {
 
   // Calendar
   const [bookingMethod, setBookingMethod] = useState('manual');
-  const [calendlyUrl, setCalendlyUrl] = useState('');
-  const [calendlySaved, setCalendlySaved] = useState(false);
+  const [calDiyUrl, setCalDiyUrl] = useState('');
+  const [calDiySaved, setCalDiySaved] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(true);
 
   // Notifications
@@ -65,13 +65,13 @@ const AccountSettings: React.FC = () => {
     if (!user) return;
     (async () => {
       const [{ data: vendorRow }, { data: prefsRow }, { data: invites }] = await Promise.all([
-        supabase.from('vendors').select('booking_method, calendly_url, contact_phone, stripe_connect_status').eq('id', user.id).maybeSingle(),
+        supabase.from('vendors').select('booking_method, cal_diy_url, contact_phone, stripe_connect_status').eq('id', user.id).maybeSingle(),
         supabase.from('notification_prefs').select('prefs').eq('user_id', user.id).maybeSingle(),
         supabase.from('partner_invites').select('*').eq('inviter_id', user.id).eq('inviter_role', 'vendor').order('created_at', { ascending: false }),
       ]);
       if (vendorRow) {
         setBookingMethod(vendorRow.booking_method ?? 'manual');
-        setCalendlyUrl(vendorRow.calendly_url ?? '');
+        setCalDiyUrl(vendorRow.cal_diy_url ?? '');
         setPhone(vendorRow.contact_phone ?? '');
         setStripeStatus(vendorRow.stripe_connect_status === 'connected' ? 'connected' : 'disconnected');
       }
@@ -124,24 +124,17 @@ const AccountSettings: React.FC = () => {
     setTwoFactorEnabled(next);
   };
 
-  const connectGoogleCalendar = async () => {
-    if (!user) return;
-    // Simulated OAuth: recorded in-platform, no real Google account linked.
-    await supabase.from('vendors').update({ booking_method: 'google' }).eq('id', user.id);
-    setBookingMethod('google');
-  };
-
   const disconnectCalendar = async () => {
     if (!user) return;
     await supabase.from('vendors').update({ booking_method: 'manual' }).eq('id', user.id);
     setBookingMethod('manual');
   };
 
-  const saveCalendlyUrl = async () => {
-    if (!user || !calendlyUrl) return;
-    await supabase.from('vendors').update({ booking_method: 'calendly', calendly_url: calendlyUrl }).eq('id', user.id);
-    setBookingMethod('calendly');
-    setCalendlySaved(true);
+  const saveCalDiyUrl = async () => {
+    if (!user || !calDiyUrl) return;
+    await supabase.from('vendors').update({ booking_method: 'cal_diy', cal_diy_url: calDiyUrl }).eq('id', user.id);
+    setBookingMethod('cal_diy');
+    setCalDiySaved(true);
   };
 
   const setNotifPref = (key: string, value: 'realtime' | 'digest' | 'off') => {
@@ -303,55 +296,42 @@ const AccountSettings: React.FC = () => {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium mb-1">Calendar Connections</h3>
-              <p className="text-sm text-gray-500 mb-4">Connect your calendar so buyers can book discovery calls directly from your profile.</p>
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
-                  <span className="text-xs font-bold text-[#4285F4]">G</span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">Google Calendar</p>
-                  <p className="text-xs text-gray-500">Allow buyers to book discovery calls via your Google Calendar</p>
-                </div>
-              </div>
-              {calendarLoading ? (
-                <Loader2 className="h-4 w-4 text-gray-300 animate-spin" />
-              ) : bookingMethod === 'google' ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Connected</span>
-                  <button onClick={disconnectCalendar} className="text-xs text-red-500 hover:text-red-600">Disconnect</button>
-                </div>
-              ) : (
-                <button onClick={connectGoogleCalendar} className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-xs font-semibold hover:bg-blue-700">
-                  Connect Google Calendar
-                </button>
-              )}
+              <p className="text-sm text-gray-500 mb-4">Connect Cal.diy so buyers can book discovery calls directly from your profile — a real embedded booking widget, not a pre-filled message.</p>
             </div>
 
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
-                  <span className="text-xs font-bold text-[#006BFF]">Cal</span>
+                  <Calendar className="h-4 w-4 text-[#0070F3]" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Calendly URL</p>
-                  <p className="text-xs text-gray-500">Paste your Calendly booking link — buyers will see an embedded booking page</p>
+                  <p className="text-sm font-semibold text-gray-900">Cal.diy</p>
+                  <p className="text-xs text-gray-500">Paste your Cal.diy public booking link — buyers see it embedded directly on your profile</p>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="url" value={calendlyUrl} onChange={e => { setCalendlyUrl(e.target.value); setCalendlySaved(false); }}
-                  placeholder="https://calendly.com/yourname/discovery-call"
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
-                />
-                <button onClick={saveCalendlyUrl} className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
-                  {calendlySaved && bookingMethod === 'calendly' ? 'Saved ✓' : 'Save'}
-                </button>
-              </div>
-              {calendlySaved && bookingMethod === 'calendly' && <p className="text-xs text-green-600 mt-1.5">Calendly URL saved. Buyers can now book directly from your profile.</p>}
-              {bookingMethod === 'manual' && <p className="text-xs text-gray-400 mt-1.5">No calendar connected — buyers send a pre-filled message to book instead.</p>}
+              {calendarLoading ? (
+                <Loader2 className="h-4 w-4 text-gray-300 animate-spin" />
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="url" value={calDiyUrl} onChange={e => { setCalDiyUrl(e.target.value); setCalDiySaved(false); }}
+                      placeholder="https://cal.diy/yourname/discovery-call"
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                    />
+                    <button onClick={saveCalDiyUrl} className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+                      {calDiySaved && bookingMethod === 'cal_diy' ? 'Saved ✓' : 'Save'}
+                    </button>
+                  </div>
+                  {bookingMethod === 'cal_diy' && calDiyUrl && (
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Connected — bookings sync back here automatically</span>
+                      <button onClick={disconnectCalendar} className="text-xs text-red-500 hover:text-red-600">Disconnect</button>
+                    </div>
+                  )}
+                  {bookingMethod === 'manual' && <p className="text-xs text-gray-400 mt-1.5">No calendar connected — buyers send a pre-filled message to book instead.</p>}
+                </>
+              )}
             </div>
           </div>
         );
