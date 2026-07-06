@@ -932,7 +932,6 @@ export default function EngagementWorkspacePage() {
           {role === 'buyer' && eng.engagement_type === 'discovery' &&
             milestones.length > 0 && milestones.every(m => ['released', 'accepted'].includes(m.escrow_status)) && (
             <DiscoveryConversionCard
-              engagement={eng}
               evidence={evidenceByMilestone[milestones[0].id]}
               counterparty={counterparty}
               onBuildWith={() => navigate(
@@ -1028,7 +1027,7 @@ export default function EngagementWorkspacePage() {
         <FundModal milestone={fundTarget} busy={busy} onConfirm={(last4) => doFund(fundTarget, last4)} onClose={() => setFundTarget(null)} />
       )}
       {evidenceTarget && (
-        <EvidenceModal milestone={evidenceTarget} isDiscovery={eng.engagement_type === 'discovery'} busy={busy}
+        <EvidenceModal milestone={evidenceTarget} engagementId={eng.id} isDiscovery={eng.engagement_type === 'discovery'} busy={busy}
           onSubmit={(p) => submitEvidence(evidenceTarget, p)} onClose={() => setEvidenceTarget(null)} />
       )}
       {reviewTarget && (
@@ -1153,28 +1152,15 @@ function DisputeBanner({ dispute, role, onPosition, onSettle }: {
   );
 }
 
-function DiscoveryConversionCard({ engagement, evidence, counterparty, onBuildWith, onTakeToMarketplace }: {
-  engagement: Engagement; evidence: any; counterparty: string;
+function DiscoveryConversionCard({ evidence, counterparty, onBuildWith, onTakeToMarketplace }: {
+  evidence: any; counterparty: string;
   onBuildWith: () => void; onTakeToMarketplace: () => void;
 }) {
-  const downloadSpec = () => {
-    const lines = [
-      'DISCOVERY SPECIFICATION SUMMARY',
-      `Engagement: ${engagement.project_title ?? ''}`,
-      `Vendor: ${counterparty}`,
-      '',
-      evidence?.delivery_description ?? 'No executive summary recorded.',
-      '',
-      'Files delivered:',
-      ...((Array.isArray(evidence?.files) ? evidence.files : []).map((f: string) => `- ${f}`)),
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Discovery_Spec_${(engagement.project_title ?? 'project').replace(/\s+/g, '_')}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadSpec = async () => {
+    const filePaths: string[] = Array.isArray(evidence?.files) ? evidence.files.map(String) : [];
+    if (filePaths.length === 0) return;
+    const { data } = await supabase.storage.from('engagement-files').createSignedUrl(filePaths[0], 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -1183,7 +1169,7 @@ function DiscoveryConversionCard({ engagement, evidence, counterparty, onBuildWi
         <span className="font-semibold">Discovery complete.</span> Build the full project with {counterparty}, or take the spec to the open marketplace.
       </div>
       <div className="flex gap-2">
-        <button onClick={() => { downloadSpec(); onTakeToMarketplace(); }} className="px-4 py-2 border border-blue-300 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-100">
+        <button onClick={async () => { await downloadSpec(); onTakeToMarketplace(); }} className="px-4 py-2 border border-blue-300 text-blue-700 text-sm font-semibold rounded-lg hover:bg-blue-100">
           Take to marketplace
         </button>
         <button onClick={onBuildWith} className="px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700">
@@ -1903,15 +1889,16 @@ function FundModal({ milestone, busy, onConfirm, onClose }: {
   );
 }
 
-function EvidenceModal({ milestone, isDiscovery, busy, onSubmit, onClose }: {
-  milestone: Milestone; isDiscovery: boolean; busy: boolean;
+function EvidenceModal({ milestone, engagementId, isDiscovery, busy, onSubmit, onClose }: {
+  milestone: Milestone; engagementId: string; isDiscovery: boolean; busy: boolean;
   onSubmit: (p: { description: string; checklist: { text: string; checked: boolean }[]; demoUrl: string; files: string[] }) => void;
   onClose: () => void;
 }) {
   const [description, setDescription] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
-  const [fileName, setFileName] = useState('');
   const [files, setFiles] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [checklist, setChecklist] = useState(
     (milestone.acceptance_criteria ?? []).map(c => ({ text: String(c), checked: false }))
   );
@@ -1919,6 +1906,26 @@ function EvidenceModal({ milestone, isDiscovery, busy, onSubmit, onClose }: {
   const minDesc = isDiscovery ? 200 : 100;
   const complete = description.trim().length >= minDesc && (files.length > 0 || demoUrl.trim().length > 0);
   const unchecked = checklist.filter(c => !c.checked).length;
+
+  const fileDisplayName = (path: string) => path.split('/').pop()?.replace(/^\d+-/, '') ?? path;
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const path = `${engagementId}/${milestone.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+      const { error } = await supabase.storage.from('engagement-files').upload(path, file);
+      if (error) throw error;
+      setFiles(prev => [...prev, path]);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <ModalShell title={`Evidence — ${milestone.title}`} onClose={onClose}>
@@ -1950,15 +1957,14 @@ function EvidenceModal({ milestone, isDiscovery, busy, onSubmit, onClose }: {
         )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Files {isDiscovery && <span className="text-red-500">(spec PDF required)</span>}</label>
-          <div className="flex gap-2">
-            <input value={fileName} onChange={e => setFileName(e.target.value)} placeholder="e.g. specification-v1.pdf"
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-            <button onClick={() => { if (fileName.trim()) { setFiles(prev => [...prev, fileName.trim()]); setFileName(''); } }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm">Add</button>
-          </div>
+          <label className={`flex items-center justify-center gap-2 border border-dashed rounded-lg px-3 py-3 text-sm cursor-pointer ${uploading ? 'border-gray-200 text-gray-400' : 'border-gray-300 text-gray-500 hover:bg-gray-50'}`}>
+            <input type="file" onChange={handleFileSelect} disabled={uploading} className="hidden" />
+            {uploading ? 'Uploading…' : 'Click to upload a file'}
+          </label>
+          {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
           {files.map((f, i) => (
             <div key={i} className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5 mt-1">
-              {f}<button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} className="text-red-400"><X className="h-3.5 w-3.5" /></button>
+              {fileDisplayName(f)}<button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))} className="text-red-400"><X className="h-3.5 w-3.5" /></button>
             </div>
           ))}
         </div>
@@ -1970,7 +1976,7 @@ function EvidenceModal({ milestone, isDiscovery, busy, onSubmit, onClose }: {
         <p className="text-xs text-gray-400">Evidence locks on submit — it cannot be edited. The buyer has 7 days to review.</p>
         <button
           onClick={() => onSubmit({ description: description.trim(), checklist, demoUrl: demoUrl.trim(), files })}
-          disabled={!complete || busy}
+          disabled={!complete || busy || uploading}
           className="w-full py-3 bg-[#0070F3] text-white font-semibold rounded-xl disabled:opacity-40">
           {busy ? 'Submitting…' : 'Submit evidence (locks on submit)'}
         </button>
@@ -1989,8 +1995,23 @@ function BuyerReviewModal({ milestone, evidence, busy, onAccept, onRevision, onD
   const [mode, setMode] = useState<'view' | 'revision'>('view');
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [note, setNote] = useState('');
+  const [signedFileUrls, setSignedFileUrls] = useState<Record<string, string>>({});
   const criteria = (milestone.acceptance_criteria ?? []).map(String);
   const checklist: { text: string; checked: boolean }[] = Array.isArray(evidence?.criteria_checklist) ? evidence.criteria_checklist : [];
+
+  useEffect(() => {
+    const paths: string[] = Array.isArray(evidence?.files) ? evidence.files.map(String) : [];
+    if (paths.length === 0) { setSignedFileUrls({}); return; }
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(paths.map(async (path) => {
+        const { data } = await supabase.storage.from('engagement-files').createSignedUrl(path, 3600);
+        return [path, data?.signedUrl ?? ''] as const;
+      }));
+      if (!cancelled) setSignedFileUrls(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [evidence]);
 
   return (
     <ModalShell title={`Review delivery — ${milestone.title}`} onClose={onClose}>
@@ -2014,7 +2035,15 @@ function BuyerReviewModal({ milestone, evidence, busy, onAccept, onRevision, onD
             )}
             {Array.isArray(evidence.files) && evidence.files.length > 0 && (
               <div className="text-sm text-gray-600">
-                <span className="text-xs font-semibold text-gray-500 uppercase">Files:</span> {evidence.files.map(String).join(', ')}
+                <span className="text-xs font-semibold text-gray-500 uppercase block mb-1">Files:</span>
+                <div className="space-y-1">
+                  {evidence.files.map(String).map((f: string, i: number) => (
+                    <a key={i} href={signedFileUrls[f] || '#'} target="_blank" rel="noreferrer"
+                      className="block text-xs text-[#0070F3] hover:underline truncate">
+                      📎 {f.split('/').pop()?.replace(/^\d+-/, '') ?? f}
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
             {evidence.demo_url && (
