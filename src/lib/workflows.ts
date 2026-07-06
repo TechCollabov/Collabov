@@ -84,6 +84,19 @@ export const NOTIFICATION_EVENTS: NotificationEventDef[] = [
   { key: 'review', label: 'New review', forced: false },
 ];
 
+/** The 6 IR35 status indicators a buyer answers in the SOW Wizard for staff-aug
+ *  engagements, persisted verbatim to sow_documents.ir35_answers (index-keyed)
+ *  and read back by the admin IR35 SDS stamp queue so the determination isn't
+ *  made blind. */
+export const IR35_QUESTIONS = [
+  'Does the buyer control how and when the work is done (not just what is delivered)?',
+  'Is the worker required to do the work personally, with no right to send a substitute?',
+  'Does the buyer guarantee a minimum amount of work?',
+  'Does the worker provide their own equipment and tools?',
+  'Is the worker financially dependent on this single engagement?',
+  'Is the worker integrated into the buyer\'s organisation (permanent desk, company email, line management)?',
+];
+
 export const DISPUTE_REASONS = [
   { value: 'scope_mismatch', label: 'Scope mismatch' },
   { value: 'delivery_quality', label: 'Delivery quality' },

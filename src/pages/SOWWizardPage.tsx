@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { notify, logEvent, NOTICE_PERIOD_DAYS, VENDOR_CONTRACT_TEMPLATE } from '../lib/workflows';
+import { notify, logEvent, NOTICE_PERIOD_DAYS, VENDOR_CONTRACT_TEMPLATE, IR35_QUESTIONS } from '../lib/workflows';
 import {
   Loader2,
   CheckCircle,
@@ -61,6 +61,7 @@ interface FormData {
   ip_shared_terms: string;
   working_location: string;
   ir35_answers: Record<string, string>;
+  right_to_work_confirmed: boolean;
   response_time_slo: string;
   uptime_slo: string;
 }
@@ -85,15 +86,6 @@ const SERVICE_TYPES = [
   'DevOps',
   'Data & Analytics',
   'UI/UX Design',
-];
-
-const IR35_QUESTIONS = [
-  'Does the buyer control how and when the work is done (not just what is delivered)?',
-  'Is the worker required to do the work personally, with no right to send a substitute?',
-  'Does the buyer guarantee a minimum amount of work?',
-  'Does the worker provide their own equipment and tools?',
-  'Is the worker financially dependent on this single engagement?',
-  'Is the worker integrated into the buyer\'s organisation (permanent desk, company email, line management)?',
 ];
 
 const DEFAULT_MSP_DELIVERABLES = [
@@ -140,6 +132,7 @@ function buildDefaultFormData(
     ip_shared_terms: '',
     working_location: 'Remote from home country',
     ir35_answers: {},
+    right_to_work_confirmed: false,
     response_time_slo: '',
     uptime_slo: '',
   };
@@ -911,11 +904,20 @@ function Step4({
           {showRightToWork && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mt-3 text-sm text-amber-800">
               <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <p className="font-semibold mb-1">Right to Work Check Required</p>
-                <p className="leading-relaxed">
+                <p className="leading-relaxed mb-3">
                   You are required to verify this person's right to work in the UK before they begin. This is a legal obligation under the Immigration, Asylum and Nationality Act 2006. Collabov does not conduct this check — it is your responsibility.
                 </p>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.right_to_work_confirmed}
+                    onChange={(e) => onChange({ right_to_work_confirmed: e.target.checked })}
+                    className="mt-0.5 accent-amber-600"
+                  />
+                  <span className="font-medium">I confirm I will complete this right-to-work check before the worker begins.</span>
+                </label>
               </div>
             </div>
           )}
@@ -1222,7 +1224,7 @@ function Step5({
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-function validateStep(step: number, formData: FormData): string | null {
+function validateStep(step: number, formData: FormData, vendorType: string): string | null {
   if (step === 1) {
     if (!formData.project_title || formData.project_title.length < 5) return 'Project title must be at least 5 characters.';
     if (!formData.service_type) return 'Please select a service type.';
@@ -1241,6 +1243,11 @@ function validateStep(step: number, formData: FormData): string | null {
     if (!formData.ip_ownership) return 'Please select IP ownership.';
     if (formData.ip_ownership === 'Shared IP (specify terms)' && !formData.ip_shared_terms.trim()) {
       return 'Please specify the shared IP terms.';
+    }
+    const showRightToWork = vendorType === 'staffaug' &&
+      (formData.working_location === 'On-site at buyer premises in UK' || formData.working_location === 'Hybrid');
+    if (showRightToWork && !formData.right_to_work_confirmed) {
+      return 'Please confirm you will complete the right-to-work check before proceeding.';
     }
   }
   return null;
@@ -1368,7 +1375,7 @@ export default function SOWWizardPage() {
   };
 
   const goNext = () => {
-    const err = validateStep(step, formData);
+    const err = validateStep(step, formData, vendorType);
     if (err) { setError(err); return; }
     setError(null);
     setStep((s) => Math.min(s + 1, 5));
@@ -1497,6 +1504,7 @@ export default function SOWWizardPage() {
         ip_shared_terms: formData.ip_shared_terms || null,
         working_location: vendorType === 'staffaug' ? formData.working_location : null,
         ir35_answers: vendorType === 'staffaug' ? formData.ir35_answers : null,
+        right_to_work_confirmed: vendorType === 'staffaug' ? formData.right_to_work_confirmed : false,
         obligations_summary: obligationsSummary(),
         status: 'generated',
         generated_at: new Date().toISOString(),

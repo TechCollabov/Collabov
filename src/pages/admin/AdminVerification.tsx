@@ -5,7 +5,7 @@ import {
   CheckCircle, AlertTriangle, Eye, Loader2, UserCheck,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getPlatformSettings } from '../../lib/workflows';
+import { getPlatformSettings, IR35_QUESTIONS } from '../../lib/workflows';
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
@@ -180,24 +180,64 @@ function DocModal({ doc, adminStatus, onSave, onClose }: DocModalProps) {
 
 /* ─── Main Component ────────────────────────────────────────────── */
 
+// Which answer to each IR35_QUESTIONS index signals "inside IR35" risk.
+// Equipment provision (index 3) is inverted: the worker NOT providing their
+// own equipment is the risk signal, not the reverse.
+const IR35_RISK_ANSWER: ('Yes' | 'No')[] = ['Yes', 'Yes', 'Yes', 'No', 'Yes', 'Yes'];
+
+interface IR35QueueRow {
+  id: string;
+  project_title: string;
+  buyer_id: string;
+  vendor_id: string;
+  working_location: string | null;
+  created_at: string;
+  ir35_answers: Record<string, string>;
+  right_to_work_confirmed: boolean;
+}
+
 /** Staff-aug engagements signed by both parties wait here for the IR35 SDS
- *  stamp — the contract activates only after an admin stamps inside/outside. */
+ *  stamp — the contract activates only after an admin stamps inside/outside.
+ *  Shows the buyer's actual IR35 questionnaire answers and right-to-work
+ *  confirmation from the SOW, rather than asking the admin to stamp blind. */
 function IR35StampQueue() {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<IR35QueueRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = async () => {
+    interface EngRow {
+      id: string; project_title: string; buyer_id: string; vendor_id: string;
+      working_location: string | null; created_at: string; sow_id: string | null;
+    }
+    interface SowRow {
+      id: string; ir35_answers: Record<string, string> | null; right_to_work_confirmed: boolean | null;
+    }
     const { data } = await supabase
       .from('engagements')
-      .select('id, project_title, buyer_id, vendor_id, working_location, status, created_at')
+      .select('id, project_title, buyer_id, vendor_id, working_location, status, created_at, sow_id')
       .eq('ir35_status', 'pending')
       .eq('status', 'pending_ir35')
       .order('created_at', { ascending: true });
-    setRows(data ?? []);
+    const engs = (data ?? []) as EngRow[];
+    const sowIds = engs.map(e => e.sow_id).filter((id): id is string => !!id);
+    const { data: sows } = sowIds.length
+      ? await supabase.from('sow_documents').select('id, ir35_answers, right_to_work_confirmed').in('id', sowIds)
+      : { data: [] as SowRow[] };
+    const sowMap = new Map((sows as SowRow[] ?? []).map(s => [s.id, s]));
+    setRows(engs.map(e => {
+      const sow = e.sow_id ? sowMap.get(e.sow_id) : undefined;
+      return {
+        id: e.id, project_title: e.project_title, buyer_id: e.buyer_id, vendor_id: e.vendor_id,
+        working_location: e.working_location, created_at: e.created_at,
+        ir35_answers: sow?.ir35_answers ?? {},
+        right_to_work_confirmed: !!sow?.right_to_work_confirmed,
+      };
+    }));
   };
   useEffect(() => { load(); }, []);
 
-  const stamp = async (row: any, determination: 'inside' | 'outside') => {
+  const stamp = async (row: IR35QueueRow, determination: 'inside' | 'outside') => {
     setBusyId(row.id);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -224,29 +264,73 @@ function IR35StampQueue() {
 
   if (rows.length === 0) return null;
 
+  const requiresRightToWork = (row: IR35QueueRow) =>
+    row.working_location === 'On-site at buyer premises in UK' || row.working_location === 'Hybrid';
+
   return (
     <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-5 mb-6">
       <h2 className="text-sm font-bold text-[#0B2D59] mb-1">IR35 SDS Stamp Queue ({rows.length})</h2>
-      <p className="text-xs text-gray-400 mb-3">Staff-aug contracts signed by both parties — stamp the status determination to activate.</p>
+      <p className="text-xs text-gray-400 mb-3">Staff-aug contracts signed by both parties — review the buyer's IR35 indicators before stamping the status determination.</p>
       <div className="space-y-2">
-        {rows.map(row => (
-          <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded-lg p-3">
-            <div>
-              <div className="text-sm font-semibold text-gray-900">{row.project_title}</div>
-              <div className="text-xs text-gray-400">Working location: {row.working_location ?? 'unspecified'} · Signed {fmtDate(row.created_at)}</div>
+        {rows.map(row => {
+          const answerCount = Object.keys(row.ir35_answers).length;
+          const riskCount = IR35_QUESTIONS.reduce((n, _, idx) => n + (row.ir35_answers[idx] === IR35_RISK_ANSWER[idx] ? 1 : 0), 0);
+          const expanded = expandedId === row.id;
+          return (
+            <div key={row.id} className="border border-gray-100 rounded-lg p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">{row.project_title}</div>
+                  <div className="text-xs text-gray-400">Working location: {row.working_location ?? 'unspecified'} · Signed {fmtDate(row.created_at)}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    {answerCount > 0 ? (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${riskCount >= 4 ? 'bg-red-100 text-red-700' : riskCount >= 2 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                        {riskCount}/{IR35_QUESTIONS.length} indicators suggest inside IR35
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No IR35 answers on file</span>
+                    )}
+                    {requiresRightToWork(row) && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${row.right_to_work_confirmed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {row.right_to_work_confirmed ? 'Right to work confirmed' : 'Right to work NOT confirmed'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setExpandedId(expanded ? null : row.id)}
+                    className="px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50">
+                    {expanded ? 'Hide answers' : 'View answers'}
+                  </button>
+                  <button disabled={busyId === row.id} onClick={() => stamp(row, 'outside')}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                    Stamp OUTSIDE IR35
+                  </button>
+                  <button disabled={busyId === row.id} onClick={() => stamp(row, 'inside')}
+                    className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
+                    Stamp INSIDE IR35
+                  </button>
+                </div>
+              </div>
+              {expanded && (
+                <div className="mt-3 pt-3 border-t border-gray-100 overflow-hidden rounded-lg border border-gray-100">
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {IR35_QUESTIONS.map((q, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                          <td className="px-3 py-2 text-gray-600">{q}</td>
+                          <td className={`px-3 py-2 font-semibold w-16 text-center ${row.ir35_answers[idx] === IR35_RISK_ANSWER[idx] ? 'text-amber-600' : 'text-green-600'}`}>
+                            {row.ir35_answers[idx] || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-            <div className="flex gap-2">
-              <button disabled={busyId === row.id} onClick={() => stamp(row, 'outside')}
-                className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
-                Stamp OUTSIDE IR35
-              </button>
-              <button disabled={busyId === row.id} onClick={() => stamp(row, 'inside')}
-                className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
-                Stamp INSIDE IR35
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
