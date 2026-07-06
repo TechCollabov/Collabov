@@ -264,6 +264,8 @@ const ProposalTriagePage: React.FC = () => {
   const maybeProposals = proposals.filter(p => p.triage === 'maybe');
   const declinedProposals = proposals.filter(p => p.triage === 'decline');
 
+  const comparedVendorIds = Array.from(new Set(proposals.filter(p => compared.has(p.id)).map(p => p.vendor_id)));
+
   const filteredProposals = proposals.filter(p => {
     if (activeTab === 'all') return true;
     if (activeTab === 'keep') return p.triage === 'keep';
@@ -566,13 +568,18 @@ const ProposalTriagePage: React.FC = () => {
         <div className="fixed bottom-0 left-0 right-0 bg-[#0070F3] text-white px-6 py-4 z-40 shadow-2xl">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div className="text-sm font-semibold">
-              {keepProposals.length} proposals in Keep →{' '}
-              <button
-                onClick={() => navigate('/compare')}
-                className="underline hover:no-underline"
-              >
-                Compare selected
-              </button>
+              {keepProposals.length} proposals in Keep
+              {comparedVendorIds.length >= 2 && (
+                <>
+                  {' '}→{' '}
+                  <button
+                    onClick={() => navigate(`/compare?ids=${comparedVendorIds.join(',')}`)}
+                    className="underline hover:no-underline"
+                  >
+                    Compare {comparedVendorIds.length} selected
+                  </button>
+                </>
+              )}
             </div>
             <button
               onClick={() => {
