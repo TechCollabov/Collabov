@@ -235,6 +235,56 @@ describe('Feature: Vendor Registration (6-step flow)', () => {
     });
   });
 
+  describe('Scenario: Step 2 rejects personal email domains', () => {
+    it('should reject a gmail.com address', async () => {
+      const user = userEvent.setup();
+      renderVendorSignup();
+      await completeBusinessType(user);
+
+      await user.type(screen.getByPlaceholderText(/you@company\.com/i), 'vendor@gmail.com');
+      await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'ValidPass1!');
+      await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+      expect(await screen.findByText(/business email address/i)).toBeInTheDocument();
+    });
+
+    it('should accept a business domain and advance to Step 3', async () => {
+      const user = userEvent.setup();
+      renderVendorSignup();
+      await completeBusinessType(user);
+      await completeCredentials(user, 'vendor@acmeco.com', 'ValidPass1!');
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText(/techpro solutions ltd/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Scenario: Step 2 shows a live password strength bar', () => {
+    it('should show no strength bar before any password is typed', () => {
+      renderVendorSignup();
+      expect(screen.queryByText(/too weak|^weak$|^fair$|^good$|^strong$/i)).not.toBeInTheDocument();
+    });
+
+    it('should label a weak password as such', async () => {
+      const user = userEvent.setup();
+      renderVendorSignup();
+      await completeBusinessType(user);
+
+      await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'aaaaaaaaaa');
+      expect(await screen.findByText(/weak/i)).toBeInTheDocument();
+    });
+
+    it('should label a password meeting all 4 rules as Strong', async () => {
+      const user = userEvent.setup();
+      renderVendorSignup();
+      await completeBusinessType(user);
+
+      await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'ValidPass1!');
+      expect(await screen.findByText(/^strong$/i)).toBeInTheDocument();
+    });
+  });
+
   // ── Step 2 → Step 3 ───────────────────────────────────────────────────────
 
   describe('Scenario: Valid Step 2 advances to Step 3 (Company Basics)', () => {

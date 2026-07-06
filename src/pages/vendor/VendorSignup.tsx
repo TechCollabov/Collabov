@@ -4,6 +4,7 @@ import { Globe, Eye, EyeOff, CheckCircle, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRedirectPath } from '../../utils/authRedirect';
 import { supabase } from '../../lib/supabase';
+import { isBusinessEmail } from '../../lib/workflows';
 
 type BusinessType = 'msp' | 'agency' | 'staffaug';
 
@@ -76,6 +77,18 @@ const VendorSignup: React.FC = () => {
     return null;
   };
 
+  /** 0-4 strength score driving the visual bar — same 4 rules as validatePassword. */
+  const passwordStrength = (pw: string) => {
+    let score = 0;
+    if (pw.length >= 10) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    return score;
+  };
+  const STRENGTH_LABEL = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  const STRENGTH_COLOR = ['bg-gray-200', 'bg-red-400', 'bg-amber-400', 'bg-blue-400', 'bg-green-500'];
+
   const handleBusinessTypeContinue = () => {
     setError(null);
     if (!businessType) { setError('Select a business type to continue'); return; }
@@ -85,6 +98,7 @@ const VendorSignup: React.FC = () => {
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!isBusinessEmail(email)) { setError('Please use a business email address — personal addresses (Gmail, Yahoo, Hotmail, Outlook) aren\'t accepted.'); return; }
     const pwErr = validatePassword(password);
     if (pwErr) { setError(pwErr); return; }
     setStep(3);
@@ -245,6 +259,19 @@ const VendorSignup: React.FC = () => {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {password.length > 0 && (() => {
+                  const strength = passwordStrength(password);
+                  return (
+                    <div className="mt-2">
+                      <div className="flex gap-1">
+                        {[0, 1, 2, 3].map(i => (
+                          <div key={i} className={`h-1.5 flex-1 rounded-full ${i < strength ? STRENGTH_COLOR[strength] : 'bg-gray-100'}`} />
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">{STRENGTH_LABEL[strength]}</p>
+                    </div>
+                  );
+                })()}
               </div>
               <button type="submit" className="w-full py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
                 Continue
