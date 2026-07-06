@@ -1242,12 +1242,16 @@ function DeliveryTab(props: {
                     ))}
                   </ul>
                 )}
-                {ms.escrow_status === 'submitted' && ms.auto_release_at && (
-                  <p className="ml-8 text-xs text-amber-600 mb-2">
-                    <Clock className="h-3 w-3 inline mr-1" />
-                    Auto-release {new Date(ms.auto_release_at).toLocaleDateString('en-GB')} — silence equals acceptance.
-                  </p>
-                )}
+                {ms.escrow_status === 'submitted' && ms.auto_release_at && (() => {
+                  const daysLeft = Math.ceil((new Date(ms.auto_release_at).getTime() - Date.now()) / 86_400_000);
+                  const urgent = daysLeft <= getPlatformSettings().autoReleaseWarningDays;
+                  return (
+                    <p className={`ml-8 text-xs mb-2 ${urgent ? 'text-amber-700 bg-amber-50 rounded-lg px-2 py-1 font-medium w-fit' : 'text-gray-400'}`}>
+                      <Clock className="h-3 w-3 inline mr-1" />
+                      Auto-release {new Date(ms.auto_release_at).toLocaleDateString('en-GB')}{urgent ? ` — ${Math.max(daysLeft, 0)}d left, act now` : ''} — silence equals acceptance.
+                    </p>
+                  );
+                })()}
                 {ms.escrow_status === 'rejected' && ms.rejection_reason && (
                   <p className="ml-8 text-xs text-red-600 bg-red-50 rounded-lg p-2 mb-2">Revision requested: {ms.rejection_reason}</p>
                 )}
