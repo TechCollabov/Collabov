@@ -122,6 +122,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           description: userData.additionalData?.description ?? null,
           service_categories: userData.additionalData?.services ?? null,
           tech_stack: userData.additionalData?.techStack ?? null,
+          legal_entity_name: userData.additionalData?.legalEntityName ?? null,
+          trading_name: userData.additionalData?.tradingName ?? null,
+          industry: userData.additionalData?.industry ?? null,
+          headcount_band: userData.additionalData?.headcountBand ?? null,
         },
       },
     });

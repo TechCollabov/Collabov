@@ -143,6 +143,58 @@ describe('Feature: Buyer Registration (3-step flow)', () => {
     });
   });
 
+  // ── Step 1: Business email domain check ───────────────────────────────────
+
+  describe('Scenario: Step 1 rejects personal email domains', () => {
+    it('should reject a gmail.com address', async () => {
+      const user = userEvent.setup();
+      renderBuyerSignup();
+
+      await user.type(screen.getByPlaceholderText(/you@company\.com/i), 'buyer@gmail.com');
+      await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'ValidPass1!');
+      await user.type(screen.getByPlaceholderText(/repeat your password/i), 'ValidPass1!');
+      await user.click(screen.getByRole('button', { name: /^continue$/i }));
+
+      expect(await screen.findByText(/business email address/i)).toBeInTheDocument();
+    });
+
+    it('should accept a business domain and advance to Step 2', async () => {
+      const user = userEvent.setup();
+      renderBuyerSignup();
+
+      await completeStep1(user, 'buyer@acmeco.com', 'ValidPass1!');
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /your company profile/i })).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ── Step 1: Password strength bar ─────────────────────────────────────────
+
+  describe('Scenario: Step 1 shows a live password strength bar', () => {
+    it('should show no strength label before any password is typed', () => {
+      renderBuyerSignup();
+      expect(screen.queryByText(/too weak|^weak$|^fair$|^good$|^strong$/i)).not.toBeInTheDocument();
+    });
+
+    it('should label a weak password as such', async () => {
+      const user = userEvent.setup();
+      renderBuyerSignup();
+
+      await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'aaaaaaaaaa');
+      expect(await screen.findByText(/weak/i)).toBeInTheDocument();
+    });
+
+    it('should label a password meeting all 4 rules as Strong', async () => {
+      const user = userEvent.setup();
+      renderBuyerSignup();
+
+      await user.type(screen.getByPlaceholderText(/min 10 chars/i), 'ValidPass1!');
+      expect(await screen.findByText(/^strong$/i)).toBeInTheDocument();
+    });
+  });
+
   // ── Step 1 → Step 2 transition ────────────────────────────────────────────
 
   describe('Scenario: Valid Step 1 advances to Step 2', () => {
