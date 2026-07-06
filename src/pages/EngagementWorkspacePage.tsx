@@ -99,6 +99,7 @@ export default function EngagementWorkspacePage() {
   const [notFoundFlag, setNotFoundFlag] = useState(false);
   const [eng, setEng] = useState<Engagement | null>(null);
   const [contract, setContract] = useState<Contract | null>(null);
+  const [sow, setSow] = useState<{ id: string; opensign_vendor_sign_url: string | null; vendor_signed_at: string | null } | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [disputes, setDisputes] = useState<any[]>([]);
   const [flags, setFlags] = useState<any[]>([]);
@@ -155,11 +156,14 @@ export default function EngagementWorkspacePage() {
     await sweepDisputeEscalation(engagement.id);
     await sweepFlagDeadlines(engagement);
 
-    const [conRes, msRes, dRes, fRes, crRes, ciRes, hlRes, wlRes, invRes, evRes, termRes, revRes, msgRes] =
+    const [conRes, sowRes, msRes, dRes, fRes, crRes, ciRes, hlRes, wlRes, invRes, evRes, termRes, revRes, msgRes] =
       await Promise.all([
         engagement.contract_id
           ? supabase.from('contracts').select('*').eq('id', engagement.contract_id).maybeSingle()
           : Promise.resolve({ data: null } as any),
+        engagement.sow_id
+          ? supabase.from('sow_documents').select('id, opensign_vendor_sign_url, vendor_signed_at').eq('id', engagement.sow_id).maybeSingle()
+          : Promise.resolve({ data: null } as { data: null }),
         supabase.from('project_milestones').select('*').eq('engagement_id', engagement.id).order('display_order'),
         supabase.from('disputes').select('*').eq('engagement_id', engagement.id).order('opened_at', { ascending: false }),
         supabase.from('milestone_flags').select('*').eq('engagement_id', engagement.id).order('created_at', { ascending: false }),
@@ -255,6 +259,7 @@ export default function EngagementWorkspacePage() {
 
     setEng(engagement);
     setContract(con);
+    setSow(sowRes.data as { id: string; opensign_vendor_sign_url: string | null; vendor_signed_at: string | null } | null);
     setMilestones(msList.map(m => ({ ...m, acceptance_criteria: Array.isArray(m.acceptance_criteria) ? m.acceptance_criteria : [] })));
     setDisputes(dRes.data ?? []);
     setFlags(fRes.data ?? []);
@@ -290,16 +295,21 @@ export default function EngagementWorkspacePage() {
 
   // ── Actions ──────────────────────────────────────────────────────────────────
 
-  const vendorSign = async () => {
-    if (!eng || !contract || !user) return;
+  /** Opens the real OpenSign signing page — signed_by_vendor is only ever set
+   *  by the opensign-webhook Edge Function once OpenSign reports completion. */
+  const vendorSign = () => {
+    if (!sow?.opensign_vendor_sign_url) {
+      showToast('Signing link not ready yet — refresh in a moment.');
+      return;
+    }
+    window.open(sow.opensign_vendor_sign_url, '_blank', 'noopener,noreferrer');
+  };
+
+  const refreshSignatureStatus = async () => {
     setBusy(true);
     try {
-      const now = new Date().toISOString();
-      await supabase.from('contracts').update({ signed_by_vendor: true, vendor_signature_date: now }).eq('id', contract.id);
-      if (eng.sow_id) await supabase.from('sow_documents').update({ vendor_signed_at: now }).eq('id', eng.sow_id);
-      await logEvent('contract_signed', user.id, 'vendor', 'contract', contract.id, {});
-      showToast('Signed. The contract activates once both signatures are in.');
       await load();
+      showToast(contract?.signed_by_vendor ? 'Signature recorded.' : 'Not signed yet — sign in the OpenSign tab, then refresh again.');
     } finally { setBusy(false); }
   };
 
@@ -851,9 +861,14 @@ export default function EngagementWorkspacePage() {
                 {vendorType === 'staffaug' && ' Staff aug contracts also need an admin IR35 stamp before activating.'}
               </div>
               {role === 'vendor' && !contract.signed_by_vendor && (
-                <button onClick={vendorSign} disabled={busy} className="px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg disabled:opacity-50">
-                  Review & Sign Contract
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={vendorSign} disabled={busy || !sow?.opensign_vendor_sign_url} className="px-4 py-2 bg-[#0070F3] text-white text-sm font-semibold rounded-lg disabled:opacity-50">
+                    Sign with OpenSign →
+                  </button>
+                  <button onClick={refreshSignatureStatus} disabled={busy} className="px-3 py-2 border border-blue-300 text-blue-700 text-sm font-medium rounded-lg disabled:opacity-50">
+                    I've signed — refresh status
+                  </button>
+                </div>
               )}
               {role === 'buyer' && !contract.signed_by_customer && (
                 <span className="text-xs text-blue-700">Sign from the SOW wizard's signature step.</span>

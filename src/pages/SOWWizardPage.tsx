@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { notify, logEvent, NOTICE_PERIOD_DAYS, VENDOR_CONTRACT_TEMPLATE, IR35_QUESTIONS } from '../lib/workflows';
+import { logEvent, NOTICE_PERIOD_DAYS, VENDOR_CONTRACT_TEMPLATE, IR35_QUESTIONS } from '../lib/workflows';
 import {
   Loader2,
   CheckCircle,
@@ -1007,6 +1007,9 @@ function Step5({
   buyerSigned,
   signingInProgress,
   obligations,
+  openSignUrl,
+  openSignError,
+  onRefreshStatus,
 }: {
   formData: FormData;
   vendor: string;
@@ -1021,6 +1024,9 @@ function Step5({
   buyerSigned: boolean;
   signingInProgress: boolean;
   obligations: string;
+  openSignUrl: string | null;
+  openSignError: string | null;
+  onRefreshStatus: () => void;
 }) {
   const navigate = useNavigate();
 
@@ -1159,7 +1165,7 @@ function Step5({
         </div>
       )}
 
-      {/* E-Signature Modal (simulated in-platform signing) */}
+      {/* E-Signature Modal — real OpenSign signing, not an in-app flip */}
       {showESignatureModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
@@ -1173,7 +1179,7 @@ function Step5({
               <p className="text-sm text-gray-600">
                 {buyerSigned
                   ? 'Waiting for the vendor to counter-sign. Both parties sign independently — the contract activates once both signatures are in.'
-                  : 'Signing is parallel: you sign here, the vendor signs from their Active Contracts screen. The contract activates when both have signed.'}
+                  : 'Signing happens in OpenSign, which opens in a new tab. The vendor signs separately from their Active Contracts screen. The contract activates when both have signed.'}
               </p>
 
               <div className="space-y-2 mt-4">
@@ -1196,15 +1202,27 @@ function Step5({
                 </p>
               )}
 
+              {openSignError && <p className="text-xs text-red-600 mt-2">{openSignError}</p>}
+
               {!buyerSigned ? (
-                <button
-                  type="button"
-                  onClick={onBuyerSign}
-                  disabled={signingInProgress}
-                  className="w-full bg-[#0070F3] hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-xl mt-2 transition-colors"
-                >
-                  {signingInProgress ? 'Signing…' : 'Sign Contract'}
-                </button>
+                <div className="space-y-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={onBuyerSign}
+                    disabled={!openSignUrl}
+                    className="w-full bg-[#0070F3] hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-xl transition-colors"
+                  >
+                    {openSignUrl ? 'Sign with OpenSign →' : 'Preparing signing link…'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRefreshStatus}
+                    disabled={signingInProgress}
+                    className="w-full border border-blue-200 text-blue-700 font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    {signingInProgress ? 'Checking…' : "I've signed — refresh status"}
+                  </button>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -1283,6 +1301,8 @@ export default function SOWWizardPage() {
   const [signing, setSigning] = useState(false);
   const [buyerSigned, setBuyerSigned] = useState(false);
   const [persistedIds, setPersistedIds] = useState<{ engagementId: string; contractId: string; sowId: string } | null>(null);
+  const [openSignBuyerUrl, setOpenSignBuyerUrl] = useState<string | null>(null);
+  const [openSignError, setOpenSignError] = useState<string | null>(null);
 
   // Pre-fill from the accepted proposal or purchased package.
   useEffect(() => {
@@ -1551,6 +1571,18 @@ export default function SOWWizardPage() {
       await logEvent('sow_generated', user.id, 'buyer', 'sow', sow.id, { total: formData.budget });
       setPersistedIds({ engagementId: eng.id, contractId: contract.id, sowId: sow.id });
       setGenerated(true);
+
+      // Real e-signature request — replaces the old in-app "click to sign"
+      // flip. Failure here isn't fatal to SOW generation; the buyer can retry
+      // from the e-signature step.
+      try {
+        const { data: envelope, error: envelopeErr } = await supabase.functions.invoke('opensign-create-envelope', { body: { sowId: sow.id } });
+        if (envelopeErr) throw envelopeErr;
+        setOpenSignBuyerUrl(envelope?.buyerSignUrl ?? null);
+      } catch (envelopeErr) {
+        console.error('OpenSign envelope creation failed:', envelopeErr);
+        setOpenSignError('Could not prepare the e-signature request. You can retry from the e-signature step.');
+      }
     } catch (e) {
       console.error('SOW generation failed:', e);
       setError('Could not generate the SOW. Please check the form and try again.');
@@ -1559,24 +1591,21 @@ export default function SOWWizardPage() {
     }
   };
 
-  /** Buyer signs in-app (parallel signing: the vendor signs from Active Contracts). */
-  const handleBuyerSign = async () => {
-    if (!persistedIds || !user) return;
+  /** Opens the real OpenSign signing page — the actual signature happens
+   *  there, not in this app. buyer_signed_at is only ever set by the
+   *  opensign-webhook Edge Function once OpenSign reports it's complete. */
+  const handleBuyerSign = () => {
+    if (!openSignBuyerUrl) return;
+    window.open(openSignBuyerUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  /** Re-fetches the SOW to pick up a signature the webhook has since recorded. */
+  const refreshSignStatus = async () => {
+    if (!persistedIds) return;
     setSigning(true);
     try {
-      const now = new Date().toISOString();
-      await supabase.from('contracts').update({
-        signed_by_customer: true,
-        customer_signature_date: now,
-      }).eq('id', persistedIds.contractId);
-      await supabase.from('sow_documents').update({ buyer_signed_at: now, status: 'signing' }).eq('id', persistedIds.sowId);
-      await notify(vendorId, 'contract', 'Your contract is ready — sign now',
-        `The SOW for "${formData.project_title}" is generated and the buyer has signed. Review and counter-sign from Active Contracts.`,
-        '/vendor/dashboard/contracts');
-      await logEvent('contract_signed', user.id, 'buyer', 'contract', persistedIds.contractId, {});
-      setBuyerSigned(true);
-    } catch (e) {
-      console.error('Signing failed:', e);
+      const { data } = await supabase.from('sow_documents').select('buyer_signed_at').eq('id', persistedIds.sowId).maybeSingle();
+      setBuyerSigned(!!data?.buyer_signed_at);
     } finally {
       setSigning(false);
     }
@@ -1640,6 +1669,9 @@ export default function SOWWizardPage() {
               buyerSigned={buyerSigned}
               signingInProgress={signing}
               obligations={obligationsSummary()}
+              openSignUrl={openSignBuyerUrl}
+              openSignError={openSignError}
+              onRefreshStatus={refreshSignStatus}
             />
           )}
 
