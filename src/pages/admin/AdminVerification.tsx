@@ -62,6 +62,8 @@ const DOC_LABELS: Record<string, string> = {
   vatCert: 'VAT Registration Certificate',
 };
 
+const EXPECTED_DOC_COUNT = 3; // companies_house, address_proof, vat_certificate
+
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   submitted:          { label: 'Pending Review',      color: 'bg-amber-100 text-amber-700' },
   under_review:       { label: 'Under Review',        color: 'bg-blue-100 text-blue-700' },
@@ -358,6 +360,7 @@ const AdminVerification: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [referrals, setReferrals] = useState<VendorReferral[]>([]);
   const [decisionBusy, setDecisionBusy] = useState(false);
+  const [referralStatus, setReferralStatus] = useState<Record<string, { confirmed: number; total: number }>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -407,6 +410,25 @@ const AdminVerification: React.FC = () => {
         }));
         setAdminDocStatus(docStatus);
         setDocNotes(notes);
+
+        // Referral confirmation counts, for the queue-row summary — computed
+        // from real vendor_referrals rows rather than the vendors.referral_count
+        // trust-badge column, which nothing in the app keeps in sync.
+        const vendorIds = mapped.map(v => v.id);
+        if (vendorIds.length > 0) {
+          const { data: allReferrals } = await supabase
+            .from('vendor_referrals')
+            .select('vendor_id, confirmed')
+            .in('vendor_id', vendorIds);
+          const statusMap: Record<string, { confirmed: number; total: number }> = {};
+          (allReferrals ?? []).forEach((r: { vendor_id: string; confirmed: boolean }) => {
+            const cur = statusMap[r.vendor_id] ?? { confirmed: 0, total: 0 };
+            cur.total += 1;
+            if (r.confirmed) cur.confirmed += 1;
+            statusMap[r.vendor_id] = cur;
+          });
+          if (!cancelled) setReferralStatus(statusMap);
+        }
       } catch {
         setVendors([]);
       } finally {
@@ -600,6 +622,11 @@ const AdminVerification: React.FC = () => {
               const sla = getPlatformSettings().vendorVerificationSlaDays;
               const timeColor = age > sla ? 'text-red-500' : age > Math.max(1, sla - 2) ? 'text-amber-500' : 'text-gray-400';
               const s = STATUS_MAP[v.status] ?? STATUS_MAP['submitted'];
+              const docCount = v.vendor_documents?.length ?? 0;
+              const validDocCount = (v.vendor_documents ?? []).filter(d => adminDocStatus[d.id] === 'valid').length;
+              const docColor = docCount === 0 ? 'bg-red-100 text-red-700' : docCount < EXPECTED_DOC_COUNT ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+              const ref = referralStatus[v.id];
+              const refColor = !ref || ref.total === 0 ? 'bg-red-100 text-red-700' : ref.confirmed < ref.total ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
               return (
                 <div
                   key={v.id}
@@ -613,8 +640,16 @@ const AdminVerification: React.FC = () => {
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5">
                       {v.country && <span>{v.country}</span>}
                     </div>
-                    <div className={`flex items-center gap-1 text-xs mb-2 ${timeColor}`}>
+                    <div className={`flex items-center gap-1 text-xs mb-1.5 ${timeColor}`}>
                       <Clock className="h-3 w-3" /> {fmtDate(dateStr)} ({age}d ago)
+                    </div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${docColor}`} title={`${validDocCount} of ${docCount} uploaded documents marked valid`}>
+                        Docs {docCount}/{EXPECTED_DOC_COUNT}
+                      </span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${refColor}`}>
+                        Referrals {ref ? `${ref.confirmed}/${ref.total}` : '0/0'}
+                      </span>
                     </div>
                     <button
                       onClick={() => { setSelectedId(v.id); setAdminNotes(''); setShowRejectConfirm(false); }}
