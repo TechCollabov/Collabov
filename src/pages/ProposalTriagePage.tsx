@@ -13,6 +13,7 @@ interface Proposal {
   vendor: string;
   vendor_id: string;
   vendor_type: string;
+  verified: boolean;
   vendor_business_type: string;
   country: string;
   rating: number;
@@ -132,6 +133,7 @@ const ProposalTriagePage: React.FC = () => {
           vendor: vendor?.company_name ?? 'Vendor',
           vendor_id: p.vendor_id,
           vendor_type: vendor?.is_verified ? 'Verified Vendor' : 'Vendor',
+          verified: !!vendor?.is_verified,
           vendor_business_type: businessType,
           country: vendor?.country ?? '',
           rating: vendor?.rating ?? 0,
@@ -266,13 +268,21 @@ const ProposalTriagePage: React.FC = () => {
 
   const comparedVendorIds = Array.from(new Set(proposals.filter(p => compared.has(p.id)).map(p => p.vendor_id)));
 
-  const filteredProposals = proposals.filter(p => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'keep') return p.triage === 'keep';
-    if (activeTab === 'maybe') return p.triage === 'maybe';
-    if (activeTab === 'declined') return p.triage === 'decline';
-    return true;
-  });
+  const filteredProposals = proposals
+    .filter(p => {
+      if (activeTab === 'all') return true;
+      if (activeTab === 'keep') return p.triage === 'keep';
+      if (activeTab === 'maybe') return p.triage === 'maybe';
+      if (activeTab === 'declined') return p.triage === 'decline';
+      return true;
+    })
+    // Verified vendors first, then by rating, then most recent — matches the
+    // "Ranking based on verification status" note shown above the list.
+    .sort((a, b) =>
+      (Number(b.verified) - Number(a.verified)) ||
+      (b.rating - a.rating) ||
+      (new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
+    );
 
   const getBorderColor = (triage: Triage) => {
     if (triage === 'keep') return 'border-green-200';
@@ -358,7 +368,7 @@ const ProposalTriagePage: React.FC = () => {
           <h1 className="text-2xl font-bold text-[#0B2D59]">Proposal Inbox</h1>
           <div className="flex items-center gap-3 mt-1">
             <span className="text-sm text-gray-500">{proposals.length} proposals received</span>
-            <span className="text-xs text-gray-400 italic">Ranking based on verification status — scores build with history.</span>
+            <span className="text-xs text-gray-400 italic">Ranked by verification status, then rating — most recent first within each tier.</span>
           </div>
         </div>
 
