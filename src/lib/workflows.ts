@@ -24,7 +24,6 @@ export const PROPOSAL_WARNING_DAY = 25;
 export const INTERVIEW_RESPONSE_HOURS = 48;
 export const REVIEW_WINDOW_DAYS = 14;
 export const DEFECT_LIABILITY_DAYS = 30;
-export const REPLACEMENT_SLA_BUSINESS_DAYS = 10;
 export const REHIRE_PROMPT_DAYS = 30;
 export const PARTNER_INVITE_EXPIRY_DAYS = 7;
 
@@ -214,10 +213,6 @@ refreshPlatformSettings().catch(() => {});
 
 export function platformFee(gross: number): number {
   return Math.round(gross * getPlatformSettings().platformFeePct) / 100;
-}
-
-export function netToVendor(gross: number): number {
-  return Math.round((gross - platformFee(gross)) * 100) / 100;
 }
 
 export function formatGBP(amount: number): string {
