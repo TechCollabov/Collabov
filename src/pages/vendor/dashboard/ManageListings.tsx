@@ -125,8 +125,6 @@ const emptyReferral = (): ReferralRow => ({
 });
 
 const extractCaseStudyKeywords = async (caseStudy: CaseStudyRow): Promise<string[]> => {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-  if (!apiKey) return [];
   try {
     const prompt = `Extract 3-5 keyword tags from this IT project case study. Return ONLY a JSON array of strings, no other text.
 
@@ -140,23 +138,11 @@ Outcomes: ${caseStudy.outcomes.filter(Boolean).join('. ')}
 
 Return 3-5 specific keyword tags as a JSON array, e.g. ["fintech", "real-time-payments", "aws-lambda"]`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal: controller.signal,
+    const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
+      body: { prompt, maxTokens: 200 },
     });
-    clearTimeout(timeout);
-    if (!response.ok) throw new Error('API error');
-    const data = await response.json();
-    const text = data.content?.[0]?.text || '[]';
-    const tags = JSON.parse(text);
+    if (error) throw error;
+    const tags = JSON.parse(envelope?.text || '[]');
     return Array.isArray(tags) ? tags : [];
   } catch {
     return [];

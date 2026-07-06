@@ -337,46 +337,18 @@ function Step2({
 
   const generateDeliverables = async () => {
     setGenerating(true);
-    const apiKey = (import.meta as any).env?.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      setMilestones([
-        { id: uid(), name: 'Discovery & Architecture', description: 'Technical architecture document and project plan', amount: Math.round(formData.budget * 0.2), due_date: '', acceptance_criteria: ['Architecture document delivered', 'Technology stack confirmed', 'Project plan approved'] },
-        { id: uid(), name: 'Core Development', description: 'Main application features built and tested', amount: Math.round(formData.budget * 0.5), due_date: '', acceptance_criteria: ['All core features functional', 'Unit tests passing (>80% coverage)', 'Staging environment deployed'] },
-        { id: uid(), name: 'Testing & Launch', description: 'UAT, bug fixes, and production deployment', amount: Math.round(formData.budget * 0.3), due_date: '', acceptance_criteria: ['UAT sign-off from buyer', 'Production deployment complete', 'Handover documentation delivered'] },
-      ]);
-      setGenerating(false);
-      return;
-    }
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: `Create 3-4 project milestones for this IT project SOW. Return ONLY valid JSON array.
+      const prompt = `Create 3-4 project milestones for this IT project SOW. Return ONLY valid JSON array.
 Project: ${formData.project_title}
 Service: ${formData.service_type}
 Description: ${formData.description}
 Budget: £${formData.budget}
-Format: [{"name": "...", "description": "...", "amount": number, "acceptance_criteria": ["...", "...", "..."]}]`,
-            },
-          ],
-        }),
-        signal: controller.signal,
+Format: [{"name": "...", "description": "...", "amount": number, "acceptance_criteria": ["...", "...", "..."]}]`;
+      const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
+        body: { prompt, maxTokens: 1000 },
       });
-      clearTimeout(timer);
-      const data = await res.json();
-      const text = data.content?.[0]?.text || '[]';
+      if (error) throw error;
+      const text: string = envelope?.text || '[]';
       // Extract JSON array from possible surrounding text
       const match = text.match(/\[[\s\S]*\]/);
       const parsed = JSON.parse(match ? match[0] : text);
@@ -385,9 +357,9 @@ Format: [{"name": "...", "description": "...", "amount": number, "acceptance_cri
       );
     } catch {
       setMilestones([
-        { id: uid(), name: 'Milestone 1', description: 'First deliverable', amount: Math.round(formData.budget / 3), due_date: '', acceptance_criteria: ['Deliverable complete', 'Accepted by buyer'] },
-        { id: uid(), name: 'Milestone 2', description: 'Second deliverable', amount: Math.round(formData.budget / 3), due_date: '', acceptance_criteria: ['Deliverable complete'] },
-        { id: uid(), name: 'Final Delivery', description: 'Project completion', amount: formData.budget - Math.round(formData.budget / 3) * 2, due_date: '', acceptance_criteria: ['All deliverables accepted', 'Production deployment complete'] },
+        { id: uid(), name: 'Discovery & Architecture', description: 'Technical architecture document and project plan', amount: Math.round(formData.budget * 0.2), due_date: '', acceptance_criteria: ['Architecture document delivered', 'Technology stack confirmed', 'Project plan approved'] },
+        { id: uid(), name: 'Core Development', description: 'Main application features built and tested', amount: Math.round(formData.budget * 0.5), due_date: '', acceptance_criteria: ['All core features functional', 'Unit tests passing (>80% coverage)', 'Staging environment deployed'] },
+        { id: uid(), name: 'Testing & Launch', description: 'UAT, bug fixes, and production deployment', amount: Math.round(formData.budget * 0.3), due_date: '', acceptance_criteria: ['UAT sign-off from buyer', 'Production deployment complete', 'Handover documentation delivered'] },
       ]);
     }
     setGenerating(false);
