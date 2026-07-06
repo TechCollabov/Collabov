@@ -50,6 +50,7 @@ import DiscoveryBriefPage from './pages/DiscoveryBriefPage';
 import SOWWizardPage from './pages/SOWWizardPage';
 import EngagementWorkspacePage from './pages/EngagementWorkspacePage';
 import MyVendorsPage from './pages/customer/MyVendorsPage';
+import ShortlistPage from './pages/customer/ShortlistPage';
 import CustomerPayments from './pages/customer/CustomerPayments';
 import CustomerGovernance from './pages/customer/CustomerGovernance';
 import CustomerSettings from './pages/customer/CustomerSettings';
@@ -119,6 +120,7 @@ function AppContent() {
           {/* Sprint 3 — Engagement flows */}
           <Route path="/engagement/:engagementId" element={<EngagementWorkspacePage />} />
           <Route path="/customer/my-vendors" element={<CustomerRoute><MyVendorsPage /></CustomerRoute>} />
+          <Route path="/customer/shortlist" element={<CustomerRoute><ShortlistPage /></CustomerRoute>} />
           <Route path="/customer/payments" element={<CustomerRoute><CustomerPayments /></CustomerRoute>} />
           <Route path="/customer/governance" element={<CustomerRoute><CustomerGovernance /></CustomerRoute>} />
           <Route path="/customer/settings" element={<CustomerRoute><CustomerSettings /></CustomerRoute>} />

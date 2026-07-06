@@ -637,6 +637,9 @@ const CustomerDashboard: React.FC = () => {
                     else if (tab.id === 'contracts' || tab.id === 'disputes') navigate('/customer/governance');
                     else if (tab.id === 'invoices') navigate('/customer/payments');
                     else if (tab.id === 'settings') navigate('/customer/settings');
+                    else if (tab.id === 'ai-matchmaking') navigate('/results');
+                    else if (tab.id === 'saved-talent') navigate('/customer/shortlist');
+                    else if (tab.id === 'my-projects') navigate('/customer/my-vendors');
                     else setActiveTab(tab.id);
                   }}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
