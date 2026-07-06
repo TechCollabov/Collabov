@@ -14,7 +14,7 @@ export function ProtectedRoute({
   allowedUserTypes,
   requireAuth = true
 }: ProtectedRouteProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, needsMfaChallenge } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -27,6 +27,10 @@ export function ProtectedRoute({
 
   if (requireAuth && !user) {
     return <Navigate to="/signin" state={{ from: location }} replace />;
+  }
+
+  if (requireAuth && user && needsMfaChallenge) {
+    return <Navigate to="/mfa-challenge" state={{ from: location }} replace />;
   }
 
   if (allowedUserTypes && profile && !allowedUserTypes.includes(profile.user_type)) {

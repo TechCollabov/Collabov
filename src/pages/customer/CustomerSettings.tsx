@@ -4,6 +4,7 @@ import { ArrowLeft, Users, BellRing, ShieldCheck, UserCircle, Plus, Trash2, Load
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { NOTIFICATION_EVENTS, isBusinessEmail } from '../../lib/workflows';
+import TwoFactorSetup from '../../components/auth/TwoFactorSetup';
 
 type Tab = 'account' | 'team' | 'notifications' | 'privacy';
 
@@ -27,8 +28,6 @@ const CustomerSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [backupCodes, setBackupCodes] = useState<string[]>([]);
-  const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
 
@@ -77,20 +76,13 @@ const CustomerSettings: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const toggleTwoFactor = async () => {
+  const onTwoFactorChange = async (next: boolean) => {
     if (!user) return;
-    const next = !twoFactorEnabled;
-    if (next) {
-      const codes = Array.from({ length: 8 }, () => Math.random().toString(36).slice(2, 8).toUpperCase());
-      await supabase.from('profiles').update({
-        two_factor_enabled: true, two_factor_backup_codes: codes, two_factor_enabled_at: new Date().toISOString(),
-      }).eq('id', user.id);
-      setBackupCodes(codes);
-      setShowBackupCodes(true);
-    } else {
-      await supabase.from('profiles').update({ two_factor_enabled: false, two_factor_backup_codes: null }).eq('id', user.id);
-    }
     setTwoFactorEnabled(next);
+    await supabase.from('profiles').update({
+      two_factor_enabled: next,
+      two_factor_enabled_at: next ? new Date().toISOString() : null,
+    }).eq('id', user.id);
   };
 
   const updateCompanyField = (key: keyof typeof companyProfile, value: string) => {
@@ -265,24 +257,7 @@ const CustomerSettings: React.FC = () => {
 
             <div className="border-t border-gray-100 pt-5">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Two-Factor Authentication</h3>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">2FA Status</span>
-                <button onClick={toggleTwoFactor} className={`relative inline-flex h-6 w-11 items-center rounded-full ${twoFactorEnabled ? 'bg-[#0070F3]' : 'bg-gray-200'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-              </div>
-              {twoFactorEnabled && showBackupCodes && backupCodes.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mt-3">
-                  <p className="text-sm font-semibold text-amber-800 mb-2">Save your backup codes — shown once</p>
-                  <div className="grid grid-cols-4 gap-2 font-mono text-xs text-amber-900">
-                    {backupCodes.map(c => <span key={c} className="bg-white rounded px-2 py-1 text-center">{c}</span>)}
-                  </div>
-                  <button onClick={() => setShowBackupCodes(false)} className="text-xs text-amber-700 underline mt-2">I've saved these codes</button>
-                </div>
-              )}
-              {twoFactorEnabled && !showBackupCodes && (
-                <p className="text-xs text-green-600 flex items-center gap-1 mt-2"><CheckCircle className="h-3.5 w-3.5" /> Two-factor authentication is enabled.</p>
-              )}
+              <TwoFactorSetup enabled={twoFactorEnabled} onChange={onTwoFactorChange} />
             </div>
           </div>
         )}

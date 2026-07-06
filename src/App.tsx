@@ -15,6 +15,7 @@ import ComingSoonPage from './pages/ComingSoonPage';
 import UserTypeSelection from './pages/UserTypeSelection';
 import CustomerSignup from './pages/CustomerSignup';
 import SignInPage from './pages/SignInPage';
+import MfaChallengePage from './pages/MfaChallengePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ResultsPage from './pages/ResultsPage';
@@ -59,6 +60,7 @@ const hideNavbarFooterPaths = [
   '/admin',
   '/vendor/dashboard',
   '/signin',
+  '/mfa-challenge',
   '/forgot-password',
   '/reset-password',
   '/user-type',
@@ -151,6 +153,7 @@ function AppContent() {
           <Route path="/vendor/signup" element={<VendorSignup />} />
           <Route path="/vendor/signup/:type" element={<VendorSignup />} />
           <Route path="/signin" element={<SignInPage />} />
+          <Route path="/mfa-challenge" element={<MfaChallengePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/oauth/consent" element={<OAuthConsentPage />} />
