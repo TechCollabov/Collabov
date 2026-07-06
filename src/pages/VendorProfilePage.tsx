@@ -755,6 +755,19 @@ function Sidebar({ vendor, onRFP }: { vendor: any; onRFP: () => void }) {
       >
         Send a Message
       </button>
+      {vendor.business_type === 'agency' && (
+        <>
+          <Link
+            to={`/discovery-brief?vendor=${vendor.id}`}
+            className="block w-full text-center py-2.5 border border-[#0070F3] text-[#0070F3] text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            Start a Discovery
+          </Link>
+          <p className="text-xs text-gray-400">
+            Not sure what you need built yet? A discovery gets you a scoped spec first — request a proposal instead if you already know what to build.
+          </p>
+        </>
+      )}
       <hr className="border-gray-100" />
       <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors w-full">
         <Share2 className="h-4 w-4" /> Copy link
@@ -1883,6 +1896,14 @@ const VendorProfilePage: React.FC = () => {
               <button onClick={openRFP} className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
                 Send Message
               </button>
+              {vendor.business_type === 'agency' && (
+                <Link
+                  to={`/discovery-brief?vendor=${vendor.id}`}
+                  className="px-4 py-2.5 border border-[#0070F3] text-[#0070F3] text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Start a Discovery
+                </Link>
+              )}
               <button
                 onClick={() => setActiveTab('Calendar & Availability')}
                 className="px-4 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"

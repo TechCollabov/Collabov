@@ -188,7 +188,7 @@ const ResultsPage: React.FC = () => {
 
   const [filters, setFilters] = useState<Filters>({
     ...DEFAULT_FILTERS,
-    types: typeParam ? [typeParam.toUpperCase() as VendorType] : [],
+    types: typeParam && BUSINESS_TYPE_LABEL[typeParam.toLowerCase()] ? [BUSINESS_TYPE_LABEL[typeParam.toLowerCase()]] : [],
     location: locationParam,
   });
   const [sort, setSort] = useState('best');
