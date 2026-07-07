@@ -65,7 +65,9 @@ const BuyerSignup: React.FC = () => {
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!isBusinessEmail(email)) { setError('Please use a business email address — personal addresses (Gmail, Yahoo, Hotmail, Outlook) aren\'t accepted.'); return; }
+    // TODO(revert-before-launch): business-email check disabled for testing — re-enable
+    // by uncommenting the line below.
+    // if (!isBusinessEmail(email)) { setError('Please use a business email address — personal addresses (Gmail, Yahoo, Hotmail, Outlook) aren\'t accepted.'); return; }
     const pwError = validatePassword(password);
     if (pwError) { setError(pwError); return; }
     if (password !== confirmPassword) { setError("Passwords don't match"); return; }

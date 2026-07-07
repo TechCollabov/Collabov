@@ -100,7 +100,10 @@ const VendorSignup: React.FC = () => {
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!isBusinessEmail(email)) { setError('Please use a business email address — personal addresses (Gmail, Yahoo, Hotmail, Outlook) aren\'t accepted.'); return; }
+    // TODO(revert-before-launch): business-email check disabled for testing — re-enable
+    // by uncommenting the line below. Applies to all three vendor types (MSP/agency/staffaug)
+    // since they share this one signup component.
+    // if (!isBusinessEmail(email)) { setError('Please use a business email address — personal addresses (Gmail, Yahoo, Hotmail, Outlook) aren\'t accepted.'); return; }
     const pwErr = validatePassword(password);
     if (pwErr) { setError(pwErr); return; }
     setStep(3);
