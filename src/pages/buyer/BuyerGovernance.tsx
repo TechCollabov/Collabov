@@ -7,7 +7,7 @@ import { formatGBP, hoursLeft } from '../../lib/workflows';
 
 type Tab = 'contracts' | 'disputes' | 'ir35' | 'gdpr';
 
-const CustomerGovernance: React.FC = () => {
+const BuyerGovernance: React.FC = () => {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('contracts');
   const [loading, setLoading] = useState(true);
@@ -20,7 +20,7 @@ const CustomerGovernance: React.FC = () => {
     if (!user) return;
     setLoading(true);
     const [conRes, engRes] = await Promise.all([
-      supabase.from('contracts').select('*').eq('customer_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('contracts').select('*').eq('buyer_id', user.id).order('created_at', { ascending: false }),
       supabase.from('engagements').select('*').eq('buyer_id', user.id).order('created_at', { ascending: false }),
     ]);
     const engagementIds = (engRes.data ?? []).map((e: any) => e.id);
@@ -93,7 +93,7 @@ const CustomerGovernance: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/customer/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+          <Link to="/buyer/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
             <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
           <h1 className="text-2xl font-bold text-[#0B2D59]">Governance</h1>
@@ -211,4 +211,4 @@ const CustomerGovernance: React.FC = () => {
   );
 };
 
-export default CustomerGovernance;
+export default BuyerGovernance;

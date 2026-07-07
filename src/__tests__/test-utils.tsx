@@ -17,7 +17,7 @@ export const createMockUser = (overrides: Record<string, unknown> = {}) => ({
 });
 
 export const createMockProfile = (
-  userType: 'customer' | 'vendor' | 'admin' | 'contractor' = 'customer',
+  userType: 'buyer' | 'vendor' | 'admin' | 'contractor' = 'buyer',
   overrides: Record<string, unknown> = {}
 ) => ({
   id: 'user-test-123',

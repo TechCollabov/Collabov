@@ -27,7 +27,7 @@ function renderSignIn() {
   return renderWithRouter(
     <Routes>
       <Route path="/signin"            element={<SignInPage />} />
-      <Route path="/customer/dashboard" element={<div data-testid="customer-dashboard" />} />
+      <Route path="/buyer/dashboard" element={<div data-testid="buyer-dashboard" />} />
       <Route path="/vendor/dashboard"   element={<div data-testid="vendor-dashboard" />} />
       <Route path="/admin"              element={<div data-testid="admin-panel" />} />
     </Routes>,
@@ -134,17 +134,17 @@ describe('Feature: User Sign In', () => {
       });
     });
 
-    it('should redirect a customer to /customer/dashboard after sign-in', async () => {
+    it('should redirect a buyer to /buyer/dashboard after sign-in', async () => {
       // First render shows the unauthenticated sign-in form;
       // after signIn resolves the auth state updates and the component re-renders
-      // with an authenticated customer profile → redirect triggers.
+      // with an authenticated buyer profile → redirect triggers.
       let callCount = 0;
       vi.mocked(useAuth).mockImplementation(() => {
         callCount++;
         if (callCount > 2) {
           return createMockAuthValue({
             user: createMockUser(),
-            profile: createMockProfile('customer'),
+            profile: createMockProfile('buyer'),
           }) as ReturnType<typeof useAuth>;
         }
         return createMockAuthValue({
@@ -160,7 +160,7 @@ describe('Feature: User Sign In', () => {
       await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
       await waitFor(() => {
-        expect(screen.getByTestId('customer-dashboard')).toBeInTheDocument();
+        expect(screen.getByTestId('buyer-dashboard')).toBeInTheDocument();
       });
     });
   });

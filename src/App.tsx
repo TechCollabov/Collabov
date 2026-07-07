@@ -3,7 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { supabase } from './lib/supabase';
 import MaintenanceModePage from './pages/MaintenanceModePage';
-import { CustomerRoute, VendorRoute, AdminRoute } from './components/auth/ProtectedRoute';
+import { BuyerRoute, VendorRoute, AdminRoute } from './components/auth/ProtectedRoute';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import HomePage from './pages/HomePage';
@@ -13,7 +13,7 @@ import HowItWorksPage from './pages/HowItWorksPage';
 import ContactPage from './pages/ContactPage';
 import ComingSoonPage from './pages/ComingSoonPage';
 import UserTypeSelection from './pages/UserTypeSelection';
-import CustomerSignup from './pages/CustomerSignup';
+import BuyerSignup from './pages/BuyerSignup';
 import SignInPage from './pages/SignInPage';
 import MfaChallengePage from './pages/MfaChallengePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -24,9 +24,9 @@ import ComparePage from './pages/ComparePage';
 import PackagesPage from './pages/PackagesPage';
 import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
-import CustomerDashboard from './pages/customer/CustomerDashboard';
-import PostJobPage from './pages/customer/PostJobPage';
-import BYOVPage from './pages/customer/BYOVPage';
+import BuyerDashboard from './pages/buyer/BuyerDashboard';
+import PostJobPage from './pages/buyer/PostJobPage';
+import BYOVPage from './pages/buyer/BYOVPage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -50,11 +50,11 @@ import ProposalTriagePage from './pages/ProposalTriagePage';
 import DiscoveryBriefPage from './pages/DiscoveryBriefPage';
 import SOWWizardPage from './pages/SOWWizardPage';
 import EngagementWorkspacePage from './pages/EngagementWorkspacePage';
-import MyVendorsPage from './pages/customer/MyVendorsPage';
-import ShortlistPage from './pages/customer/ShortlistPage';
-import CustomerPayments from './pages/customer/CustomerPayments';
-import CustomerGovernance from './pages/customer/CustomerGovernance';
-import CustomerSettings from './pages/customer/CustomerSettings';
+import MyVendorsPage from './pages/buyer/MyVendorsPage';
+import ShortlistPage from './pages/buyer/ShortlistPage';
+import BuyerPayments from './pages/buyer/BuyerPayments';
+import BuyerGovernance from './pages/buyer/BuyerGovernance';
+import BuyerSettings from './pages/buyer/BuyerSettings';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -65,8 +65,8 @@ const hideNavbarFooterPaths = [
   '/reset-password',
   '/user-type',
   '/signup',
-  '/customer/post-job',
-  '/customer/dashboard',
+  '/buyer/post-job',
+  '/buyer/dashboard',
   '/oauth/consent',
   '/messages',
   '/proposals',
@@ -114,18 +114,18 @@ function AppContent() {
           <Route path="/jobs" element={<JobsPage />} />
 
           {/* Sprint 2 — Proposal & Contract flows */}
-          <Route path="/proposals" element={<CustomerRoute><ProposalTriagePage /></CustomerRoute>} />
-          <Route path="/discovery-brief" element={<CustomerRoute><DiscoveryBriefPage /></CustomerRoute>} />
-          <Route path="/sow-wizard" element={<CustomerRoute><SOWWizardPage /></CustomerRoute>} />
+          <Route path="/proposals" element={<BuyerRoute><ProposalTriagePage /></BuyerRoute>} />
+          <Route path="/discovery-brief" element={<BuyerRoute><DiscoveryBriefPage /></BuyerRoute>} />
+          <Route path="/sow-wizard" element={<BuyerRoute><SOWWizardPage /></BuyerRoute>} />
           <Route path="/messages" element={<MessagingPage />} />
 
           {/* Sprint 3 — Engagement flows */}
           <Route path="/engagement/:engagementId" element={<EngagementWorkspacePage />} />
-          <Route path="/customer/my-vendors" element={<CustomerRoute><MyVendorsPage /></CustomerRoute>} />
-          <Route path="/customer/shortlist" element={<CustomerRoute><ShortlistPage /></CustomerRoute>} />
-          <Route path="/customer/payments" element={<CustomerRoute><CustomerPayments /></CustomerRoute>} />
-          <Route path="/customer/governance" element={<CustomerRoute><CustomerGovernance /></CustomerRoute>} />
-          <Route path="/customer/settings" element={<CustomerRoute><CustomerSettings /></CustomerRoute>} />
+          <Route path="/buyer/my-vendors" element={<BuyerRoute><MyVendorsPage /></BuyerRoute>} />
+          <Route path="/buyer/shortlist" element={<BuyerRoute><ShortlistPage /></BuyerRoute>} />
+          <Route path="/buyer/payments" element={<BuyerRoute><BuyerPayments /></BuyerRoute>} />
+          <Route path="/buyer/governance" element={<BuyerRoute><BuyerGovernance /></BuyerRoute>} />
+          <Route path="/buyer/settings" element={<BuyerRoute><BuyerSettings /></BuyerRoute>} />
 
           {/* Legal & Info */}
           <Route path="/terms" element={<TermsPage />} />
@@ -149,7 +149,7 @@ function AppContent() {
 
           {/* Auth */}
           <Route path="/user-type" element={<UserTypeSelection />} />
-          <Route path="/signup/customer" element={<CustomerSignup />} />
+          <Route path="/signup/buyer" element={<BuyerSignup />} />
           <Route path="/vendor/signup" element={<VendorSignup />} />
           <Route path="/vendor/signup/:type" element={<VendorSignup />} />
           <Route path="/signin" element={<SignInPage />} />
@@ -158,10 +158,10 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/oauth/consent" element={<OAuthConsentPage />} />
 
-          {/* Customer */}
-          <Route path="/customer/dashboard" element={<CustomerRoute><CustomerDashboard /></CustomerRoute>} />
-          <Route path="/customer/post-job" element={<CustomerRoute><PostJobPage /></CustomerRoute>} />
-          <Route path="/customer/byov" element={<CustomerRoute><BYOVPage /></CustomerRoute>} />
+          {/* Buyer */}
+          <Route path="/buyer/dashboard" element={<BuyerRoute><BuyerDashboard /></BuyerRoute>} />
+          <Route path="/buyer/post-job" element={<BuyerRoute><PostJobPage /></BuyerRoute>} />
+          <Route path="/buyer/byov" element={<BuyerRoute><BYOVPage /></BuyerRoute>} />
 
           {/* Vendor */}
           <Route path="/vendor/dashboard/*" element={<VendorRoute><VendorDashboard /></VendorRoute>} />

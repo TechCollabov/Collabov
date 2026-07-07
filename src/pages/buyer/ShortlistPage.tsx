@@ -42,7 +42,7 @@ const ShortlistPage: React.FC = () => {
     const { data: saved } = await supabase
       .from('saved_vendors')
       .select('id, created_at, vendor_id')
-      .eq('customer_id', user.id)
+      .eq('buyer_id', user.id)
       .is('contractor_id', null)
       .order('created_at', { ascending: false });
 

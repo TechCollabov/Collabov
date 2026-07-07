@@ -18,7 +18,7 @@ interface JobRow {
   tech_stack: string[] | null;
   submission_deadline: string | null;
   created_at: string;
-  customer_id: string;
+  buyer_id: string;
   company?: string;
 }
 
@@ -58,17 +58,17 @@ const JobBoard: React.FC = () => {
     // Only admin-approved jobs are visible on the public Job Board.
     const { data: jobRows } = await supabase
       .from('jobs')
-      .select('id, title, description, category, service_type, job_kind, budget_amount, budget_from, budget_to, budget_type, tech_stack, submission_deadline, created_at, customer_id')
+      .select('id, title, description, category, service_type, job_kind, budget_amount, budget_from, budget_to, budget_type, tech_stack, submission_deadline, created_at, buyer_id')
       .eq('visibility', 'public')
       .eq('status', 'open')
       .eq('admin_status', 'live')
       .order('created_at', { ascending: false });
 
-    const customerIds = Array.from(new Set((jobRows ?? []).map(j => j.customer_id)));
-    const { data: customers } = customerIds.length
-      ? await supabase.from('customers').select('id, company_name').in('id', customerIds)
+    const buyerIds = Array.from(new Set((jobRows ?? []).map(j => j.buyer_id)));
+    const { data: buyers } = buyerIds.length
+      ? await supabase.from('buyers').select('id, company_name').in('id', buyerIds)
       : { data: [] as any[] };
-    const custMap = new Map((customers ?? []).map((c: any) => [c.id, c.company_name]));
+    const custMap = new Map((buyers ?? []).map((c: any) => [c.id, c.company_name]));
 
     const scored = (jobRows ?? []).map(j => {
       const jobTech = (j.tech_stack as string[]) ?? [];
@@ -80,7 +80,7 @@ const JobBoard: React.FC = () => {
         caseStudyTechMatch: overlap > 0,
         keywordMatch: false,
       });
-      return { ...j, company: custMap.get(j.customer_id) ?? 'Buyer', score } as JobRow & { score: number };
+      return { ...j, company: custMap.get(j.buyer_id) ?? 'Buyer', score } as JobRow & { score: number };
     });
     setJobs(scored);
 
@@ -106,7 +106,7 @@ const JobBoard: React.FC = () => {
     try {
       const { error } = await supabase.from('proposals').insert({
         vendor_id: user.id,
-        customer_id: job.customer_id,
+        buyer_id: job.buyer_id,
         job_id: job.id,
         proposal_kind: job.job_kind === 'tender' ? 'standard' : 'standard',
         proposal_content: proposal.trim(),
@@ -116,7 +116,7 @@ const JobBoard: React.FC = () => {
         workflow_state: 'sent',
       });
       if (error) throw error;
-      await notify(job.customer_id, 'new_proposal', 'New application received',
+      await notify(job.buyer_id, 'new_proposal', 'New application received',
         `A vendor applied to "${job.title}".`, '/proposals');
       await logEvent('proposal_submitted', user.id, 'vendor', 'proposal', job.id, { source: 'job_board' });
       setApplied(prev => ({ ...prev, [job.id]: new Date().toISOString() }));

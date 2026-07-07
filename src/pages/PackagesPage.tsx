@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Search, ShieldCheck, X, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../lib/workflows';
+import { logEvent, hasCompanyProfile, isBuyerBlacklisted } from '../lib/workflows';
 import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 interface PackageRow {
@@ -71,7 +71,7 @@ const PackagesPage: React.FC = () => {
       setShowProfileGate(true);
       return;
     }
-    if (await isCustomerBlacklisted(user.id)) {
+    if (await isBuyerBlacklisted(user.id)) {
       setBlacklistError('This account is blacklisted and cannot purchase packages. Contact support@collabov.com.');
       return;
     }

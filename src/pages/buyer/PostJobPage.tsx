@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { notify, logEvent, hasCompanyProfile, isCustomerBlacklisted, getPlatformSettings } from '../../lib/workflows';
+import { notify, logEvent, hasCompanyProfile, isBuyerBlacklisted, getPlatformSettings } from '../../lib/workflows';
 import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 export interface JobData {
@@ -176,7 +176,7 @@ const PostJobPage: React.FC = () => {
         setSubmitting(false);
         return;
       }
-      if (await isCustomerBlacklisted(user.id)) {
+      if (await isBuyerBlacklisted(user.id)) {
         setSubmitError('This account is blacklisted and cannot post new jobs or tenders. Contact support@collabov.com.');
         setSubmitting(false);
         return;
@@ -189,7 +189,7 @@ const PostJobPage: React.FC = () => {
       }
 
       const { data: job, error } = await supabase.from('jobs').insert({
-        customer_id: user.id,
+        buyer_id: user.id,
         title: jobData.title,
         description: jobData.description,
         category: jobData.category || null,
@@ -224,7 +224,7 @@ const PostJobPage: React.FC = () => {
       await logEvent(isTender ? 'tender_posted' : 'job_posted', user.id, 'buyer', 'job', job.id, {
         visibility: jobData.visibility,
       });
-      navigate('/customer/dashboard?success=job-posted');
+      navigate('/buyer/dashboard?success=job-posted');
     } catch (e) {
       console.error('Job post failed:', e);
       setSubmitError('Could not post the job. Please try again.');
@@ -790,7 +790,7 @@ const PostJobPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => navigate('/customer/dashboard')}
+                onClick={() => navigate('/buyer/dashboard')}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeft className="h-5 w-5" />

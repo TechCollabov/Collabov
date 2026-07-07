@@ -40,7 +40,7 @@ const VendorPayments: React.FC = () => {
 
     const buyerIds = Array.from(new Set((engs ?? []).map((e: any) => e.buyer_id)));
     if (buyerIds.length) {
-      const { data: buyers } = await supabase.from('customers').select('id, company_name, on_time_payment_rate').in('id', buyerIds);
+      const { data: buyers } = await supabase.from('buyers').select('id, company_name, on_time_payment_rate').in('id', buyerIds);
       setBuyerBadges(new Map((buyers ?? []).map((b: any) => [b.id, `${b.company_name}|${paymentBadge(b.on_time_payment_rate ?? 100)}`])));
     }
 

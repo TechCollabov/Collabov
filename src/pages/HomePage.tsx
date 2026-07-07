@@ -526,13 +526,13 @@ const HomePage: React.FC = () => {
                 title: 'Post a Job',
                 body: 'Hire a specialist or small team for a defined scope. Ideal for development sprints, design work, and QA projects. Proposals arrive within 24 hours.',
                 cta: 'Post a Job →',
-                route: '/customer/dashboard',
+                route: '/buyer/dashboard',
               },
               {
                 title: 'Create a Tender',
                 body: 'Large structured project requiring multiple vendor proposals and formal evaluation. Ideal for platform builds, IT migrations, and long-term partnerships.',
                 cta: 'Create a Tender →',
-                route: '/customer/dashboard',
+                route: '/buyer/dashboard',
               },
               {
                 title: 'Browse Open Work',
@@ -557,7 +557,7 @@ const HomePage: React.FC = () => {
       <section className="py-16 bg-white">
         <div className="container mx-auto px-8">
           <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold text-[#0B2D59] mb-3">What Our Customers Say</h2>
+            <h2 className="text-3xl font-bold text-[#0B2D59] mb-3">What Our Buyers Say</h2>
             <p className="text-gray-600">Real results from real businesses.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">

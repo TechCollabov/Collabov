@@ -34,8 +34,8 @@ describe('Feature: Account Type Selection (/user-type)', () => {
     });
   });
 
-  describe('Scenario: Buyer card links to /signup/customer', () => {
-    it('should link the "Sign up as a Buyer" CTA to /signup/customer', () => {
+  describe('Scenario: Buyer card links to /signup/buyer', () => {
+    it('should link the "Sign up as a Buyer" CTA to /signup/buyer', () => {
       // Given the user sees the Buyer card
       renderWithRouter(<UserTypeSelection />);
 
@@ -43,7 +43,7 @@ describe('Feature: Account Type Selection (/user-type)', () => {
       const buyerLink = screen.getByRole('link', { name: /sign up as a buyer/i });
 
       // Then it navigates to the buyer signup flow
-      expect(buyerLink).toHaveAttribute('href', '/signup/customer');
+      expect(buyerLink).toHaveAttribute('href', '/signup/buyer');
     });
   });
 

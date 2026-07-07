@@ -47,6 +47,184 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_log: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number
+          feature: string
+          id: string
+          input_tokens: number
+          model: string
+          output_tokens: number
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number
+          feature: string
+          id?: string
+          input_tokens?: number
+          model: string
+          output_tokens?: number
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number
+          feature?: string
+          id?: string
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      buyer_team_members: {
+        Row: {
+          buyer_id: string
+          created_at: string | null
+          email: string
+          id: string
+          name: string | null
+          role: string
+          status: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string | null
+          email: string
+          id?: string
+          name?: string | null
+          role?: string
+          status?: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string | null
+          role?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_team_members_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "buyers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      buyers: {
+        Row: {
+          active_projects_count: number | null
+          address: string | null
+          billing_address: string | null
+          blacklist_pending: boolean | null
+          blacklist_reason: string | null
+          blacklisted_at: string | null
+          blacklisted_by: string | null
+          city: string | null
+          companies_house_number: string | null
+          company_name: string
+          company_website: string | null
+          country: string | null
+          created_at: string | null
+          headcount_band: string | null
+          id: string
+          industry: string | null
+          is_blacklisted: boolean | null
+          late_payment_count: number | null
+          legal_entity_name: string | null
+          logo_url: string | null
+          on_time_payment_rate: number | null
+          payment_events_count: number | null
+          phone: string | null
+          restoration_approvals: Json | null
+          state: string | null
+          timezone: string | null
+          total_spent: number | null
+          trading_name: string | null
+          updated_at: string | null
+          vat_number: string | null
+        }
+        Insert: {
+          active_projects_count?: number | null
+          address?: string | null
+          billing_address?: string | null
+          blacklist_pending?: boolean | null
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
+          city?: string | null
+          companies_house_number?: string | null
+          company_name: string
+          company_website?: string | null
+          country?: string | null
+          created_at?: string | null
+          headcount_band?: string | null
+          id: string
+          industry?: string | null
+          is_blacklisted?: boolean | null
+          late_payment_count?: number | null
+          legal_entity_name?: string | null
+          logo_url?: string | null
+          on_time_payment_rate?: number | null
+          payment_events_count?: number | null
+          phone?: string | null
+          restoration_approvals?: Json | null
+          state?: string | null
+          timezone?: string | null
+          total_spent?: number | null
+          trading_name?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Update: {
+          active_projects_count?: number | null
+          address?: string | null
+          billing_address?: string | null
+          blacklist_pending?: boolean | null
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
+          city?: string | null
+          companies_house_number?: string | null
+          company_name?: string
+          company_website?: string | null
+          country?: string | null
+          created_at?: string | null
+          headcount_band?: string | null
+          id?: string
+          industry?: string | null
+          is_blacklisted?: boolean | null
+          late_payment_count?: number | null
+          legal_entity_name?: string | null
+          logo_url?: string | null
+          on_time_payment_rate?: number | null
+          payment_events_count?: number | null
+          phone?: string | null
+          restoration_approvals?: Json | null
+          state?: string | null
+          timezone?: string | null
+          total_spent?: number | null
+          trading_name?: string | null
+          updated_at?: string | null
+          vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyers_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       case_studies: {
         Row: {
           ai_generated_hash: string | null
@@ -494,12 +672,12 @@ export type Database = {
       }
       contracts: {
         Row: {
+          buyer_id: string
+          buyer_signature_date: string | null
           contract_number: string
           contractor_id: string | null
           created_at: string | null
           credential_log: Json | null
-          customer_id: string
-          customer_signature_date: string | null
           defect_liability_days: number | null
           defect_liability_end_date: string | null
           document_url: string | null
@@ -509,7 +687,7 @@ export type Database = {
           offboarding_checklist: Json | null
           payment_terms: string | null
           project_id: string | null
-          signed_by_customer: boolean | null
+          signed_by_buyer: boolean | null
           signed_by_vendor: boolean | null
           start_date: string
           status: Database["public"]["Enums"]["contract_status"] | null
@@ -523,12 +701,12 @@ export type Database = {
           vendor_signature_date: string | null
         }
         Insert: {
+          buyer_id: string
+          buyer_signature_date?: string | null
           contract_number: string
           contractor_id?: string | null
           created_at?: string | null
           credential_log?: Json | null
-          customer_id: string
-          customer_signature_date?: string | null
           defect_liability_days?: number | null
           defect_liability_end_date?: string | null
           document_url?: string | null
@@ -538,7 +716,7 @@ export type Database = {
           offboarding_checklist?: Json | null
           payment_terms?: string | null
           project_id?: string | null
-          signed_by_customer?: boolean | null
+          signed_by_buyer?: boolean | null
           signed_by_vendor?: boolean | null
           start_date: string
           status?: Database["public"]["Enums"]["contract_status"] | null
@@ -552,12 +730,12 @@ export type Database = {
           vendor_signature_date?: string | null
         }
         Update: {
+          buyer_id?: string
+          buyer_signature_date?: string | null
           contract_number?: string
           contractor_id?: string | null
           created_at?: string | null
           credential_log?: Json | null
-          customer_id?: string
-          customer_signature_date?: string | null
           defect_liability_days?: number | null
           defect_liability_end_date?: string | null
           document_url?: string | null
@@ -567,7 +745,7 @@ export type Database = {
           offboarding_checklist?: Json | null
           payment_terms?: string | null
           project_id?: string | null
-          signed_by_customer?: boolean | null
+          signed_by_buyer?: boolean | null
           signed_by_vendor?: boolean | null
           start_date?: string
           status?: Database["public"]["Enums"]["contract_status"] | null
@@ -582,17 +760,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "contracts_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "buyers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contracts_contractor_id_fkey"
             columns: ["contractor_id"]
             isOneToOne: false
             referencedRelation: "contractors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -607,151 +785,6 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      customer_team_members: {
-        Row: {
-          created_at: string | null
-          customer_id: string
-          email: string
-          id: string
-          name: string | null
-          role: string
-          status: string
-        }
-        Insert: {
-          created_at?: string | null
-          customer_id: string
-          email: string
-          id?: string
-          name?: string | null
-          role?: string
-          status?: string
-        }
-        Update: {
-          created_at?: string | null
-          customer_id?: string
-          email?: string
-          id?: string
-          name?: string | null
-          role?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_team_members_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      customers: {
-        Row: {
-          active_projects_count: number | null
-          address: string | null
-          billing_address: string | null
-          blacklist_pending: boolean | null
-          blacklist_reason: string | null
-          blacklisted_at: string | null
-          blacklisted_by: string | null
-          city: string | null
-          companies_house_number: string | null
-          company_name: string
-          company_website: string | null
-          country: string | null
-          created_at: string | null
-          headcount_band: string | null
-          id: string
-          industry: string | null
-          is_blacklisted: boolean | null
-          late_payment_count: number | null
-          legal_entity_name: string | null
-          logo_url: string | null
-          on_time_payment_rate: number | null
-          payment_events_count: number | null
-          phone: string | null
-          restoration_approvals: Json | null
-          state: string | null
-          timezone: string | null
-          total_spent: number | null
-          trading_name: string | null
-          updated_at: string | null
-          vat_number: string | null
-        }
-        Insert: {
-          active_projects_count?: number | null
-          address?: string | null
-          billing_address?: string | null
-          blacklist_pending?: boolean | null
-          blacklist_reason?: string | null
-          blacklisted_at?: string | null
-          blacklisted_by?: string | null
-          city?: string | null
-          companies_house_number?: string | null
-          company_name: string
-          company_website?: string | null
-          country?: string | null
-          created_at?: string | null
-          headcount_band?: string | null
-          id: string
-          industry?: string | null
-          is_blacklisted?: boolean | null
-          late_payment_count?: number | null
-          legal_entity_name?: string | null
-          logo_url?: string | null
-          on_time_payment_rate?: number | null
-          payment_events_count?: number | null
-          phone?: string | null
-          restoration_approvals?: Json | null
-          state?: string | null
-          timezone?: string | null
-          total_spent?: number | null
-          trading_name?: string | null
-          updated_at?: string | null
-          vat_number?: string | null
-        }
-        Update: {
-          active_projects_count?: number | null
-          address?: string | null
-          billing_address?: string | null
-          blacklist_pending?: boolean | null
-          blacklist_reason?: string | null
-          blacklisted_at?: string | null
-          blacklisted_by?: string | null
-          city?: string | null
-          companies_house_number?: string | null
-          company_name?: string
-          company_website?: string | null
-          country?: string | null
-          created_at?: string | null
-          headcount_band?: string | null
-          id?: string
-          industry?: string | null
-          is_blacklisted?: boolean | null
-          late_payment_count?: number | null
-          legal_entity_name?: string | null
-          logo_url?: string | null
-          on_time_payment_rate?: number | null
-          payment_events_count?: number | null
-          phone?: string | null
-          restoration_approvals?: Json | null
-          state?: string | null
-          timezone?: string | null
-          total_spent?: number | null
-          trading_name?: string | null
-          updated_at?: string | null
-          vat_number?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customers_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -962,10 +995,10 @@ export type Database = {
           attachment_url: string | null
           budget_from: number | null
           budget_to: number | null
+          buyer_email: string
+          buyer_id: string
+          buyer_phone: string | null
           created_at: string | null
-          customer_email: string
-          customer_id: string
-          customer_phone: string | null
           end_date: string | null
           engagement_model: string | null
           enquiry_type: string | null
@@ -988,10 +1021,10 @@ export type Database = {
           attachment_url?: string | null
           budget_from?: number | null
           budget_to?: number | null
+          buyer_email: string
+          buyer_id: string
+          buyer_phone?: string | null
           created_at?: string | null
-          customer_email: string
-          customer_id: string
-          customer_phone?: string | null
           end_date?: string | null
           engagement_model?: string | null
           enquiry_type?: string | null
@@ -1014,10 +1047,10 @@ export type Database = {
           attachment_url?: string | null
           budget_from?: number | null
           budget_to?: number | null
+          buyer_email?: string
+          buyer_id?: string
+          buyer_phone?: string | null
           created_at?: string | null
-          customer_email?: string
-          customer_id?: string
-          customer_phone?: string | null
           end_date?: string | null
           engagement_model?: string | null
           enquiry_type?: string | null
@@ -1038,10 +1071,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "enquiries_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "enquiries_buyer_id_fkey"
+            columns: ["buyer_id"]
             isOneToOne: false
-            referencedRelation: "customers"
+            referencedRelation: "buyers"
             referencedColumns: ["id"]
           },
           {
@@ -1299,7 +1332,7 @@ export type Database = {
             foreignKeyName: "interview_requests_buyer_id_fkey"
             columns: ["buyer_id"]
             isOneToOne: false
-            referencedRelation: "customers"
+            referencedRelation: "buyers"
             referencedColumns: ["id"]
           },
           {
@@ -1479,11 +1512,11 @@ export type Database = {
           budget_from: number | null
           budget_to: number | null
           budget_type: Database["public"]["Enums"]["budget_type"]
+          buyer_id: string
           category: string | null
           closed_at: string | null
           created_at: string | null
           currency: string | null
-          customer_id: string
           description: string
           end_date: string | null
           engagement_model: string | null
@@ -1520,11 +1553,11 @@ export type Database = {
           budget_from?: number | null
           budget_to?: number | null
           budget_type: Database["public"]["Enums"]["budget_type"]
+          buyer_id: string
           category?: string | null
           closed_at?: string | null
           created_at?: string | null
           currency?: string | null
-          customer_id: string
           description: string
           end_date?: string | null
           engagement_model?: string | null
@@ -1561,11 +1594,11 @@ export type Database = {
           budget_from?: number | null
           budget_to?: number | null
           budget_type?: Database["public"]["Enums"]["budget_type"]
+          buyer_id?: string
           category?: string | null
           closed_at?: string | null
           created_at?: string | null
           currency?: string | null
-          customer_id?: string
           description?: string
           end_date?: string | null
           engagement_model?: string | null
@@ -1597,10 +1630,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "jobs_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "jobs_buyer_id_fkey"
+            columns: ["buyer_id"]
             isOneToOne: false
-            referencedRelation: "customers"
+            referencedRelation: "buyers"
             referencedColumns: ["id"]
           },
         ]
@@ -1934,8 +1967,8 @@ export type Database = {
       payment_methods: {
         Row: {
           brand: string
+          buyer_id: string
           created_at: string | null
-          customer_id: string
           exp_month: number
           exp_year: number
           id: string
@@ -1944,8 +1977,8 @@ export type Database = {
         }
         Insert: {
           brand: string
+          buyer_id: string
           created_at?: string | null
-          customer_id: string
           exp_month: number
           exp_year: number
           id?: string
@@ -1954,8 +1987,8 @@ export type Database = {
         }
         Update: {
           brand?: string
+          buyer_id?: string
           created_at?: string | null
-          customer_id?: string
           exp_month?: number
           exp_year?: number
           id?: string
@@ -1964,10 +1997,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "payment_methods_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: "payment_methods_buyer_id_fkey"
+            columns: ["buyer_id"]
             isOneToOne: false
-            referencedRelation: "customers"
+            referencedRelation: "buyers"
             referencedColumns: ["id"]
           },
         ]
@@ -2276,10 +2309,10 @@ export type Database = {
       projects: {
         Row: {
           budget: number
+          buyer_id: string
           completed_at: string | null
           contractor_id: string | null
           created_at: string | null
-          customer_id: string
           deadline: string | null
           description: string | null
           id: string
@@ -2293,10 +2326,10 @@ export type Database = {
         }
         Insert: {
           budget: number
+          buyer_id: string
           completed_at?: string | null
           contractor_id?: string | null
           created_at?: string | null
-          customer_id: string
           deadline?: string | null
           description?: string | null
           id?: string
@@ -2310,10 +2343,10 @@ export type Database = {
         }
         Update: {
           budget?: number
+          buyer_id?: string
           completed_at?: string | null
           contractor_id?: string | null
           created_at?: string | null
-          customer_id?: string
           deadline?: string | null
           description?: string | null
           id?: string
@@ -2327,17 +2360,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "projects_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "buyers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "projects_contractor_id_fkey"
             columns: ["contractor_id"]
             isOneToOne: false
             referencedRelation: "contractors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "projects_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -2362,9 +2395,9 @@ export type Database = {
           ai_generated: boolean | null
           approach_summary: string | null
           assumptions: string | null
+          buyer_id: string | null
           contractor_id: string | null
           cover_letter: string | null
-          customer_id: string | null
           discovery_fee: number | null
           enquiry_id: string | null
           exclusions: string | null
@@ -2392,9 +2425,9 @@ export type Database = {
           ai_generated?: boolean | null
           approach_summary?: string | null
           assumptions?: string | null
+          buyer_id?: string | null
           contractor_id?: string | null
           cover_letter?: string | null
-          customer_id?: string | null
           discovery_fee?: number | null
           enquiry_id?: string | null
           exclusions?: string | null
@@ -2422,9 +2455,9 @@ export type Database = {
           ai_generated?: boolean | null
           approach_summary?: string | null
           assumptions?: string | null
+          buyer_id?: string | null
           contractor_id?: string | null
           cover_letter?: string | null
-          customer_id?: string | null
           discovery_fee?: number | null
           enquiry_id?: string | null
           exclusions?: string | null
@@ -2449,17 +2482,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "proposals_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "buyers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "proposals_contractor_id_fkey"
             columns: ["contractor_id"]
             isOneToOne: false
             referencedRelation: "contractors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "proposals_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -2487,11 +2520,11 @@ export type Database = {
       }
       reviews: {
         Row: {
+          buyer_id: string | null
           comment: string | null
           contractor_id: string | null
           created_at: string | null
           criteria_scores: Json | null
-          customer_id: string | null
           direction: string | null
           engagement_id: string | null
           id: string
@@ -2505,11 +2538,11 @@ export type Database = {
           would_recommend: boolean | null
         }
         Insert: {
+          buyer_id?: string | null
           comment?: string | null
           contractor_id?: string | null
           created_at?: string | null
           criteria_scores?: Json | null
-          customer_id?: string | null
           direction?: string | null
           engagement_id?: string | null
           id?: string
@@ -2523,11 +2556,11 @@ export type Database = {
           would_recommend?: boolean | null
         }
         Update: {
+          buyer_id?: string | null
           comment?: string | null
           contractor_id?: string | null
           created_at?: string | null
           criteria_scores?: Json | null
-          customer_id?: string | null
           direction?: string | null
           engagement_id?: string | null
           id?: string
@@ -2542,17 +2575,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "reviews_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "buyers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "reviews_contractor_id_fkey"
             columns: ["contractor_id"]
             isOneToOne: false
             referencedRelation: "contractors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reviews_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -2573,42 +2606,42 @@ export type Database = {
       }
       saved_vendors: {
         Row: {
+          buyer_id: string
           contractor_id: string | null
           created_at: string | null
-          customer_id: string
           id: string
           notes: string | null
           vendor_id: string | null
         }
         Insert: {
+          buyer_id: string
           contractor_id?: string | null
           created_at?: string | null
-          customer_id: string
           id?: string
           notes?: string | null
           vendor_id?: string | null
         }
         Update: {
+          buyer_id?: string
           contractor_id?: string | null
           created_at?: string | null
-          customer_id?: string
           id?: string
           notes?: string | null
           vendor_id?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "saved_vendors_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "buyers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "saved_vendors_contractor_id_fkey"
             columns: ["contractor_id"]
             isOneToOne: false
             referencedRelation: "contractors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "saved_vendors_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
           {
@@ -2716,9 +2749,13 @@ export type Database = {
           monthly_amount: number | null
           msp_onboarding: Json | null
           obligations_summary: string | null
+          opensign_buyer_sign_url: string | null
+          opensign_document_id: string | null
+          opensign_vendor_sign_url: string | null
           payment_model: string | null
           project_title: string | null
           proposal_id: string | null
+          right_to_work_confirmed: boolean | null
           service_type: string | null
           start_date: string | null
           status: string
@@ -2751,9 +2788,13 @@ export type Database = {
           monthly_amount?: number | null
           msp_onboarding?: Json | null
           obligations_summary?: string | null
+          opensign_buyer_sign_url?: string | null
+          opensign_document_id?: string | null
+          opensign_vendor_sign_url?: string | null
           payment_model?: string | null
           project_title?: string | null
           proposal_id?: string | null
+          right_to_work_confirmed?: boolean | null
           service_type?: string | null
           start_date?: string | null
           status?: string
@@ -2786,9 +2827,13 @@ export type Database = {
           monthly_amount?: number | null
           msp_onboarding?: Json | null
           obligations_summary?: string | null
+          opensign_buyer_sign_url?: string | null
+          opensign_document_id?: string | null
+          opensign_vendor_sign_url?: string | null
           payment_model?: string | null
           project_title?: string | null
           proposal_id?: string | null
+          right_to_work_confirmed?: boolean | null
           service_type?: string | null
           start_date?: string | null
           status?: string
@@ -3063,37 +3108,49 @@ export type Database = {
       vendor_packages: {
         Row: {
           billing_period: string | null
+          category: string | null
           created_at: string | null
+          delivery_days: number | null
           description: string | null
           features: Json | null
           id: string
+          ideal_for: string | null
           is_active: boolean | null
           name: string
           price: number
+          tech_stack: Json | null
           updated_at: string | null
           vendor_id: string
         }
         Insert: {
           billing_period?: string | null
+          category?: string | null
           created_at?: string | null
+          delivery_days?: number | null
           description?: string | null
           features?: Json | null
           id?: string
+          ideal_for?: string | null
           is_active?: boolean | null
           name: string
           price: number
+          tech_stack?: Json | null
           updated_at?: string | null
           vendor_id: string
         }
         Update: {
           billing_period?: string | null
+          category?: string | null
           created_at?: string | null
+          delivery_days?: number | null
           description?: string | null
           features?: Json | null
           id?: string
+          ideal_for?: string | null
           is_active?: boolean | null
           name?: string
           price?: number
+          tech_stack?: Json | null
           updated_at?: string | null
           vendor_id?: string
         }
@@ -3234,6 +3291,7 @@ export type Database = {
           blacklisted_by: string | null
           booking_method: string | null
           business_type: string | null
+          cal_diy_url: string | null
           calendly_url: string | null
           city: string | null
           company_name: string
@@ -3310,6 +3368,7 @@ export type Database = {
           blacklisted_by?: string | null
           booking_method?: string | null
           business_type?: string | null
+          cal_diy_url?: string | null
           calendly_url?: string | null
           city?: string | null
           company_name: string
@@ -3386,6 +3445,7 @@ export type Database = {
           blacklisted_by?: string | null
           booking_method?: string | null
           business_type?: string | null
+          cal_diy_url?: string | null
           calendly_url?: string | null
           city?: string | null
           company_name?: string
@@ -3524,6 +3584,9 @@ export type Database = {
         | "aoa"
         | "moa"
         | "director_details"
+        | "companies_house"
+        | "address_proof"
+        | "vat_certificate"
       experience_level: "entry" | "intermediate" | "expert"
       job_status: "open" | "in-progress" | "closed" | "cancelled"
       notification_type:
@@ -3543,7 +3606,7 @@ export type Database = {
         | "cancelled"
       project_type: "one-time" | "ongoing" | "contract-to-hire"
       proposal_status: "submitted" | "interviewing" | "accepted" | "rejected"
-      user_type: "customer" | "contractor" | "vendor" | "admin"
+      user_type: "buyer" | "contractor" | "vendor" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3687,6 +3750,9 @@ export const Constants = {
         "aoa",
         "moa",
         "director_details",
+        "companies_house",
+        "address_proof",
+        "vat_certificate",
       ],
       experience_level: ["entry", "intermediate", "expert"],
       job_status: ["open", "in-progress", "closed", "cancelled"],
@@ -3709,10 +3775,7 @@ export const Constants = {
       ],
       project_type: ["one-time", "ongoing", "contract-to-hire"],
       proposal_status: ["submitted", "interviewing", "accepted", "rejected"],
-      user_type: ["customer", "contractor", "vendor", "admin"],
+      user_type: ["buyer", "contractor", "vendor", "admin"],
     },
   },
 } as const
-
-
-export type UserType = Database['public']['Enums']['user_type']

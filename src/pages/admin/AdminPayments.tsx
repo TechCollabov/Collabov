@@ -262,7 +262,7 @@ const AdminPayments: React.FC = () => {
     const partyIds = Array.from(new Set((engagements ?? []).flatMap((e: any) => [e.buyer_id, e.vendor_id])));
     const [{ data: vendors }, { data: buyers }] = await Promise.all([
       supabase.from('vendors').select('id, company_name, is_blacklisted, dispute_outcome_count').in('id', partyIds),
-      supabase.from('customers').select('id, company_name').in('id', partyIds),
+      supabase.from('buyers').select('id, company_name').in('id', partyIds),
     ]);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
     const bMap = new Map((buyers ?? []).map((b: any) => [b.id, b]));

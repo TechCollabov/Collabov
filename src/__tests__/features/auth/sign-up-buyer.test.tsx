@@ -13,7 +13,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import CustomerSignup from '@/pages/CustomerSignup';
+import BuyerSignup from '@/pages/BuyerSignup';
 import { renderWithRouter, createMockAuthValue } from '../../test-utils';
 
 // ── Mock AuthContext ──────────────────────────────────────────────────────────
@@ -27,8 +27,8 @@ import { useAuth } from '@/contexts/AuthContext';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function renderBuyerSignup() {
-  return renderWithRouter(<CustomerSignup />, {
-    routerProps: { initialEntries: ['/signup/customer'] },
+  return renderWithRouter(<BuyerSignup />, {
+    routerProps: { initialEntries: ['/signup/buyer'] },
   });
 }
 
@@ -275,7 +275,7 @@ describe('Feature: Buyer Registration (3-step flow)', () => {
   // ── Step 2: Submission ────────────────────────────────────────────────────
 
   describe('Scenario: Valid Step 2 submits registration', () => {
-    it('should call signUp with customer user type and company name', async () => {
+    it('should call signUp with buyer user type and company name', async () => {
       const mockSignUp = vi.fn().mockResolvedValue(undefined);
       vi.mocked(useAuth).mockReturnValue(
         createMockAuthValue({ signUp: mockSignUp }) as ReturnType<typeof useAuth>
@@ -309,7 +309,7 @@ describe('Feature: Buyer Registration (3-step flow)', () => {
           'buyer@company.com',
           'ValidPass1!',
           expect.objectContaining({
-            userType: 'customer',
+            userType: 'buyer',
             additionalData: expect.objectContaining({
               companyName: expect.any(String),
             }),

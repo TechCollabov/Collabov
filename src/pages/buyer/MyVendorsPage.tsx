@@ -361,7 +361,7 @@ export default function MyVendorsPage() {
         const { data: savedData, error: savedError } = await supabase
           .from('saved_vendors')
           .select('id, vendor_id, contractor_id, vendors(id, company_name, logo_url, rating, country, business_type)')
-          .eq('customer_id', user!.id);
+          .eq('buyer_id', user!.id);
 
         if (savedError) throw savedError;
 

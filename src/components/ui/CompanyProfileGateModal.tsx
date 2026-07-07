@@ -18,7 +18,7 @@ const CompanyProfileGateModal: React.FC<Props> = ({ action, onClose }) => (
         engagement identifiable for tax and contract purposes.
       </p>
       <div className="flex gap-3 justify-center">
-        <Link to="/customer/settings" className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">
+        <Link to="/buyer/settings" className="px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg">
           Complete Profile
         </Link>
         <button onClick={onClose} className="px-5 py-2.5 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg">

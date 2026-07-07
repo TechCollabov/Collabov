@@ -1,10 +1,10 @@
 // Receives OpenSign's signature-completed webhook and is the ONLY thing that
 // writes sow_documents.buyer_signed_at / vendor_signed_at and
-// contracts.signed_by_customer / signed_by_vendor from here on — the old
+// contracts.signed_by_buyer / signed_by_vendor from here on — the old
 // "Sign Contract" buttons used to set these directly on click, which was the
 // simulated part. Once both are set, EngagementWorkspacePage's existing
 // load() already activates the contract/engagement (see the
-// signed_by_customer && signed_by_vendor && status === 'pending' check there)
+// signed_by_buyer && signed_by_vendor && status === 'pending' check there)
 // the next time either party loads the page, so this function doesn't need
 // to duplicate that activation logic.
 //
@@ -98,7 +98,7 @@ serve(async (req: Request) => {
 
   if (isBuyer) {
     await supabase.from('sow_documents').update({ buyer_signed_at: now }).eq('id', sow.id)
-    if (sow.contract_id) await supabase.from('contracts').update({ signed_by_customer: true, customer_signature_date: now }).eq('id', sow.contract_id)
+    if (sow.contract_id) await supabase.from('contracts').update({ signed_by_buyer: true, buyer_signature_date: now }).eq('id', sow.contract_id)
   } else if (isVendor) {
     await supabase.from('sow_documents').update({ vendor_signed_at: now }).eq('id', sow.id)
     if (sow.contract_id) await supabase.from('contracts').update({ signed_by_vendor: true, vendor_signature_date: now }).eq('id', sow.contract_id)
@@ -115,7 +115,7 @@ serve(async (req: Request) => {
     type: 'contract',
     title: isBuyer ? 'Buyer signed the contract' : 'Vendor signed the contract',
     message: `${isBuyer ? 'The buyer' : 'The vendor'} signed via OpenSign. ${isBuyer ? 'Counter-sign' : 'Check'} from your Active Contracts screen.`,
-    link_url: isBuyer ? '/vendor/dashboard/contracts' : '/customer/dashboard',
+    link_url: isBuyer ? '/vendor/dashboard/contracts' : '/buyer/dashboard',
   })
 
   return new Response(JSON.stringify({ ok: true }), {

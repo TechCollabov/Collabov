@@ -90,7 +90,7 @@ const ProposalTriagePage: React.FC = () => {
     if (!user) return;
     try {
       // Lazy "cron": expire anything past 30 days before showing the inbox.
-      await sweepProposalExpiry({ customer_id: user.id });
+      await sweepProposalExpiry({ buyer_id: user.id });
 
       // Vendor proposals sent to this buyer (direct RFP/discovery) plus any
       // proposals on this buyer's jobs.
@@ -104,7 +104,7 @@ const ProposalTriagePage: React.FC = () => {
           enquiries (title, budget_to),
           jobs (title, budget_amount)
         `)
-        .eq('customer_id', user.id)
+        .eq('buyer_id', user.id)
         .neq('workflow_state', 'draft')
         .order('submitted_at', { ascending: false });
 

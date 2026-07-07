@@ -35,7 +35,7 @@ const UserTypeSelection: React.FC = () => {
               receive proposals, and manage work in one place.
             </p>
             <Link
-              to="/signup/customer"
+              to="/signup/buyer"
               className="block w-full py-3 text-center bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
               Sign up as a Buyer →

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Send, UserPlus, Clock, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { isBusinessEmail, addDays, getPlatformSettings, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../../lib/workflows';
+import { isBusinessEmail, addDays, getPlatformSettings, logEvent, hasCompanyProfile, isBuyerBlacklisted } from '../../lib/workflows';
 import CompanyProfileGateModal from '../../components/ui/CompanyProfileGateModal';
 
 interface PendingInvitation {
@@ -68,7 +68,7 @@ const BYOVPage: React.FC = () => {
         setLoading(false);
         return;
       }
-      if (await isCustomerBlacklisted(user.id)) {
+      if (await isBuyerBlacklisted(user.id)) {
         setErrors({ blacklist: 'This account is blacklisted and cannot invite new vendors. Contact support@collabov.com.' });
         setLoading(false);
         return;
@@ -132,7 +132,7 @@ const BYOVPage: React.FC = () => {
       <div className="max-w-xl mx-auto">
         {/* Back link */}
         <Link
-          to="/customer/dashboard"
+          to="/buyer/dashboard"
           className="inline-flex items-center space-x-2 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />

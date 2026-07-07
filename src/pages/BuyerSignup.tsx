@@ -24,7 +24,7 @@ const INDUSTRIES = [
 const HEADCOUNT_BANDS = ['1–10', '11–50', '51–200', '201–1,000', '1,000+'];
 const COUNTRIES = ['United Kingdom', 'Ireland', 'United States', 'Germany', 'France', 'Netherlands', 'Other'];
 
-const CustomerSignup: React.FC = () => {
+const BuyerSignup: React.FC = () => {
   const navigate = useNavigate();
   const { signUp, profile, user, loading } = useAuth();
   const [step, setStep] = useState(1);
@@ -86,7 +86,7 @@ const CustomerSignup: React.FC = () => {
       setFirstName(extractedFirst);
       await signUp(email, password, {
         fullName: name,
-        userType: 'customer',
+        userType: 'buyer',
         additionalData: {
           companyName: tradingName || legalName,
           legalEntityName: legalName,
@@ -252,7 +252,7 @@ const CustomerSignup: React.FC = () => {
                 </div>
                 <ArrowRight className="h-4 w-4 text-gray-400 ml-auto" />
               </Link>
-              <Link to="/customer/dashboard" className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors text-left">
+              <Link to="/buyer/dashboard" className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors text-left">
                 <Briefcase className="h-6 w-6 text-[#0070F3] flex-shrink-0" />
                 <div>
                   <div className="font-semibold text-[#0B2D59]">Post your first job</div>
@@ -260,7 +260,7 @@ const CustomerSignup: React.FC = () => {
                 </div>
                 <ArrowRight className="h-4 w-4 text-gray-400 ml-auto" />
               </Link>
-              <Link to="/customer/dashboard" className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors text-left">
+              <Link to="/buyer/dashboard" className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors text-left">
                 <Users className="h-6 w-6 text-[#0070F3] flex-shrink-0" />
                 <div>
                   <div className="font-semibold text-[#0B2D59]">Invite your existing agency</div>
@@ -276,4 +276,4 @@ const CustomerSignup: React.FC = () => {
   );
 };
 
-export default CustomerSignup;
+export default BuyerSignup;

@@ -168,7 +168,7 @@ const MessagingPage: React.FC<MessagingPageProps> = ({ initialConversationId }) 
         return {
           id: otherId,
           counterparty: name,
-          counterparty_type: (profile?.user_type === 'customer' ? 'buyer' : 'vendor') as 'vendor' | 'buyer',
+          counterparty_type: (profile?.user_type === 'buyer' ? 'buyer' : 'vendor') as 'vendor' | 'buyer',
           engagement: latest.subject ?? '',
           avatar_initials: getInitials(name),
           avatar_color: getAvatarColor(otherId),

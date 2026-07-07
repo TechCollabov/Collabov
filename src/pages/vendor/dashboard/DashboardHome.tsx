@@ -349,7 +349,7 @@ const DashboardHome: React.FC = () => {
     const buyerIds = Array.from(new Set(activeEngs.map((e: any) => e.buyer_id)));
     const buyerMap = new Map<string, string>();
     if (buyerIds.length) {
-      const { data: buyers } = await supabase.from('customers').select('id, company_name').in('id', buyerIds);
+      const { data: buyers } = await supabase.from('buyers').select('id, company_name').in('id', buyerIds);
       (buyers || []).forEach((b: any) => buyerMap.set(b.id, b.company_name));
     }
 

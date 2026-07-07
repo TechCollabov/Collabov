@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../lib/workflows';
+import { addHours, INTERVIEW_RESPONSE_HOURS, notify, logEvent, hasCompanyProfile, isBuyerBlacklisted } from '../lib/workflows';
 import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -310,7 +310,7 @@ interface DBPortfolioItem {
 interface DBReview {
   id: string;
   vendor_id: string;
-  customer_id: string;
+  buyer_id: string;
   rating: number;
   comment: string | null;
   would_recommend: boolean | null;
@@ -1487,13 +1487,13 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
         setSending(false);
         return;
       }
-      if (await isCustomerBlacklisted(user.id)) {
+      if (await isBuyerBlacklisted(user.id)) {
         setError('This account is blacklisted and cannot send new enquiries. Contact support@collabov.com.');
         setSending(false);
         return;
       }
       const { data: enquiry, error: insErr } = await supabase.from('enquiries').insert({
-        customer_id: user.id,
+        buyer_id: user.id,
         vendor_id: (vendor as any).id,
         enquiry_type: 'rfp',
         subject: title.trim(),
@@ -1503,7 +1503,7 @@ function RFPModal({ vendor, onClose }: { vendor: VendorData; onClose: () => void
         budget_from: budgetFrom ? Number(budgetFrom) : null,
         budget_to: budgetTo ? Number(budgetTo) : null,
         engagement_model: model || null,
-        customer_email: profile?.email ?? user.email ?? '',
+        buyer_email: profile?.email ?? user.email ?? '',
         status: 'new',
       }).select().single();
       if (insErr) throw insErr;

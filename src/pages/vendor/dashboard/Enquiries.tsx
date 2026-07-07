@@ -8,7 +8,7 @@ import { addDays, notify, logEvent, paymentBadge, PAYMENT_BADGE_LABEL, PROPOSAL_
 interface Enquiry {
   id: string;
   kind: 'rfp' | 'discovery' | 'interview';
-  customer_id: string;
+  buyer_id: string;
   title: string;
   description: string;
   budget_from: number;
@@ -77,13 +77,13 @@ const Enquiries: React.FC = () => {
     const [enqRes, intRes] = await Promise.all([
       supabase
         .from('enquiries')
-        .select('*, customers(company_name, country, industry, on_time_payment_rate)')
+        .select('*, buyers(company_name, country, industry, on_time_payment_rate)')
         .eq('vendor_id', user.id)
         .neq('status', 'declined')
         .order('created_at', { ascending: false }),
       supabase
         .from('interview_requests')
-        .select('*, vendor_employees(name, role, job_title), customers:buyer_id(country, industry, on_time_payment_rate)')
+        .select('*, vendor_employees(name, role, job_title), buyers:buyer_id(country, industry, on_time_payment_rate)')
         .eq('vendor_id', user.id)
         .in('status', ['requested', 'confirmed'])
         .order('created_at', { ascending: false }),
@@ -91,11 +91,11 @@ const Enquiries: React.FC = () => {
 
     const rows: Enquiry[] = [];
     for (const e of enqRes.data ?? []) {
-      const cust: any = e.customers;
+      const cust: any = e.buyers;
       rows.push({
         id: e.id,
         kind: e.enquiry_type === 'discovery_brief' ? 'discovery' : 'rfp',
-        customer_id: e.customer_id,
+        buyer_id: e.buyer_id,
         title: e.title || e.subject,
         description: e.message,
         budget_from: e.budget_from ?? 0,
@@ -113,11 +113,11 @@ const Enquiries: React.FC = () => {
     }
     for (const i of intRes.data ?? []) {
       const emp: any = i.vendor_employees;
-      const cust: any = i.customers;
+      const cust: any = i.buyers;
       rows.push({
         id: i.id,
         kind: 'interview',
-        customer_id: i.buyer_id,
+        buyer_id: i.buyer_id,
         title: `Interview Request: ${emp?.name ?? 'Employee'}`,
         description: '',
         budget_from: 0,
@@ -154,7 +154,7 @@ const Enquiries: React.FC = () => {
 
   const handleDecline = async (enq: Enquiry) => {
     await supabase.from('enquiries').update({ status: 'declined' }).eq('id', enq.id);
-    await notify(enq.customer_id, 'enquiry', 'Enquiry declined',
+    await notify(enq.buyer_id, 'enquiry', 'Enquiry declined',
       `The vendor declined your request "${enq.title}". You can approach another vendor from search.`);
     setEnquiries(prev => prev.filter(e => e.id !== enq.id));
     showToastMsg('Enquiry declined.');
@@ -183,7 +183,7 @@ const Enquiries: React.FC = () => {
         }));
       const { data: created, error } = await supabase.from('proposals').insert({
         vendor_id: user.id,
-        customer_id: enq.customer_id,
+        buyer_id: enq.buyer_id,
         enquiry_id: enq.id,
         proposal_kind: 'standard',
         proposal_content: proposal.approach,
@@ -201,7 +201,7 @@ const Enquiries: React.FC = () => {
 
       if (!isDraft) {
         await supabase.from('enquiries').update({ status: 'responded', responded_at: new Date().toISOString() }).eq('id', enq.id);
-        await notify(enq.customer_id, 'new_proposal', 'New proposal received',
+        await notify(enq.buyer_id, 'new_proposal', 'New proposal received',
           `A vendor responded to "${enq.title}". Review it in your Proposals inbox.`, '/proposals');
         await logEvent('proposal_submitted', user.id, 'vendor', 'proposal', created.id, { total: proposal.total });
       }
@@ -221,7 +221,7 @@ const Enquiries: React.FC = () => {
       const specItems = discSpec.split('\n').map(s => s.trim()).filter(Boolean);
       const { data: created, error } = await supabase.from('proposals').insert({
         vendor_id: user.id,
-        customer_id: enq.customer_id,
+        buyer_id: enq.buyer_id,
         enquiry_id: enq.id,
         proposal_kind: 'discovery',
         proposal_content: discApproach,
@@ -236,7 +236,7 @@ const Enquiries: React.FC = () => {
       }).select().single();
       if (error) throw error;
       await supabase.from('enquiries').update({ status: 'responded', responded_at: new Date().toISOString() }).eq('id', enq.id);
-      await notify(enq.customer_id, 'new_proposal', 'Discovery proposal received',
+      await notify(enq.buyer_id, 'new_proposal', 'Discovery proposal received',
         'The agency responded to your discovery brief. Review the proposed spec structure and fee.', '/proposals');
       await logEvent('proposal_submitted', user.id, 'vendor', 'proposal', created.id, { kind: 'discovery' });
       setDiscSubmitted(true);
@@ -254,7 +254,7 @@ const Enquiries: React.FC = () => {
       status: 'confirmed',
       confirmed_time: new Date(selectedTime).toISOString(),
     }).eq('id', enq.id);
-    await notify(enq.customer_id, 'enquiry', 'Interview confirmed',
+    await notify(enq.buyer_id, 'enquiry', 'Interview confirmed',
       `${enq.employee_name} is confirmed for ${new Date(selectedTime).toLocaleString('en-GB')}.`);
     setInterviewConfirmed(true);
     showToastMsg('Interview confirmed. Buyer notified.');
@@ -266,7 +266,7 @@ const Enquiries: React.FC = () => {
     await supabase.from('interview_requests').update({
       alternative_times: times.map(t => new Date(t).toISOString()),
     }).eq('id', enq.id);
-    await notify(enq.customer_id, 'enquiry', 'Alternative interview times proposed',
+    await notify(enq.buyer_id, 'enquiry', 'Alternative interview times proposed',
       `The vendor proposed ${times.length} alternative time(s) for the interview with ${enq.employee_name}. Pick one to confirm.`);
     setShowAlternative(false);
     showToastMsg('Alternative times sent to buyer.');
