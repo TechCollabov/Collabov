@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
-  LayoutDashboard, Plus, FileText, Bot, Bookmark,
+  Plus, FileText, Bot, Bookmark,
   FolderOpen, FileCheck, CreditCard, MessageSquare,
   AlertTriangle, HelpCircle, Search,
   Bell, Settings, LogOut, ChevronDown, User, Globe,
@@ -436,6 +436,7 @@ const BuyerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showPaymentAlert, setShowPaymentAlert] = useState(true);
   const [paymentAlert, setPaymentAlert] = useState<{ vendorName: string; projectTitle: string } | null>(null);
   const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedVendor[]>([]);
@@ -451,10 +452,17 @@ const BuyerDashboard: React.FC = () => {
   const toggleNotifications = () => {
     setShowNotifications(v => !v);
     setShowUserDropdown(false);
+    setShowMoreMenu(false);
   };
   const toggleUserDropdown = () => {
     setShowUserDropdown(v => !v);
     setShowNotifications(false);
+    setShowMoreMenu(false);
+  };
+  const toggleMoreMenu = () => {
+    setShowMoreMenu(v => !v);
+    setShowNotifications(false);
+    setShowUserDropdown(false);
   };
 
   const loadNotifications = useCallback(async () => {
@@ -631,7 +639,6 @@ const BuyerDashboard: React.FC = () => {
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
 
   const navigationTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'post-job', label: 'Post a Job', icon: Plus },
     { id: 'create-tender', label: 'Create a Tender', icon: FileText },
     { id: 'ai-matchmaking', label: 'Find Vendors', icon: Bot },
@@ -640,11 +647,29 @@ const BuyerDashboard: React.FC = () => {
     { id: 'contracts', label: 'Governance', icon: FileCheck },
     { id: 'invoices', label: 'Payments', icon: CreditCard },
     { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+  const moreTabs = [
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'disputes', label: 'Disputes', icon: AlertTriangle },
     { id: 'help', label: 'Help Center', icon: HelpCircle },
     { id: 'invite-vendor', label: 'Invite a Vendor', icon: UserPlus },
   ];
+
+  const handleTabClick = (tabId: string) => {
+    setShowMoreMenu(false);
+    if (tabId === 'invite-vendor') navigate('/buyer/byov');
+    else if (tabId === 'post-job') navigate('/buyer/post-job');
+    else if (tabId === 'create-tender') navigate('/buyer/post-job?type=tender');
+    else if (tabId === 'contracts' || tabId === 'disputes') navigate('/buyer/governance');
+    else if (tabId === 'invoices') navigate('/buyer/payments');
+    else if (tabId === 'settings') navigate('/buyer/settings');
+    else if (tabId === 'ai-matchmaking') navigate('/results');
+    else if (tabId === 'saved-talent') navigate('/buyer/shortlist');
+    else if (tabId === 'my-projects') navigate('/buyer/my-vendors');
+    else if (tabId === 'messages') navigate('/messages');
+    else if (tabId === 'help') navigate('/help');
+    else setActiveTab(tabId);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -660,21 +685,10 @@ const BuyerDashboard: React.FC = () => {
 
             {/* Center tabs */}
             <div className="hidden lg:flex items-center space-x-1">
-              {navigationTabs.slice(0, 9).map((tab) => (
+              {navigationTabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => {
-                    if (tab.id === 'invite-vendor') navigate('/buyer/byov');
-                    else if (tab.id === 'post-job') navigate('/buyer/post-job');
-                    else if (tab.id === 'create-tender') navigate('/buyer/post-job?type=tender');
-                    else if (tab.id === 'contracts' || tab.id === 'disputes') navigate('/buyer/governance');
-                    else if (tab.id === 'invoices') navigate('/buyer/payments');
-                    else if (tab.id === 'settings') navigate('/buyer/settings');
-                    else if (tab.id === 'ai-matchmaking') navigate('/results');
-                    else if (tab.id === 'saved-talent') navigate('/buyer/shortlist');
-                    else if (tab.id === 'my-projects') navigate('/buyer/my-vendors');
-                    else setActiveTab(tab.id);
-                  }}
+                  onClick={() => handleTabClick(tab.id)}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? 'bg-[#0070F3] text-white'
@@ -685,10 +699,27 @@ const BuyerDashboard: React.FC = () => {
                 </button>
               ))}
               <div className="relative">
-                <button className="flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                <button
+                  onClick={toggleMoreMenu}
+                  className="flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                >
                   <span>More</span>
                   <ChevronDown className="h-4 w-4" />
                 </button>
+                {showMoreMenu && (
+                  <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                    {moreTabs.map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabClick(tab.id)}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                      >
+                        <tab.icon className="h-4 w-4" />
+                        <span>{tab.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -780,7 +811,7 @@ const BuyerDashboard: React.FC = () => {
               {navigationTabs.slice(0, 4).map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabClick(tab.id)}
                   className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab.id
                       ? 'bg-[#0070F3] text-white'
