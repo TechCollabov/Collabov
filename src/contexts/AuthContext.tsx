@@ -12,7 +12,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   needsMfaChallenge: boolean;
-  signUp: (email: string, password: string, userData: SignUpData) => Promise<void>;
+  signUp: (email: string, password: string, userData: SignUpData) => Promise<{ user: User; hasSession: boolean }>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -179,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     console.log('[AuthContext] signUp completed successfully');
+    return { user: data.user, hasSession: !!data.session };
   };
 
   const signIn = async (email: string, password: string) => {

@@ -62,6 +62,8 @@ const VendorSignup: React.FC = () => {
   const [companyRegFile, setCompanyRegFile] = useState<File | null>(null);
   const [vatFile, setVatFile] = useState<File | null>(null);
   const [addressFile, setAddressFile] = useState<File | null>(null);
+  const [docsPendingUpload, setDocsPendingUpload] = useState(false);
+  const [accountCreated, setAccountCreated] = useState(false);
 
   useEffect(() => {
     if (!loading && user && profile && step < 6) {
@@ -137,11 +139,26 @@ const VendorSignup: React.FC = () => {
     setStep(6);
   };
 
+  const uploadVerificationDoc = async (
+    vendorId: string,
+    type: 'companies_house' | 'vat_certificate' | 'address_proof',
+    file: File
+  ) => {
+    const path = `${vendorId}/${type}-${Date.now()}.${file.name.split('.').pop()}`;
+    const { error: uploadErr } = await supabase.storage.from('vendor-documents').upload(path, file);
+    if (uploadErr) throw uploadErr;
+    const { error: dbErr } = await supabase.from('vendor_documents').upsert(
+      { vendor_id: vendorId, document_type: type, document_url: path, verification_status: 'submitted' },
+      { onConflict: 'vendor_id,document_type' }
+    );
+    if (dbErr) throw dbErr;
+  };
+
   const handleFinalSubmit = async () => {
     setError(null);
     setIsLoading(true);
     try {
-      await signUp(email, password, {
+      const { user: newUser, hasSession } = await signUp(email, password, {
         fullName: companyName,
         userType: 'vendor',
         additionalData: {
@@ -154,6 +171,28 @@ const VendorSignup: React.FC = () => {
           techStack: selectedTech,
         },
       });
+
+      // Uploads need an authenticated session (RLS scopes vendor-documents to
+      // auth.uid()). If email confirmation is required, signUp() doesn't
+      // return a session — the vendor uploads later from My Listing instead.
+      if (hasSession) {
+        const docs: [typeof companyRegFile, 'companies_house' | 'vat_certificate' | 'address_proof'][] = [
+          [companyRegFile, 'companies_house'],
+          [vatFile, 'vat_certificate'],
+          [addressFile, 'address_proof'],
+        ];
+        for (const [file, type] of docs) {
+          if (!file) continue;
+          try {
+            await uploadVerificationDoc(newUser.id, type, file);
+          } catch (uploadErr) {
+            console.error(`[VendorSignup] document upload failed (${type}):`, uploadErr);
+          }
+        }
+      } else {
+        setDocsPendingUpload(true);
+      }
+      setAccountCreated(true);
     } catch (err: any) {
       setError(err.message || 'Sign up failed. Please try again.');
       setStep(2);
@@ -425,16 +464,33 @@ const VendorSignup: React.FC = () => {
               We review all applications within 2 business days. You will receive an email when your profile is approved.
             </p>
             {error && <div className="bg-red-50 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>}
-            <button
-              onClick={handleFinalSubmit}
-              disabled={isLoading}
-              className="w-full py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {isLoading ? <><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> Creating account...</> : 'Create Account & Submit'}
-            </button>
-            <Link to="/vendor/dashboard" className="block mt-4 text-sm text-gray-400 hover:text-gray-600">
-              Go to vendor dashboard (limited view until approved)
-            </Link>
+            {accountCreated ? (
+              <>
+                {docsPendingUpload && (
+                  <div className="bg-amber-50 text-amber-700 text-sm px-4 py-3 rounded-lg mb-4 text-left">
+                    Confirm your email first, then log in and upload your verification documents from
+                    My Listing — we couldn't upload them yet because your account isn't verified.
+                  </div>
+                )}
+                <p className="text-sm text-gray-500 mb-4">Check your inbox for a confirmation link to activate your account.</p>
+                <Link to="/vendor/dashboard" className="block text-sm text-gray-400 hover:text-gray-600">
+                  Go to vendor dashboard (limited view until approved)
+                </Link>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleFinalSubmit}
+                  disabled={isLoading}
+                  className="w-full py-3 bg-[#0070F3] text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? <><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" /> Creating account...</> : 'Create Account & Submit'}
+                </button>
+                <Link to="/vendor/dashboard" className="block mt-4 text-sm text-gray-400 hover:text-gray-600">
+                  Go to vendor dashboard (limited view until approved)
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>
