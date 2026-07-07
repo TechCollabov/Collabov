@@ -42,6 +42,13 @@ const PostJobPage: React.FC = () => {
   const [newSkill, setNewSkill] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [isTender, setIsTender] = useState(searchParams.get('type') === 'tender');
+
+  // Re-sync when navigating between "Post a Job" and "Create a Tender" without
+  // a full page reload — react-router doesn't remount this component for a
+  // query-string-only navigation, so the useState initializer above only runs once.
+  useEffect(() => {
+    setIsTender(searchParams.get('type') === 'tender');
+  }, [searchParams]);
   const [tenderData, setTenderData] = useState({
     tenderTitle: '',
     deadline: '',
@@ -239,7 +246,7 @@ const PostJobPage: React.FC = () => {
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Job Details</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{isTender ? 'Tender Details' : 'Job Details'}</h2>
               <p className="text-gray-600">Tell us about your project</p>
             </div>
 
@@ -797,7 +804,7 @@ const PostJobPage: React.FC = () => {
                 <span>Back to Dashboard</span>
               </button>
               <div className="h-6 w-px bg-gray-300"></div>
-              <h1 className="text-2xl font-bold text-gray-900">Post a Job</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{isTender ? 'Create a Tender' : 'Post a Job'}</h1>
             </div>
             
             <div className="flex items-center space-x-2 text-sm text-gray-600">
