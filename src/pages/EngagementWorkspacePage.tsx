@@ -50,7 +50,7 @@ interface Contract {
   contract_number: string;
   title: string;
   status: string;
-  signed_by_customer: boolean;
+  signed_by_buyer: boolean;
   signed_by_vendor: boolean;
   total_value: number;
   notice_period_days: number | null;
@@ -180,7 +180,7 @@ export default function EngagementWorkspacePage() {
 
     // Contract activation: both signatures in -> active (staff aug waits for IR35 stamp).
     const con = conRes.data as Contract | null;
-    if (con && con.signed_by_customer && con.signed_by_vendor && con.status === 'pending') {
+    if (con && con.signed_by_buyer && con.signed_by_vendor && con.status === 'pending') {
       const isStaffAug = engagement.engagement_type === 'staff_aug';
       if (isStaffAug && engagement.ir35_status === 'pending') {
         if (engagement.status !== 'pending_ir35') {
@@ -199,7 +199,7 @@ export default function EngagementWorkspacePage() {
       }
     }
     // Staff aug: IR35 stamped -> activate.
-    if (con && con.signed_by_customer && con.signed_by_vendor && engagement.status === 'pending_ir35'
+    if (con && con.signed_by_buyer && con.signed_by_vendor && engagement.status === 'pending_ir35'
         && engagement.ir35_status && engagement.ir35_status !== 'pending') {
       await supabase.from('contracts').update({ status: 'active' }).eq('id', con.id);
       await supabase.from('engagements').update({ status: 'active' }).eq('id', engagement.id);
@@ -245,8 +245,8 @@ export default function EngagementWorkspacePage() {
     const counterId = user.id === engagement.buyer_id ? engagement.vendor_id : engagement.buyer_id;
     const { data: cp } = await supabase.from('profiles').select('full_name').eq('id', counterId).maybeSingle();
     const { data: cpVendor } = await supabase.from('vendors').select('company_name').eq('id', counterId).maybeSingle();
-    const { data: cpCustomer } = await supabase.from('customers').select('company_name').eq('id', counterId).maybeSingle();
-    setCounterparty(cpVendor?.company_name ?? cpCustomer?.company_name ?? cp?.full_name ?? 'Counterparty');
+    const { data: cpBuyer } = await supabase.from('buyers').select('company_name').eq('id', counterId).maybeSingle();
+    setCounterparty(cpVendor?.company_name ?? cpBuyer?.company_name ?? cp?.full_name ?? 'Counterparty');
 
     // Staff-aug bench for replacement flow.
     if (engagement.engagement_type === 'staff_aug' && user.id === engagement.vendor_id) {
@@ -626,7 +626,7 @@ export default function EngagementWorkspacePage() {
         engagement_id: eng.id,
         reviewer_id: user.id,
         direction: role === 'buyer' ? 'buyer_of_vendor' : 'vendor_of_buyer',
-        customer_id: eng.buyer_id,
+        buyer_id: eng.buyer_id,
         vendor_id: eng.vendor_id,
         rating: overall,
         comment,
@@ -816,7 +816,7 @@ export default function EngagementWorkspacePage() {
 
   const myReview = reviews.find(r => r.reviewer_id === user!.id);
   const canReview = ['closing', 'closed', 'terminated'].includes(eng.status) && !myReview;
-  const bothSigned = !!contract?.signed_by_customer && !!contract?.signed_by_vendor;
+  const bothSigned = !!contract?.signed_by_buyer && !!contract?.signed_by_vendor;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
@@ -857,7 +857,7 @@ export default function EngagementWorkspacePage() {
             <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-blue-800">
                 <span className="font-semibold">Signatures:</span>{' '}
-                Buyer {contract.signed_by_customer ? '✓ signed' : 'pending'} · Vendor {contract.signed_by_vendor ? '✓ signed' : 'pending'}.
+                Buyer {contract.signed_by_buyer ? '✓ signed' : 'pending'} · Vendor {contract.signed_by_vendor ? '✓ signed' : 'pending'}.
                 {vendorType === 'staffaug' && ' Staff aug contracts also need an admin IR35 stamp before activating.'}
               </div>
               {role === 'vendor' && !contract.signed_by_vendor && (
@@ -870,7 +870,7 @@ export default function EngagementWorkspacePage() {
                   </button>
                 </div>
               )}
-              {role === 'buyer' && !contract.signed_by_customer && (
+              {role === 'buyer' && !contract.signed_by_buyer && (
                 <span className="text-xs text-blue-700">Sign from the SOW wizard's signature step.</span>
               )}
             </div>
@@ -938,7 +938,7 @@ export default function EngagementWorkspacePage() {
                 `/sow-wizard?discoveryFrom=${eng.id}&vendorId=${eng.vendor_id}` +
                 `&vendor=${encodeURIComponent(counterparty)}&type=agency&project=${encodeURIComponent(eng.project_title ?? 'Project')}`
               )}
-              onTakeToMarketplace={() => navigate(`/customer/post-job?fromDiscovery=${eng.id}`)}
+              onTakeToMarketplace={() => navigate(`/buyer/post-job?fromDiscovery=${eng.id}`)}
             />
           )}
 
@@ -1717,7 +1717,7 @@ function GovernanceTab({ role, eng, contract, disputes, changeRequests, terminat
               Notice period {contract.notice_period_days ?? '—'} days
             </p>
             <p className="text-xs text-gray-400">
-              Signatures: buyer {contract.signed_by_customer ? '✓' : '—'} · vendor {contract.signed_by_vendor ? '✓' : '—'}
+              Signatures: buyer {contract.signed_by_buyer ? '✓' : '—'} · vendor {contract.signed_by_vendor ? '✓' : '—'}
             </p>
           </div>
         ) : <p className="text-sm text-gray-400">No contract linked.</p>}

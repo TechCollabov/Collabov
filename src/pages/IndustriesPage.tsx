@@ -16,13 +16,13 @@ const IndustriesPage: React.FC = () => {
     {
       icon: <MonitorSmartphone className="h-6 w-6" />,
       title: 'SaaS',
-      description: 'Development, maintenance, and customer support for software-as-a-service businesses.',
+      description: 'Development, maintenance, and buyer support for software-as-a-service businesses.',
       image: 'https://images.pexels.com/photos/3183150/pexels-photo-3183150.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
     },
     {
       icon: <ShoppingCart className="h-6 w-6" />,
       title: 'E-commerce',
-      description: 'Store development, product management, and customer experience optimization.',
+      description: 'Store development, product management, and buyer experience optimization.',
       image: 'https://images.pexels.com/photos/230544/pexels-photo-230544.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
     },
     {
@@ -34,7 +34,7 @@ const IndustriesPage: React.FC = () => {
     {
       icon: <Building2 className="h-6 w-6" />,
       title: 'Finance',
-      description: 'Back-office operations, data analysis, and customer service for financial institutions.',
+      description: 'Back-office operations, data analysis, and buyer service for financial institutions.',
       image: 'https://images.pexels.com/photos/210607/pexels-photo-210607.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
     },
     {
@@ -52,7 +52,7 @@ const IndustriesPage: React.FC = () => {
     {
       icon: <Truck className="h-6 w-6" />,
       title: 'Logistics',
-      description: 'Route optimization, inventory management, and customer tracking systems.',
+      description: 'Route optimization, inventory management, and buyer tracking systems.',
       image: 'https://images.pexels.com/photos/2226458/pexels-photo-2226458.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
     },
     {

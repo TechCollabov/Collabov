@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckSquare, Square } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { notify, logEvent, hasCompanyProfile, isCustomerBlacklisted } from '../lib/workflows';
+import { notify, logEvent, hasCompanyProfile, isBuyerBlacklisted } from '../lib/workflows';
 import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 const OUTPUT_OPTIONS = [
@@ -71,13 +71,13 @@ const DiscoveryBriefPage: React.FC = () => {
         setSending(false);
         return;
       }
-      if (await isCustomerBlacklisted(user.id)) {
+      if (await isBuyerBlacklisted(user.id)) {
         setError('This account is blacklisted and cannot send new briefs. Contact support@collabov.com.');
         setSending(false);
         return;
       }
       const { data: enquiry, error: insErr } = await supabase.from('enquiries').insert({
-        customer_id: user.id,
+        buyer_id: user.id,
         vendor_id: vendorId!,
         enquiry_type: 'discovery_brief',
         subject: 'Discovery brief',
@@ -87,7 +87,7 @@ const DiscoveryBriefPage: React.FC = () => {
         budget_from: Number(budget) || null,
         budget_to: Number(budget) || null,
         start_date: startDate || null,
-        customer_email: profile?.email ?? user.email ?? '',
+        buyer_email: profile?.email ?? user.email ?? '',
         status: 'new',
       }).select().single();
       if (insErr) throw insErr;

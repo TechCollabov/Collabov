@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, User, Building2, Ban, Mail, Lock, Unlock, ShieldOff, Link2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { blacklistCustomer, approveCustomerRestoration, blacklistVendor, approveVendorRestoration } from '../../lib/workflows';
+import { blacklistBuyer, approveBuyerRestoration, blacklistVendor, approveVendorRestoration } from '../../lib/workflows';
 
 interface AdminAccountRow {
   id: string;
@@ -165,9 +165,9 @@ function BuyerBlacklistPanel() {
   const [adminId, setAdminId] = useState<string | null>(null);
 
   const loadBlacklisted = async () => {
-    const { data } = await supabase.from('customers').select('id, company_name, blacklist_reason, blacklisted_at, restoration_approvals, blacklist_pending').eq('is_blacklisted', true);
+    const { data } = await supabase.from('buyers').select('id, company_name, blacklist_reason, blacklisted_at, restoration_approvals, blacklist_pending').eq('is_blacklisted', true);
     setBlacklisted(data ?? []);
-    const { data: pendingRows } = await supabase.from('customers').select('id, company_name, blacklist_reason').eq('blacklist_pending', true).eq('is_blacklisted', false);
+    const { data: pendingRows } = await supabase.from('buyers').select('id, company_name, blacklist_reason').eq('blacklist_pending', true).eq('is_blacklisted', false);
     setPending(pendingRows ?? []);
   };
 
@@ -180,7 +180,7 @@ function BuyerBlacklistPanel() {
     setSearch(q);
     if (q.trim().length < 2) { setResults([]); return; }
     const { data } = await supabase
-      .from('customers')
+      .from('buyers')
       .select('id, company_name, is_blacklisted')
       .ilike('company_name', `%${q.trim()}%`)
       .eq('is_blacklisted', false)
@@ -195,23 +195,23 @@ function BuyerBlacklistPanel() {
     }
   };
 
-  const doBlacklist = async (customerId: string) => {
-    if (!adminId || !reason[customerId]?.trim()) return;
-    setBusyId(customerId);
+  const doBlacklist = async (buyerId: string) => {
+    if (!adminId || !reason[buyerId]?.trim()) return;
+    setBusyId(buyerId);
     try {
-      await blacklistCustomer(customerId, reason[customerId].trim(), adminId);
-      setResults(prev => prev.filter(c => c.id !== customerId));
+      await blacklistBuyer(buyerId, reason[buyerId].trim(), adminId);
+      setResults(prev => prev.filter(c => c.id !== buyerId));
       await loadBlacklisted();
     } finally {
       setBusyId(null);
     }
   };
 
-  const doApproveRestore = async (customerId: string) => {
+  const doApproveRestore = async (buyerId: string) => {
     if (!adminId) return;
-    setBusyId(customerId);
+    setBusyId(buyerId);
     try {
-      await approveCustomerRestoration(customerId, adminId);
+      await approveBuyerRestoration(buyerId, adminId);
       await loadBlacklisted();
     } finally {
       setBusyId(null);
@@ -337,19 +337,19 @@ const AdminUsers: React.FC = () => {
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, email, user_type, created_at')
-      .in('user_type', ['customer', 'vendor'])
+      .in('user_type', ['buyer', 'vendor'])
       .order('created_at', { ascending: false });
     const rows = profiles || [];
     const ids = rows.map(p => p.id);
 
-    const [{ data: vendors }, { data: customers }, { data: invitesReceived }, { data: invitesSent }] = await Promise.all([
+    const [{ data: vendors }, { data: buyers }, { data: invitesReceived }, { data: invitesSent }] = await Promise.all([
       supabase.from('vendors').select('id, company_name, is_verified, is_blacklisted, blacklist_pending, active_contracts_count').in('id', ids),
-      supabase.from('customers').select('id, company_name, is_blacklisted, blacklist_pending, active_projects_count').in('id', ids),
+      supabase.from('buyers').select('id, company_name, is_blacklisted, blacklist_pending, active_projects_count').in('id', ids),
       supabase.from('partner_invites').select('linked_profile_id, inviter_id, company_name').eq('status', 'accepted').in('linked_profile_id', ids),
       supabase.from('partner_invites').select('inviter_id, company_name').eq('status', 'accepted').in('inviter_id', ids),
     ]);
     const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v]));
-    const cMap = new Map((customers ?? []).map((c: any) => [c.id, c]));
+    const cMap = new Map((buyers ?? []).map((c: any) => [c.id, c]));
     const invitedByMap = new Map((invitesReceived ?? []).map((i: any) => [i.linked_profile_id, i]));
     const invitedCountMap = new Map<string, number>();
     (invitesSent ?? []).forEach((i: any) => invitedCountMap.set(i.inviter_id, (invitedCountMap.get(i.inviter_id) ?? 0) + 1));

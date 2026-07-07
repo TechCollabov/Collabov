@@ -1,6 +1,6 @@
 // Creates a real OpenSign signature request for a generated SOW, replacing
 // the old flow where the buyer's "Sign Contract" button and the vendor's
-// "Review & Sign Contract" button just flipped signed_by_customer /
+// "Review & Sign Contract" button just flipped signed_by_buyer /
 // signed_by_vendor directly in the DB with no actual signing ceremony.
 //
 // Setup (once real OpenSign credentials exist):

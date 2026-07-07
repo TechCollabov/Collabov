@@ -93,8 +93,8 @@ const AboutPage: React.FC = () => {
             />
             <FeatureCard 
               icon={<Heart className="h-6 w-6" />}
-              title="Customer Centricity"
-              description="Every decision we make is driven by the needs and success of our customers and partners."
+              title="Buyer Centricity"
+              description="Every decision we make is driven by the needs and success of our buyers and partners."
               delay={0.4}
             />
           </div>

@@ -39,7 +39,7 @@ interface PaymentMethod {
   is_default: boolean;
 }
 
-const CustomerPayments: React.FC = () => {
+const BuyerPayments: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
@@ -56,7 +56,7 @@ const CustomerPayments: React.FC = () => {
     const [invRes, txRes, methodRes] = await Promise.all([
       supabase.from('invoices').select('*').eq('buyer_id', user.id).order('issued_at', { ascending: false }),
       supabase.from('escrow_transactions').select('*').eq('buyer_id', user.id).order('created_at', { ascending: false }).limit(50),
-      supabase.from('payment_methods').select('*').eq('customer_id', user.id).order('created_at', { ascending: true }),
+      supabase.from('payment_methods').select('*').eq('buyer_id', user.id).order('created_at', { ascending: true }),
     ]);
     const invoiceRows = (invRes.data ?? []) as InvoiceRow[];
     const vendorIds = Array.from(new Set(invoiceRows.map(i => i.vendor_id)));
@@ -117,7 +117,7 @@ const CustomerPayments: React.FC = () => {
     if (!user) return;
     const isFirst = methods.length === 0;
     const { error } = await supabase.from('payment_methods').insert({
-      customer_id: user.id,
+      buyer_id: user.id,
       brand: 'Visa',
       last4: newCard.last4,
       exp_month: Number(newCard.exp_month),
@@ -138,7 +138,7 @@ const CustomerPayments: React.FC = () => {
 
   const setDefaultCard = async (id: string) => {
     if (!user) return;
-    await supabase.from('payment_methods').update({ is_default: false }).eq('customer_id', user.id);
+    await supabase.from('payment_methods').update({ is_default: false }).eq('buyer_id', user.id);
     await supabase.from('payment_methods').update({ is_default: true }).eq('id', id);
     load();
   };
@@ -151,7 +151,7 @@ const CustomerPayments: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/customer/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+          <Link to="/buyer/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
             <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
           <h1 className="text-2xl font-bold text-[#0B2D59]">Payments & Escrow</h1>
@@ -300,4 +300,4 @@ const CustomerPayments: React.FC = () => {
   );
 };
 
-export default CustomerPayments;
+export default BuyerPayments;

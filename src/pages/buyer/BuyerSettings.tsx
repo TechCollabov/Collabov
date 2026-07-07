@@ -22,7 +22,7 @@ const ROLES = [
   { value: 'viewer', label: 'Viewer', desc: 'Read-only access to engagements and governance' },
 ];
 
-const CustomerSettings: React.FC = () => {
+const BuyerSettings: React.FC = () => {
   const { user, profile } = useAuth();
   const [tab, setTab] = useState<Tab>('account');
   const [loading, setLoading] = useState(true);
@@ -50,25 +50,25 @@ const CustomerSettings: React.FC = () => {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [{ data: prof }, { data: team }, { data: prefsRow }, { data: customer }] = await Promise.all([
+    const [{ data: prof }, { data: team }, { data: prefsRow }, { data: buyer }] = await Promise.all([
       supabase.from('profiles').select('two_factor_enabled').eq('id', user.id).maybeSingle(),
-      supabase.from('customer_team_members').select('*').eq('customer_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('buyer_team_members').select('*').eq('buyer_id', user.id).order('created_at', { ascending: false }),
       supabase.from('notification_prefs').select('prefs').eq('user_id', user.id).maybeSingle(),
-      supabase.from('customers').select('legal_entity_name, trading_name, industry, headcount_band, country, company_website').eq('id', user.id).maybeSingle(),
+      supabase.from('buyers').select('legal_entity_name, trading_name, industry, headcount_band, country, company_website').eq('id', user.id).maybeSingle(),
     ]);
     setTwoFactorEnabled(!!(prof as any)?.two_factor_enabled);
     setTeamMembers(team ?? []);
     const defaults: Record<string, 'realtime' | 'digest' | 'off'> = {};
     NOTIFICATION_EVENTS.forEach(e => { defaults[e.key] = 'realtime'; });
     setNotifPrefs({ ...defaults, ...(prefsRow?.prefs as any ?? {}) });
-    if (customer) {
+    if (buyer) {
       setCompanyProfile({
-        legal_entity_name: customer.legal_entity_name ?? '',
-        trading_name: customer.trading_name ?? '',
-        industry: customer.industry ?? '',
-        headcount_band: customer.headcount_band ?? '',
-        country: customer.country ?? '',
-        company_website: customer.company_website ?? '',
+        legal_entity_name: buyer.legal_entity_name ?? '',
+        trading_name: buyer.trading_name ?? '',
+        industry: buyer.industry ?? '',
+        headcount_band: buyer.headcount_band ?? '',
+        country: buyer.country ?? '',
+        company_website: buyer.company_website ?? '',
       });
     }
     setLoading(false);
@@ -93,7 +93,7 @@ const CustomerSettings: React.FC = () => {
   const saveCompanyProfile = async () => {
     if (!user) return;
     setSavingCompanyProfile(true);
-    await supabase.from('customers').update({
+    await supabase.from('buyers').update({
       legal_entity_name: companyProfile.legal_entity_name.trim() || null,
       trading_name: companyProfile.trading_name.trim() || null,
       industry: companyProfile.industry || null,
@@ -118,8 +118,8 @@ const CustomerSettings: React.FC = () => {
     setInviteError('');
     if (!inviteEmail.trim()) { setInviteError('Email is required.'); return; }
     if (!isBusinessEmail(inviteEmail)) { setInviteError('Please use a business email address.'); return; }
-    const { data, error } = await supabase.from('customer_team_members').insert({
-      customer_id: user.id, email: inviteEmail.trim(), role: inviteRole, status: 'invited',
+    const { data, error } = await supabase.from('buyer_team_members').insert({
+      buyer_id: user.id, email: inviteEmail.trim(), role: inviteRole, status: 'invited',
     }).select().single();
     if (error) { setInviteError('Could not send the invite — check the email is unique.'); return; }
     setTeamMembers(prev => [data, ...prev]);
@@ -127,7 +127,7 @@ const CustomerSettings: React.FC = () => {
   };
 
   const removeTeamMember = async (id: string) => {
-    await supabase.from('customer_team_members').delete().eq('id', id);
+    await supabase.from('buyer_team_members').delete().eq('id', id);
     setTeamMembers(prev => prev.filter(m => m.id !== id));
   };
 
@@ -159,7 +159,7 @@ const CustomerSettings: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/customer/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+          <Link to="/buyer/dashboard" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
             <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
           <h1 className="text-2xl font-bold text-[#0B2D59]">Settings</h1>
@@ -353,4 +353,4 @@ const CustomerSettings: React.FC = () => {
   );
 };
 
-export default CustomerSettings;
+export default BuyerSettings;

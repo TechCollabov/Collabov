@@ -1,7 +1,7 @@
 /**
  * Feature: Protected Route Access Control
  *
- * Verifies that CustomerRoute, VendorRoute, and AdminRoute enforce role-based
+ * Verifies that BuyerRoute, VendorRoute, and AdminRoute enforce role-based
  * access and redirect appropriately when the auth state does not match.
  */
 
@@ -11,7 +11,7 @@ import { screen } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
 import {
   ProtectedRoute,
-  CustomerRoute,
+  BuyerRoute,
   VendorRoute,
   AdminRoute,
 } from '@/components/auth/ProtectedRoute';
@@ -94,24 +94,24 @@ describe('Feature: Protected Route Access Control', () => {
 
   // ── Correct role ───────────────────────────────────────────────────────────
 
-  describe('Scenario: Customer accesses a customer-only route', () => {
+  describe('Scenario: Buyer accesses a buyer-only route', () => {
     it('should render the protected content', () => {
-      // Given a logged-in customer
+      // Given a logged-in buyer
       vi.mocked(useAuth).mockReturnValue(
         createMockAuthValue({
           user: createMockUser(),
-          profile: createMockProfile('customer'),
+          profile: createMockProfile('buyer'),
         }) as ReturnType<typeof useAuth>
       );
 
       renderProtected(
-        <CustomerRoute>
-          <div data-testid="customer-content">Customer Dashboard</div>
-        </CustomerRoute>
+        <BuyerRoute>
+          <div data-testid="buyer-content">Buyer Dashboard</div>
+        </BuyerRoute>
       );
 
       // Then they can see the content
-      expect(screen.getByTestId('customer-content')).toBeInTheDocument();
+      expect(screen.getByTestId('buyer-content')).toBeInTheDocument();
     });
   });
 
@@ -155,7 +155,7 @@ describe('Feature: Protected Route Access Control', () => {
 
   // ── Wrong role ─────────────────────────────────────────────────────────────
 
-  describe('Scenario: Vendor tries to access a customer-only route', () => {
+  describe('Scenario: Vendor tries to access a buyer-only route', () => {
     it('should redirect to home (/)', () => {
       // Given a vendor is logged in
       vi.mocked(useAuth).mockReturnValue(
@@ -166,23 +166,23 @@ describe('Feature: Protected Route Access Control', () => {
       );
 
       renderProtected(
-        <CustomerRoute>
-          <div data-testid="customer-content">Customer Dashboard</div>
-        </CustomerRoute>
+        <BuyerRoute>
+          <div data-testid="buyer-content">Buyer Dashboard</div>
+        </BuyerRoute>
       );
 
       // Then they are redirected to home
       expect(screen.getByTestId('home-page')).toBeInTheDocument();
-      expect(screen.queryByTestId('customer-content')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('buyer-content')).not.toBeInTheDocument();
     });
   });
 
-  describe('Scenario: Customer tries to access a vendor-only route', () => {
+  describe('Scenario: Buyer tries to access a vendor-only route', () => {
     it('should redirect to home (/)', () => {
       vi.mocked(useAuth).mockReturnValue(
         createMockAuthValue({
           user: createMockUser(),
-          profile: createMockProfile('customer'),
+          profile: createMockProfile('buyer'),
         }) as ReturnType<typeof useAuth>
       );
 
@@ -197,12 +197,12 @@ describe('Feature: Protected Route Access Control', () => {
     });
   });
 
-  describe('Scenario: Customer tries to access an admin-only route', () => {
+  describe('Scenario: Buyer tries to access an admin-only route', () => {
     it('should redirect to home (/)', () => {
       vi.mocked(useAuth).mockReturnValue(
         createMockAuthValue({
           user: createMockUser(),
-          profile: createMockProfile('customer'),
+          profile: createMockProfile('buyer'),
         }) as ReturnType<typeof useAuth>
       );
 

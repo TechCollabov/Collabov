@@ -64,8 +64,8 @@ const Footer: React.FC = () => {
             <div>
               <h4 className="text-white font-semibold mb-5">Platform</h4>
               <ul className="space-y-3 text-sm">
-                <li><Link to="/customer/dashboard" className="hover:text-white transition-colors">Post a Job</Link></li>
-                <li><Link to="/customer/dashboard" className="hover:text-white transition-colors">Create a Tender</Link></li>
+                <li><Link to="/buyer/dashboard" className="hover:text-white transition-colors">Post a Job</Link></li>
+                <li><Link to="/buyer/dashboard" className="hover:text-white transition-colors">Create a Tender</Link></li>
                 <li><Link to="/packages" className="hover:text-white transition-colors">Browse Packages</Link></li>
                 <li><Link to="/ai-calculator" className="hover:text-white transition-colors">Outsourcing Calculator</Link></li>
                 <li className="flex items-center gap-2">

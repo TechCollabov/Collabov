@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 /*
- * Shared workflow rules and state-machine helpers for the vendor/customer
+ * Shared workflow rules and state-machine helpers for the vendor/buyer
  * journeys. All money movement and signatures are simulated in-platform:
  * escrow_transactions rows record what Stripe would do, and signing is an
  * in-app action. Time-driven transitions ("crons" in the journey docs) are
@@ -115,17 +115,17 @@ export function isBusinessEmail(email: string): boolean {
 
 /** Hard gate: the buyer can't spend (RFP, job, tender, BYOV, discovery,
  *  package purchase) until company name and country are filled in. */
-export async function hasCompanyProfile(customerId: string): Promise<boolean> {
+export async function hasCompanyProfile(buyerId: string): Promise<boolean> {
   const { data } = await supabase
-    .from('customers')
+    .from('buyers')
     .select('company_name, country')
-    .eq('id', customerId)
+    .eq('id', buyerId)
     .maybeSingle();
   return !!(data?.company_name?.trim() && data?.country?.trim());
 }
 
-export async function isCustomerBlacklisted(customerId: string): Promise<boolean> {
-  const { data } = await supabase.from('customers').select('is_blacklisted').eq('id', customerId).maybeSingle();
+export async function isBuyerBlacklisted(buyerId: string): Promise<boolean> {
+  const { data } = await supabase.from('buyers').select('is_blacklisted').eq('id', buyerId).maybeSingle();
   return !!data?.is_blacklisted;
 }
 
@@ -440,14 +440,14 @@ export async function sweepAutoReleases(engagement: EngagementParties) {
 // ── Proposal lifecycle sweeps ────────────────────────────────────────────────
 
 /** Expire sent proposals older than 30 days (buyer never triaged). */
-export async function sweepProposalExpiry(vendorOrCustomerFilter: { vendor_id?: string; customer_id?: string }) {
+export async function sweepProposalExpiry(vendorOrBuyerFilter: { vendor_id?: string; buyer_id?: string }) {
   let query = supabase
     .from('proposals')
     .update({ workflow_state: 'expired' })
     .in('workflow_state', ['sent', 'keep', 'maybe'])
     .lt('expires_at', new Date().toISOString());
-  if (vendorOrCustomerFilter.vendor_id) query = query.eq('vendor_id', vendorOrCustomerFilter.vendor_id);
-  if (vendorOrCustomerFilter.customer_id) query = query.eq('customer_id', vendorOrCustomerFilter.customer_id);
+  if (vendorOrBuyerFilter.vendor_id) query = query.eq('vendor_id', vendorOrBuyerFilter.vendor_id);
+  if (vendorOrBuyerFilter.buyer_id) query = query.eq('buyer_id', vendorOrBuyerFilter.buyer_id);
   await query;
 }
 
@@ -634,7 +634,7 @@ export async function sweepRehirePrompts(buyerId: string) {
 
     await notify(buyerId, 'system', 'Ready to re-engage?',
       `It's been 30 days since "${eng.project_title}" closed with ${vendor?.company_name ?? 'your vendor'}. Re-hire with a pre-filled proposal or re-use the previous SOW from My Vendors.`,
-      '/customer/my-vendors');
+      '/buyer/my-vendors');
     await logEvent('rehire_prompted', buyerId, 'system', 'engagement', eng.id, {});
   }
 }
@@ -644,20 +644,20 @@ export async function sweepRehirePrompts(buyerId: string) {
 /** Record a payment event against the buyer's public reliability badge.
  *  On-time = buyer actively accepted/confirmed; late = auto-release fired on
  *  silence or a charge was held/disputed. */
-export async function recordPaymentEvent(customerId: string, onTime: boolean) {
+export async function recordPaymentEvent(buyerId: string, onTime: boolean) {
   const { data: c } = await supabase
-    .from('customers')
+    .from('buyers')
     .select('payment_events_count, late_payment_count')
-    .eq('id', customerId)
+    .eq('id', buyerId)
     .single();
   if (!c) return;
   const total = (c.payment_events_count ?? 0) + 1;
   const late = (c.late_payment_count ?? 0) + (onTime ? 0 : 1);
-  await supabase.from('customers').update({
+  await supabase.from('buyers').update({
     payment_events_count: total,
     late_payment_count: late,
     on_time_payment_rate: Math.round(((total - late) / total) * 10000) / 100,
-  }).eq('id', customerId);
+  }).eq('id', buyerId);
 }
 
 // ── Vendor + buyer blacklist ──────────────────────────────────────────────────
@@ -712,32 +712,32 @@ export async function approveVendorRestoration(vendorId: string, adminId: string
 }
 
 /** Same deferred-effect rule as vendors, extended to buyers. */
-export async function blacklistCustomer(customerId: string, reason: string, adminId: string) {
-  const deferred = await hasOpenDispute(customerId, 'buyer');
+export async function blacklistBuyer(buyerId: string, reason: string, adminId: string) {
+  const deferred = await hasOpenDispute(buyerId, 'buyer');
   const patch = deferred
     ? { blacklist_pending: true, blacklist_reason: reason, blacklisted_by: adminId }
     : { is_blacklisted: true, blacklist_pending: false, blacklist_reason: reason, blacklisted_at: new Date().toISOString(), blacklisted_by: adminId, restoration_approvals: [] };
-  await supabase.from('customers').update(patch).eq('id', customerId);
-  await logEvent(deferred ? 'customer_blacklist_deferred' : 'customer_blacklisted', adminId, 'admin', 'customer', customerId, { reason });
+  await supabase.from('buyers').update(patch).eq('id', buyerId);
+  await logEvent(deferred ? 'buyer_blacklist_deferred' : 'buyer_blacklisted', adminId, 'admin', 'buyer', buyerId, { reason });
 }
 
-export async function approveCustomerRestoration(customerId: string, adminId: string): Promise<number> {
-  const { data: c } = await supabase.from('customers').select('restoration_approvals').eq('id', customerId).single();
+export async function approveBuyerRestoration(buyerId: string, adminId: string): Promise<number> {
+  const { data: c } = await supabase.from('buyers').select('restoration_approvals').eq('id', buyerId).single();
   const approvals: string[] = Array.isArray(c?.restoration_approvals) ? c!.restoration_approvals : [];
   if (approvals.includes(adminId)) return approvals.length;
   const next = [...approvals, adminId];
   if (next.length >= 2) {
-    await supabase.from('customers').update({
+    await supabase.from('buyers').update({
       is_blacklisted: false,
       blacklist_pending: false,
       blacklist_reason: null,
       blacklisted_at: null,
       blacklisted_by: null,
       restoration_approvals: [],
-    }).eq('id', customerId);
-    await logEvent('customer_restored', adminId, 'admin', 'customer', customerId, { approvedBy: next });
+    }).eq('id', buyerId);
+    await logEvent('buyer_restored', adminId, 'admin', 'buyer', buyerId, { approvedBy: next });
   } else {
-    await supabase.from('customers').update({ restoration_approvals: next }).eq('id', customerId);
+    await supabase.from('buyers').update({ restoration_approvals: next }).eq('id', buyerId);
   }
   return next.length;
 }
@@ -748,9 +748,9 @@ export async function approveCustomerRestoration(customerId: string, adminId: st
  * pending, the blacklist now takes effect.
  */
 export async function finalizeDeferredBlacklists(vendorId: string, buyerId: string) {
-  const [{ data: vendor }, { data: customer }] = await Promise.all([
+  const [{ data: vendor }, { data: buyer }] = await Promise.all([
     supabase.from('vendors').select('blacklist_pending, blacklist_reason, blacklisted_by').eq('id', vendorId).maybeSingle(),
-    supabase.from('customers').select('blacklist_pending, blacklist_reason, blacklisted_by').eq('id', buyerId).maybeSingle(),
+    supabase.from('buyers').select('blacklist_pending, blacklist_reason, blacklisted_by').eq('id', buyerId).maybeSingle(),
   ]);
 
   if (vendor?.blacklist_pending && !(await hasOpenDispute(vendorId, 'vendor'))) {
@@ -759,10 +759,10 @@ export async function finalizeDeferredBlacklists(vendorId: string, buyerId: stri
     await logEvent('vendor_blacklist_finalized', vendor.blacklisted_by, 'admin', 'vendor', vendorId, {});
   }
 
-  if (customer?.blacklist_pending && !(await hasOpenDispute(buyerId, 'buyer'))) {
-    await supabase.from('customers').update({ is_blacklisted: true, blacklist_pending: false, blacklisted_at: new Date().toISOString() }).eq('id', buyerId);
-    await notify(buyerId, 'system', 'Account blacklisted', `Your account has been blacklisted now that all open disputes are resolved: ${customer.blacklist_reason ?? ''}`);
-    await logEvent('customer_blacklist_finalized', customer.blacklisted_by, 'admin', 'customer', buyerId, {});
+  if (buyer?.blacklist_pending && !(await hasOpenDispute(buyerId, 'buyer'))) {
+    await supabase.from('buyers').update({ is_blacklisted: true, blacklist_pending: false, blacklisted_at: new Date().toISOString() }).eq('id', buyerId);
+    await notify(buyerId, 'system', 'Account blacklisted', `Your account has been blacklisted now that all open disputes are resolved: ${buyer.blacklist_reason ?? ''}`);
+    await logEvent('buyer_blacklist_finalized', buyer.blacklisted_by, 'admin', 'buyer', buyerId, {});
   }
 }
 

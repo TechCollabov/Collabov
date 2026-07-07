@@ -21,7 +21,7 @@ const Navbar: React.FC = () => {
   }, []);
 
   const closeMenu = () => setIsOpen(false);
-  const isCustomer = profile?.user_type === 'customer';
+  const isBuyer = profile?.user_type === 'buyer';
   const dashboardPath = profile ? (ROLE_TO_DASHBOARD[profile.user_type] || '/') : '/';
 
   const handleSignOut = async () => {
@@ -121,8 +121,8 @@ const Navbar: React.FC = () => {
             <div className="flex items-center gap-2 ml-4">
               {user ? (
                 <>
-                  {isCustomer && (
-                    <Link to="/customer/dashboard" className="px-4 py-2 border-2 border-[#0070F3] text-[#0070F3] rounded-lg hover:bg-blue-50 transition-colors duration-200 font-medium flex items-center gap-1 text-sm">
+                  {isBuyer && (
+                    <Link to="/buyer/dashboard" className="px-4 py-2 border-2 border-[#0070F3] text-[#0070F3] rounded-lg hover:bg-blue-50 transition-colors duration-200 font-medium flex items-center gap-1 text-sm">
                       <Briefcase className="h-4 w-4" />
                       Post a Job
                     </Link>
@@ -204,9 +204,9 @@ const Navbar: React.FC = () => {
                 </Link>
               </div>
 
-              {isCustomer && (
+              {isBuyer && (
                 <div className="mb-4">
-                  <Link to="/customer/dashboard" className="block py-2 px-3 text-[#0070F3] font-medium hover:bg-blue-50 rounded-lg" onClick={closeMenu}>Post a Job</Link>
+                  <Link to="/buyer/dashboard" className="block py-2 px-3 text-[#0070F3] font-medium hover:bg-blue-50 rounded-lg" onClick={closeMenu}>Post a Job</Link>
                 </div>
               )}
             </nav>

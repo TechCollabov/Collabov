@@ -429,7 +429,7 @@ const AdminDisputes: React.FC = () => {
       const buyerIds = Array.from(new Set(rows.map((d: any) => d.buyer_id)));
       const [{ data: vendors }, { data: buyers }] = await Promise.all([
         supabase.from('vendors').select('id, company_name').in('id', vendorIds),
-        supabase.from('customers').select('id, company_name').in('id', buyerIds),
+        supabase.from('buyers').select('id, company_name').in('id', buyerIds),
       ]);
       const vMap = new Map((vendors ?? []).map((v: any) => [v.id, v.company_name]));
       const bMap = new Map((buyers ?? []).map((b: any) => [b.id, b.company_name]));

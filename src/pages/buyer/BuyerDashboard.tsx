@@ -199,7 +199,7 @@ const WorkspaceModule: React.FC<WorkspaceModuleProps> = ({ activeCount, engageme
         </div>
       )}
 
-      <CardFooter expandTo="/customer/my-vendors" />
+      <CardFooter expandTo="/buyer/my-vendors" />
     </div>
   );
 };
@@ -243,7 +243,7 @@ const MilestonePaymentsModule: React.FC<MilestonePaymentsModuleProps> = ({ pendi
       </div>
     )}
 
-    <CardFooter expandTo="/customer/payments" />
+    <CardFooter expandTo="/buyer/payments" />
   </div>
 );
 
@@ -287,7 +287,7 @@ const RiskDashboardModule: React.FC<RiskDashboardModuleProps> = ({ activeCount, 
 
     <V2Placeholder label="Full Risk Score ML" />
 
-    <CardFooter expandTo="/customer/governance" />
+    <CardFooter expandTo="/buyer/governance" />
   </div>
 );
 
@@ -325,7 +325,7 @@ const GovernanceModule: React.FC<GovernanceModuleProps> = ({ contracts, openDisp
         No open disputes
       </div>
     ) : (
-      <Link to="/customer/governance" className="flex items-center gap-2 bg-red-50 rounded-lg px-3 py-2 text-xs text-red-700 mb-4 hover:bg-red-100 transition-colors">
+      <Link to="/buyer/governance" className="flex items-center gap-2 bg-red-50 rounded-lg px-3 py-2 text-xs text-red-700 mb-4 hover:bg-red-100 transition-colors">
         <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
         {openDisputesCount} open dispute{openDisputesCount !== 1 ? 's' : ''} — review required
       </Link>
@@ -333,7 +333,7 @@ const GovernanceModule: React.FC<GovernanceModuleProps> = ({ contracts, openDisp
 
     <V2Placeholder label="Access Control" />
 
-    <CardFooter expandTo="/customer/governance" />
+    <CardFooter expandTo="/buyer/governance" />
   </div>
 );
 
@@ -429,7 +429,7 @@ const MessagesModule: React.FC<MessagesModuleProps> = ({ unreadMessages, preview
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const CustomerDashboard: React.FC = () => {
+const BuyerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { profile, user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -450,15 +450,15 @@ const CustomerDashboard: React.FC = () => {
     if (!user) return;
     async function load() {
       // Lazy sweeps: proposal expiry, 30-day re-hire prompts, T+1 call follow-ups.
-      sweepProposalExpiry({ customer_id: user!.id }).catch(() => {});
+      sweepProposalExpiry({ buyer_id: user!.id }).catch(() => {});
       sweepRehirePrompts(user!.id).catch(() => {});
       sweepPendingEngagementFollowups(user!.id).catch(() => {});
 
       const [engRes, contractRes, disputeRes, proposalRes, msgRes] = await Promise.all([
         supabase.from('engagements').select('id, project_title, vendor_id, status, engagement_type, ir35_status').eq('buyer_id', user!.id),
-        supabase.from('contracts').select('id, vendor_id, status, signed_by_customer, signed_by_vendor').eq('customer_id', user!.id),
+        supabase.from('contracts').select('id, vendor_id, status, signed_by_buyer, signed_by_vendor').eq('buyer_id', user!.id),
         supabase.from('disputes').select('id, status').eq('buyer_id', user!.id),
-        supabase.from('proposals').select('id, workflow_state, submitted_at, enquiries(title), jobs(title)').eq('customer_id', user!.id).neq('workflow_state', 'draft'),
+        supabase.from('proposals').select('id, workflow_state, submitted_at, enquiries(title), jobs(title)').eq('buyer_id', user!.id).neq('workflow_state', 'draft'),
         supabase.from('messages').select('id, sender_id, recipient_id, content, is_read, created_at')
           .or(`sender_id.eq.${user!.id},recipient_id.eq.${user!.id}`).order('created_at', { ascending: false }).limit(30),
       ]);
@@ -515,7 +515,7 @@ const CustomerDashboard: React.FC = () => {
 
       // Risk dashboard: real counts, no invented compliance-doc data.
       const contracts = contractRes.data ?? [];
-      const contractsSignedCount = contracts.filter(c => c.signed_by_customer && c.signed_by_vendor).length;
+      const contractsSignedCount = contracts.filter(c => c.signed_by_buyer && c.signed_by_vendor).length;
       const staffAugEngs = engs.filter(e => e.engagement_type === 'staff_aug');
       const pendingIR35Count = staffAugEngs.filter(e => !e.ir35_status || e.ir35_status === 'pending').length;
       setRisk({ activeCount: activeEngs.length, contractsSignedCount, pendingIR35Count, staffAugCount: staffAugEngs.length });
@@ -631,15 +631,15 @@ const CustomerDashboard: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => {
-                    if (tab.id === 'invite-vendor') navigate('/customer/byov');
-                    else if (tab.id === 'post-job') navigate('/customer/post-job');
-                    else if (tab.id === 'create-tender') navigate('/customer/post-job?type=tender');
-                    else if (tab.id === 'contracts' || tab.id === 'disputes') navigate('/customer/governance');
-                    else if (tab.id === 'invoices') navigate('/customer/payments');
-                    else if (tab.id === 'settings') navigate('/customer/settings');
+                    if (tab.id === 'invite-vendor') navigate('/buyer/byov');
+                    else if (tab.id === 'post-job') navigate('/buyer/post-job');
+                    else if (tab.id === 'create-tender') navigate('/buyer/post-job?type=tender');
+                    else if (tab.id === 'contracts' || tab.id === 'disputes') navigate('/buyer/governance');
+                    else if (tab.id === 'invoices') navigate('/buyer/payments');
+                    else if (tab.id === 'settings') navigate('/buyer/settings');
                     else if (tab.id === 'ai-matchmaking') navigate('/results');
-                    else if (tab.id === 'saved-talent') navigate('/customer/shortlist');
-                    else if (tab.id === 'my-projects') navigate('/customer/my-vendors');
+                    else if (tab.id === 'saved-talent') navigate('/buyer/shortlist');
+                    else if (tab.id === 'my-projects') navigate('/buyer/my-vendors');
                     else setActiveTab(tab.id);
                   }}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -777,7 +777,7 @@ const CustomerDashboard: React.FC = () => {
                 Milestone funding overdue for {paymentAlert.vendorName} — {paymentAlert.projectTitle}. Fund this milestone to keep the engagement active.
               </p>
               <div className="flex gap-3 mt-2">
-                <Link to="/customer/payments" className="text-xs bg-red-600 text-white rounded-lg px-3 py-1.5 font-medium">Fund now</Link>
+                <Link to="/buyer/payments" className="text-xs bg-red-600 text-white rounded-lg px-3 py-1.5 font-medium">Fund now</Link>
                 <Link to="/contact" className="text-xs text-gray-500">Contact support</Link>
               </div>
             </div>
@@ -816,4 +816,4 @@ const CustomerDashboard: React.FC = () => {
   );
 };
 
-export default CustomerDashboard;
+export default BuyerDashboard;

@@ -20,7 +20,7 @@ interface BriefRow {
   admin_status: string;
   admin_rejection_reason: string | null;
   created_at: string;
-  customer_id: string;
+  buyer_id: string;
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
@@ -70,15 +70,15 @@ const AdminBriefs: React.FC = () => {
     setLoading(true);
     const { data } = await supabase
       .from('jobs')
-      .select('id, title, tender_title, job_kind, budget_type, budget_amount, budget_from, budget_to, currency, proposals_count, category, service_type, nda_required, admin_status, admin_rejection_reason, created_at, customer_id')
+      .select('id, title, tender_title, job_kind, budget_type, budget_amount, budget_from, budget_to, currency, proposals_count, category, service_type, nda_required, admin_status, admin_rejection_reason, created_at, buyer_id')
       .order('created_at', { ascending: false });
     const rows = data || [];
-    const customerIds = Array.from(new Set(rows.map(r => r.customer_id)));
-    const { data: customers } = customerIds.length
-      ? await supabase.from('customers').select('id, company_name').in('id', customerIds)
+    const buyerIds = Array.from(new Set(rows.map(r => r.buyer_id)));
+    const { data: buyers } = buyerIds.length
+      ? await supabase.from('buyers').select('id, company_name').in('id', buyerIds)
       : { data: [] as any[] };
-    const custMap = new Map((customers ?? []).map((c: any) => [c.id, c.company_name]));
-    setBriefs(rows.map((r: any) => ({ ...r, company: custMap.get(r.customer_id) ?? 'Buyer' })));
+    const custMap = new Map((buyers ?? []).map((c: any) => [c.id, c.company_name]));
+    setBriefs(rows.map((r: any) => ({ ...r, company: custMap.get(r.buyer_id) ?? 'Buyer' })));
     setLoading(false);
   }, []);
 
@@ -95,7 +95,7 @@ const AdminBriefs: React.FC = () => {
       admin_id: adminId, action_type: actionType, target_type: 'job', target_id: brief.id, reason,
     });
     await supabase.from('notifications').insert({
-      user_id: brief.customer_id, type: 'system', title: notifyTitle, message: notifyMessage, link_url: '/customer/dashboard',
+      user_id: brief.buyer_id, type: 'system', title: notifyTitle, message: notifyMessage, link_url: '/buyer/dashboard',
     });
   };
 

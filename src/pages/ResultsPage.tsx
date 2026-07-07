@@ -210,7 +210,7 @@ const ResultsPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from('saved_vendors').select('vendor_id').eq('customer_id', user.id).is('contractor_id', null)
+    supabase.from('saved_vendors').select('vendor_id').eq('buyer_id', user.id).is('contractor_id', null)
       .then(({ data }) => setSaved((data ?? []).map((r: any) => r.vendor_id).filter(Boolean)));
   }, [user]);
 
@@ -337,9 +337,9 @@ const ResultsPage: React.FC = () => {
     setSaved(prev => alreadySaved ? prev.filter(x => x !== id) : [...prev, id]);
     if (!user) return;
     if (alreadySaved) {
-      await supabase.from('saved_vendors').delete().eq('customer_id', user.id).eq('vendor_id', id).is('contractor_id', null);
+      await supabase.from('saved_vendors').delete().eq('buyer_id', user.id).eq('vendor_id', id).is('contractor_id', null);
     } else {
-      await supabase.from('saved_vendors').insert({ customer_id: user.id, vendor_id: id });
+      await supabase.from('saved_vendors').insert({ buyer_id: user.id, vendor_id: id });
     }
   };
 

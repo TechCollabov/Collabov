@@ -72,14 +72,14 @@ const AdminDashboard: React.FC = () => {
         supabase.from('engagements').select('id', { count: 'exact', head: true }).eq('status', 'active'),
         supabase.from('disputes').select('id', { count: 'exact', head: true }).neq('status', 'resolved'),
         supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('admin_status', 'pending_review'),
-        supabase.from('customers').select('id', { count: 'exact', head: true }).gt('active_projects_count', 0),
+        supabase.from('buyers').select('id', { count: 'exact', head: true }).gt('active_projects_count', 0),
         supabase.from('escrow_transactions').select('amount').eq('transaction_type', 'release'),
         supabase.from('escrow_transactions').select('amount, created_at').eq('transaction_type', 'release').gte('created_at', sixMonthsAgo.toISOString()),
         supabase.from('disputes').select('id, reason, engagement_id').eq('status', 'admin_review'),
         supabase.from('profiles').select('id, full_name').eq('user_type', 'admin').not('locked_at', 'is', null),
         supabase.from('vendors').select('id, company_name, restoration_approvals').eq('is_blacklisted', true),
         supabase.from('jobs').select('id, title, tender_title, job_kind').eq('admin_status', 'pending_review').limit(5),
-        supabase.from('customers').select('id, company_name, restoration_approvals').eq('is_blacklisted', true),
+        supabase.from('buyers').select('id, company_name, restoration_approvals').eq('is_blacklisted', true),
         supabase.from('engagements').select('id', { count: 'exact', head: true }).eq('ir35_status', 'pending').eq('status', 'pending_ir35'),
       ]);
 
@@ -213,14 +213,14 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   const KPI_CARDS = kpis ? [
-    { label: 'Total GMV This Month', value: formatGBP(kpis.gmvThisMonth), icon: TrendingUp, color: 'text-[#0070F3]', bg: 'bg-blue-50' },
-    { label: 'Total GMV All Time', value: formatGBP(kpis.gmvAllTime), icon: CreditCard, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Total GMV This Month', value: formatGBP(kpis.gmvThisMonth), icon: TrendingUp, color: 'text-[#0070F3]', bg: 'bg-blue-50', href: '/admin/payments' },
+    { label: 'Total GMV All Time', value: formatGBP(kpis.gmvAllTime), icon: CreditCard, color: 'text-purple-600', bg: 'bg-purple-50', href: '/admin/payments' },
     { label: 'Active Engagements', value: String(kpis.activeEngagements), icon: FileText, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Verified Vendors', value: String(kpis.verifiedVendors), icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Active Buyers', value: String(kpis.activeBuyers), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Open Disputes', value: String(kpis.openDisputes), icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
-    { label: 'Pending Verifications', value: String(kpis.pendingVerifications), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Pending Brief Reviews', value: String(kpis.pendingBriefs), icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { label: 'Verified Vendors', value: String(kpis.verifiedVendors), icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50', href: '/admin/verification' },
+    { label: 'Active Buyers', value: String(kpis.activeBuyers), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', href: '/admin/users' },
+    { label: 'Open Disputes', value: String(kpis.openDisputes), icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', href: '/admin/disputes' },
+    { label: 'Pending Verifications', value: String(kpis.pendingVerifications), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', href: '/admin/verification' },
+    { label: 'Pending Brief Reviews', value: String(kpis.pendingBriefs), icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50', href: '/admin/briefs' },
   ] : [];
 
   return (
@@ -229,23 +229,36 @@ const AdminDashboard: React.FC = () => {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {(loading ? Array.from({ length: 8 }) : KPI_CARDS).map((kpi: any, idx) => (
-          <div key={kpi?.label ?? idx} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            {kpi ? (
-              <>
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className={`w-8 h-8 rounded-lg ${kpi.bg} flex items-center justify-center`}>
-                    <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                  </div>
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-tight">{kpi.label}</span>
+        {(loading ? Array.from({ length: 8 }) : KPI_CARDS).map((kpi: any, idx) => {
+          const cardClasses = 'bg-white rounded-xl border border-gray-100 shadow-sm p-5';
+          const content = kpi ? (
+            <>
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className={`w-8 h-8 rounded-lg ${kpi.bg} flex items-center justify-center`}>
+                  <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
                 </div>
-                <div className="text-2xl font-bold text-gray-900">{kpi.value}</div>
-              </>
-            ) : (
-              <div className="h-16 animate-pulse bg-gray-50 rounded-lg" />
-            )}
-          </div>
-        ))}
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide leading-tight">{kpi.label}</span>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{kpi.value}</div>
+            </>
+          ) : (
+            <div className="h-16 animate-pulse bg-gray-50 rounded-lg" />
+          );
+
+          if (kpi?.href) {
+            return (
+              <Link key={kpi.label} to={kpi.href} className={`${cardClasses} hover:border-gray-200 hover:shadow-md transition-shadow`}>
+                {content}
+              </Link>
+            );
+          }
+
+          return (
+            <div key={kpi?.label ?? idx} className={cardClasses}>
+              {content}
+            </div>
+          );
+        })}
       </div>
 
       {/* GMV Chart */}

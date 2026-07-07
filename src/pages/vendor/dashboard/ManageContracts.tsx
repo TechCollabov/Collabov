@@ -21,7 +21,7 @@ function LiveEngagements() {
         .order('created_at', { ascending: false });
       const contractIds = (engs ?? []).map(e => e.contract_id).filter(Boolean);
       const { data: cons } = contractIds.length
-        ? await supabase.from('contracts').select('id, signed_by_customer, signed_by_vendor, contract_number').in('id', contractIds)
+        ? await supabase.from('contracts').select('id, signed_by_buyer, signed_by_vendor, contract_number').in('id', contractIds)
         : { data: [] as any[] };
       const conMap = new Map((cons ?? []).map((c: any) => [c.id, c]));
       setRows((engs ?? []).map(e => ({ ...e, contract: e.contract_id ? conMap.get(e.contract_id) : null })));

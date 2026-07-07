@@ -29,7 +29,7 @@ const IR35GuidancePage: React.FC = () => (
 
         <section>
           <h2 className="text-xl font-semibold text-[#0B2D59] mb-3">Who is responsible?</h2>
-          <p>Since April 2021, medium and large private-sector businesses (end clients) are responsible for determining IR35 status. This applies to all Collabov customers hiring through a staff augmentation engagement.</p>
+          <p>Since April 2021, medium and large private-sector businesses (end clients) are responsible for determining IR35 status. This applies to all Collabov buyers hiring through a staff augmentation engagement.</p>
           <p className="mt-3">Collabov's platform includes an IR35 Status Determination Statement (SDS) as part of every staff augmentation contract. The SDS is reviewed and stamped by a Collabov administrator before the engagement activates.</p>
         </section>
 

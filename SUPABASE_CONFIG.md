@@ -36,7 +36,7 @@ Add the following URLs to the "Redirect URLs" list:
 For production:
 ```
 https://your-production-domain.com/sign-in
-https://your-production-domain.com/customer/dashboard
+https://your-production-domain.com/buyer/dashboard
 https://your-production-domain.com/vendor/dashboard
 https://your-production-domain.com/contractor/dashboard
 https://your-production-domain.com/admin/dashboard
@@ -45,7 +45,7 @@ https://your-production-domain.com/admin/dashboard
 For local development:
 ```
 http://localhost:5173/sign-in
-http://localhost:5173/customer/dashboard
+http://localhost:5173/buyer/dashboard
 http://localhost:5173/vendor/dashboard
 http://localhost:5173/contractor/dashboard
 ```

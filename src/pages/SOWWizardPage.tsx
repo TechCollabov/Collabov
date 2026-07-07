@@ -199,7 +199,7 @@ function Step1({
           type="text"
           value={formData.project_title}
           onChange={(e) => onChange({ project_title: e.target.value })}
-          placeholder="e.g. Customer Portal Redesign"
+          placeholder="e.g. Buyer Portal Redesign"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {formData.project_title.length > 0 && formData.project_title.length < 5 && (
@@ -1198,7 +1198,7 @@ function Step5({
               ) : (
                 <button
                   type="button"
-                  onClick={() => navigate('/customer/dashboard')}
+                  onClick={() => navigate('/buyer/dashboard')}
                   className="w-full bg-[#0070F3] hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl mt-2 transition-colors"
                 >
                   Return to Dashboard
@@ -1436,7 +1436,7 @@ IP ownership: ${formData.ip_ownership}`;
 
       // 1. Project record (workspace surface)
       const { data: proj, error: projErr } = await supabase.from('projects').insert({
-        customer_id: user.id,
+        buyer_id: user.id,
         vendor_id: vendorId,
         title: formData.project_title,
         description: formData.description,
@@ -1476,7 +1476,7 @@ IP ownership: ${formData.ip_ownership}`;
       const { data: contract, error: conErr } = await supabase.from('contracts').insert({
         contract_number: contractNumber,
         project_id: proj.id,
-        customer_id: user.id,
+        buyer_id: user.id,
         vendor_id: vendorId,
         title: `${VENDOR_CONTRACT_TEMPLATE[vendorType] ?? 'Service Agreement'} — ${formData.project_title}`,
         start_date: startDate,
@@ -1711,7 +1711,7 @@ IP ownership: ${formData.ip_ownership}`;
           ) : (
             <button
               type="button"
-              onClick={() => navigate('/customer/dashboard')}
+              onClick={() => navigate('/buyer/dashboard')}
               className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-600 rounded-xl font-medium text-sm hover:bg-gray-50 transition-colors"
             >
               Exit

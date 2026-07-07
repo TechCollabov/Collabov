@@ -6,15 +6,15 @@ import { supabase } from '../../lib/supabase';
 
 const BLACKLIST_EVENT_TYPES = [
   'vendor_blacklisted', 'vendor_blacklist_deferred', 'vendor_restored',
-  'customer_blacklisted', 'customer_blacklist_deferred', 'customer_restored',
+  'buyer_blacklisted', 'buyer_blacklist_deferred', 'buyer_restored',
 ];
 const BLACKLIST_EVENT_LABEL: Record<string, string> = {
   vendor_blacklisted: 'Vendor blacklisted',
   vendor_blacklist_deferred: 'Vendor blacklist deferred (open dispute)',
   vendor_restored: 'Vendor restored',
-  customer_blacklisted: 'Buyer blacklisted',
-  customer_blacklist_deferred: 'Buyer blacklist deferred (open dispute)',
-  customer_restored: 'Buyer restored',
+  buyer_blacklisted: 'Buyer blacklisted',
+  buyer_blacklist_deferred: 'Buyer blacklist deferred (open dispute)',
+  buyer_restored: 'Buyer restored',
 };
 
 interface BlacklistLogRow {
@@ -123,7 +123,7 @@ const AdminAnalytics: React.FC = () => {
 
     const [
       vendorRes, verRes, contractRes, enquiryRes, vendorsRes,
-      releasesRes, milestoneRes, customersRes, disputesRes, searchEventsRes,
+      releasesRes, milestoneRes, buyersRes, disputesRes, searchEventsRes,
     ] = await Promise.all([
       supabase.from('vendors').select('id', { count: 'exact', head: true }),
       supabase.from('vendors').select('id', { count: 'exact', head: true }).eq('is_verified', true),
@@ -132,7 +132,7 @@ const AdminAnalytics: React.FC = () => {
       supabase.from('vendors').select('id, company_name, rating, projects_completed, is_verified, verified_at, dispute_outcome_count').order('projects_completed', { ascending: false }).limit(10),
       supabase.from('escrow_transactions').select('amount, platform_fee_amount, created_at').eq('transaction_type', 'release').gte('created_at', sixMonthsAgo.toISOString()),
       supabase.from('project_milestones').select('engagement_id, escrow_status, due_date, funded_at').not('escrow_status', 'eq', 'unfunded'),
-      supabase.from('customers').select('id, company_name'),
+      supabase.from('buyers').select('id, company_name'),
       supabase.from('disputes').select('buyer_id'),
       supabase.from('platform_event').select('actor_id').eq('event_type', 'vendor_search'),
     ]);
@@ -201,7 +201,7 @@ const AdminAnalytics: React.FC = () => {
       if (onTime) cur.onTime += 1; else cur.late += 1;
       perBuyer.set(buyerId, cur);
     });
-    const custMap = new Map((customersRes.data ?? []).map((c: any) => [c.id, c.company_name]));
+    const custMap = new Map((buyersRes.data ?? []).map((c: any) => [c.id, c.company_name]));
     setBuyers(Array.from(perBuyer.entries()).map(([buyerId, s]) => {
       const onTimeRate = s.total > 0 ? Math.round((s.onTime / s.total) * 100) : 100;
       const disputeRatio = s.total > 0 ? Math.round(((disputeCountByBuyer.get(buyerId) ?? 0) / s.total) * 100) : 0;
@@ -226,14 +226,14 @@ const AdminAnalytics: React.FC = () => {
       .limit(20);
     const eventRows = (events ?? []) as PlatformEventRow[];
     const vendorIds = eventRows.filter(e => e.entity_type === 'vendor').map(e => e.entity_id);
-    const customerIds = eventRows.filter(e => e.entity_type === 'customer').map(e => e.entity_id);
-    const [{ data: eventVendors }, { data: eventCustomers }] = await Promise.all([
+    const buyerIds = eventRows.filter(e => e.entity_type === 'buyer').map(e => e.entity_id);
+    const [{ data: eventVendors }, { data: eventBuyers }] = await Promise.all([
       vendorIds.length ? supabase.from('vendors').select('id, company_name').in('id', vendorIds) : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
-      customerIds.length ? supabase.from('customers').select('id, company_name').in('id', customerIds) : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
+      buyerIds.length ? supabase.from('buyers').select('id, company_name').in('id', buyerIds) : Promise.resolve({ data: [] as { id: string; company_name: string }[] }),
     ]);
     const nameMap = new Map<string, string>([
       ...(eventVendors ?? []).map((v): [string, string] => [v.id, v.company_name]),
-      ...(eventCustomers ?? []).map((c): [string, string] => [c.id, c.company_name]),
+      ...(eventBuyers ?? []).map((c): [string, string] => [c.id, c.company_name]),
     ]);
     setBlacklistLog(eventRows.map(e => ({
       id: e.event_id,

@@ -14,7 +14,7 @@
  *  - Projects hover dropdown (Tenders, Jobs)
  *  - Flat links (Packages, Market Insight)
  *  - Auth CTAs (Sign In → /signin, Sign Up → /user-type)
- *  - "Post a Job" button visible only for logged-in customers
+ *  - "Post a Job" button visible only for logged-in buyers
  *  - Mobile hamburger opens / close button closes the slide-in panel
  */
 
@@ -231,14 +231,14 @@ describe('Feature: Navbar', () => {
     });
   });
 
-  // ── Customer role: "Post a Job" ────────────────────────────────────────────
+  // ── Buyer role: "Post a Job" ────────────────────────────────────────────
 
-  describe('Scenario: Authenticated customer sees "Post a Job"', () => {
-    it('should show the "Post a Job" link for a logged-in customer', () => {
+  describe('Scenario: Authenticated buyer sees "Post a Job"', () => {
+    it('should show the "Post a Job" link for a logged-in buyer', () => {
       vi.mocked(useAuth).mockReturnValue(
         createMockAuthValue({
           user: createMockUser(),
-          profile: createMockProfile('customer'),
+          profile: createMockProfile('buyer'),
         }) as ReturnType<typeof useAuth>
       );
       renderNavbar();
@@ -246,16 +246,16 @@ describe('Feature: Navbar', () => {
       expect(screen.getAllByRole('link', { name: /post a job/i }).length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should link "Post a Job" to /customer/dashboard', () => {
+    it('should link "Post a Job" to /buyer/dashboard', () => {
       vi.mocked(useAuth).mockReturnValue(
         createMockAuthValue({
           user: createMockUser(),
-          profile: createMockProfile('customer'),
+          profile: createMockProfile('buyer'),
         }) as ReturnType<typeof useAuth>
       );
       renderNavbar();
       screen.getAllByRole('link', { name: /post a job/i }).forEach(link =>
-        expect(link).toHaveAttribute('href', '/customer/dashboard')
+        expect(link).toHaveAttribute('href', '/buyer/dashboard')
       );
     });
 

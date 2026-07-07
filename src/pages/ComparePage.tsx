@@ -117,7 +117,7 @@ const ComparePage: React.FC = () => {
             <p className="text-xs text-gray-500 mt-0.5">Create a private job post visible only to selected vendors.</p>
           </div>
           <Link
-            to={`/customer/post-job?private=true&vendors=${vendorIds.join(',')}`}
+            to={`/buyer/post-job?private=true&vendors=${vendorIds.join(',')}`}
             className="px-4 py-2 bg-[#0070F3] text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
           >
             Post a Private Job →

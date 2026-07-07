@@ -40,9 +40,9 @@ export function ProtectedRoute({
   return <>{children}</>;
 }
 
-export function CustomerRoute({ children }: { children: ReactNode }) {
+export function BuyerRoute({ children }: { children: ReactNode }) {
   return (
-    <ProtectedRoute allowedUserTypes={['customer']}>
+    <ProtectedRoute allowedUserTypes={['buyer']}>
       {children}
     </ProtectedRoute>
   );
