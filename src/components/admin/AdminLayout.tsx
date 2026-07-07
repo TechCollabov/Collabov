@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShieldCheck, FileText, Users, AlertTriangle,
   CreditCard, BarChart2, BookOpen, Settings, Menu, X, LogOut, Globe
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AdminLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleExitAdmin = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
@@ -61,13 +69,13 @@ const AdminLayout: React.FC = () => {
           })}
         </nav>
         <div className="flex-shrink-0 p-3 border-t">
-          <Link
-            to="/"
-            className="flex items-center px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+          <button
+            onClick={handleExitAdmin}
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
           >
             <LogOut className="h-4 w-4 mr-3" />
             Exit Admin
-          </Link>
+          </button>
         </div>
       </div>
 
