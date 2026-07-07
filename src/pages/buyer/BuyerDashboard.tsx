@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -73,6 +73,7 @@ const EmptyState: React.FC<{ text: string }> = ({ text }) => (
 const BUSINESS_TYPE_LABEL: Record<string, string> = { msp: 'MSP', agency: 'IT Agency', staffaug: 'Staff Aug' };
 
 interface RecentlyViewedVendor { id: string; name: string; type: string; }
+interface NotificationRow { id: string; type: string; title: string; message: string; link_url: string | null; is_read: boolean; created_at: string; }
 const FindWithAIModule: React.FC<{ recentlyViewed: RecentlyViewedVendor[] }> = ({ recentlyViewed }) => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -445,6 +446,38 @@ const BuyerDashboard: React.FC = () => {
   const [governance, setGovernance] = useState<{ contracts: GovernanceContract[]; openDisputesCount: number }>({ contracts: [], openDisputesCount: 0 });
   const [insights, setInsights] = useState<Insight[]>([]);
   const [messagePreviews, setMessagePreviews] = useState<MessagePreview[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+
+  const toggleNotifications = () => {
+    setShowNotifications(v => !v);
+    setShowUserDropdown(false);
+  };
+  const toggleUserDropdown = () => {
+    setShowUserDropdown(v => !v);
+    setShowNotifications(false);
+  };
+
+  const loadNotifications = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('notifications')
+      .select('id, type, title, message, link_url, is_read, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    setNotifications(data || []);
+  }, [user]);
+
+  useEffect(() => { loadNotifications(); }, [loadNotifications]);
+
+  const unreadNotificationCount = notifications.filter(n => !n.is_read).length;
+
+  const markNotificationRead = async (n: NotificationRow) => {
+    setNotifications(ns => ns.map(x => x.id === n.id ? { ...x, is_read: true } : x));
+    await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('id', n.id);
+    setShowNotifications(false);
+    if (n.link_url) navigate(n.link_url);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -664,10 +697,12 @@ const BuyerDashboard: React.FC = () => {
               <div className="relative">
                 <button
                   className="p-2 text-gray-400 hover:text-gray-600 relative"
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={toggleNotifications}
                 >
                   <Bell className="h-6 w-6" />
-                  <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full" />
+                  {unreadNotificationCount > 0 && (
+                    <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full" />
+                  )}
                 </button>
                 {showNotifications && (
                   <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
@@ -675,14 +710,21 @@ const BuyerDashboard: React.FC = () => {
                       <h3 className="font-medium text-gray-900">Notifications</h3>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
-                      <div className="px-4 py-3 hover:bg-gray-50">
-                        <p className="text-sm font-medium text-gray-900">New proposal received</p>
-                        <p className="text-xs text-gray-500">TechForge Solutions submitted a proposal</p>
-                      </div>
-                      <div className="px-4 py-3 hover:bg-gray-50">
-                        <p className="text-sm font-medium text-gray-900">Milestone overdue</p>
-                        <p className="text-xs text-gray-500">CloudNorth MSP — Infrastructure Management</p>
-                      </div>
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-sm text-gray-400">No notifications yet</div>
+                      ) : (
+                        notifications.map(n => (
+                          <button
+                            key={n.id}
+                            onClick={() => markNotificationRead(n)}
+                            className={`w-full text-left px-4 py-3 hover:bg-gray-50 ${n.is_read ? '' : 'bg-blue-50/40'}`}
+                          >
+                            <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                            <p className="text-xs text-gray-500">{n.message}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{timeAgo(n.created_at)}</p>
+                          </button>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
@@ -690,7 +732,7 @@ const BuyerDashboard: React.FC = () => {
 
               <div className="relative">
                 <button
-                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  onClick={toggleUserDropdown}
                   className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-[#0070F3] flex items-center justify-center">
