@@ -77,17 +77,17 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 function StarRating({ rating }: { rating: number }) {
   return (
-    <span className="text-amber-400 text-sm">
+    <span className="text-amber-500 text-sm">
       {'★'.repeat(Math.floor(rating))}{'☆'.repeat(5 - Math.floor(rating))}
-      <span className="text-slate-400 text-xs ml-1">{rating.toFixed(1)}</span>
+      <span className="text-gray-400 text-xs ml-1">{rating.toFixed(1)}</span>
     </span>
   );
 }
 
 function BadgeChip({ badge }: { badge: string }) {
-  if (badge === 'green') return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-900/40 text-green-400 border border-green-700/50">Reliable</span>;
-  if (badge === 'amber') return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-900/40 text-amber-400 border border-amber-700/50">Average</span>;
-  return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-900/40 text-red-400 border border-red-700/50">Late payer</span>;
+  if (badge === 'green') return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Reliable</span>;
+  if (badge === 'amber') return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Average</span>;
+  return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Late payer</span>;
 }
 
 function exportCSV(data: Record<string, unknown>[], filename: string) {
@@ -288,51 +288,51 @@ const AdminAnalytics: React.FC = () => {
   const maxFunnelCount = funnel[0]?.count || 1;
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-blue-400" size={32} /></div>;
+    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-[#0070F3]" size={32} /></div>;
   }
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold text-white">Platform Analytics</h1>
+      <h1 className="text-2xl font-semibold text-gray-900">Platform Analytics</h1>
 
       {/* 1. GMV Dashboard */}
       <section>
-        <h2 className="text-lg font-bold text-white mb-4">GMV Dashboard</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">GMV Dashboard</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-[#0B2D59] rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-blue-300 uppercase tracking-wide">Active Contract Value</span>
-            <span className="text-4xl font-black text-white">£{stats.activeValue.toLocaleString()}</span>
-            <span className="text-xs text-blue-300">Active contracts</span>
+          <div className="bg-blue-50 rounded-xl p-5 flex flex-col gap-1 border border-blue-100">
+            <span className="text-xs font-semibold text-[#0070F3] uppercase tracking-wide">Active Contract Value</span>
+            <span className="text-4xl font-black text-[#0B2D59]">£{stats.activeValue.toLocaleString()}</span>
+            <span className="text-xs text-[#0070F3]">Active contracts</span>
           </div>
-          <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Vendors</span>
-            <span className="text-4xl font-black text-white">{stats.totalVendors}</span>
-            <span className="text-xs text-slate-500">{stats.verifiedVendors} verified</span>
+          <div className="bg-white rounded-xl p-5 flex flex-col gap-1 border border-gray-100 shadow-sm">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Vendors</span>
+            <span className="text-4xl font-black text-gray-900">{stats.totalVendors}</span>
+            <span className="text-xs text-gray-400">{stats.verifiedVendors} verified</span>
           </div>
-          <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Contracts</span>
-            <span className="text-4xl font-black text-white">{stats.totalContracts}</span>
-            <span className="text-xs text-slate-500">All time</span>
+          <div className="bg-white rounded-xl p-5 flex flex-col gap-1 border border-gray-100 shadow-sm">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Contracts</span>
+            <span className="text-4xl font-black text-gray-900">{stats.totalContracts}</span>
+            <span className="text-xs text-gray-400">All time</span>
           </div>
-          <div className="bg-slate-800 rounded-xl p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Total Enquiries</span>
-            <span className="text-4xl font-black text-white">{stats.totalEnquiries}</span>
-            <span className="text-xs text-slate-500">All time</span>
+          <div className="bg-white rounded-xl p-5 flex flex-col gap-1 border border-gray-100 shadow-sm">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Enquiries</span>
+            <span className="text-4xl font-black text-gray-900">{stats.totalEnquiries}</span>
+            <span className="text-xs text-gray-400">All time</span>
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-xl p-5">
-          <div className="text-sm font-semibold text-white mb-4">Last 6 Months — GMV &amp; Platform Fees (£)</div>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="text-sm font-semibold text-gray-800 mb-4">Last 6 Months — GMV &amp; Platform Fees (£)</div>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={gmvMonthly} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `£${(v / 1000).toFixed(0)}k`} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `£${(v / 1000).toFixed(0)}k`} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', fontSize: 12, color: '#f1f5f9' }}
+                contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: 12, color: '#111827' }}
                 formatter={(v: number, name: string) => [`£${v.toLocaleString()}`, name === 'gmv' ? 'GMV' : 'Fees']}
               />
-              <Legend formatter={v => v === 'gmv' ? 'GMV' : 'Platform Fees'} wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
+              <Legend formatter={v => v === 'gmv' ? 'GMV' : 'Platform Fees'} wrapperStyle={{ fontSize: 12, color: '#6b7280' }} />
               <Bar dataKey="gmv" stackId="a" fill="#0070F3" radius={[0, 0, 0, 0]} name="gmv" />
               <Bar dataKey="fees" stackId="a" fill="#0d9488" radius={[4, 4, 0, 0]} name="fees" />
             </BarChart>
@@ -342,20 +342,20 @@ const AdminAnalytics: React.FC = () => {
 
       {/* 2. Engagement Funnel */}
       <section>
-        <h2 className="text-lg font-bold text-white mb-1">Engagement Funnel — all time</h2>
-        <p className="text-xs text-slate-500 mb-4">Starts from signed-in buyer searches — anonymous top-of-funnel traffic (homepage visits before signup) still isn't instrumented in this build.</p>
-        <div className="bg-slate-800 rounded-xl p-6 space-y-3">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Engagement Funnel — all time</h2>
+        <p className="text-xs text-gray-400 mb-4">Starts from signed-in buyer searches — anonymous top-of-funnel traffic (homepage visits before signup) still isn't instrumented in this build.</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-3">
           {funnel.map(row => (
             <div key={row.stage} className="flex items-center gap-3">
-              <span className="text-sm text-slate-300 w-48 shrink-0">{row.stage}</span>
-              <div className="flex-1 bg-slate-700 rounded-full h-8 overflow-hidden">
+              <span className="text-sm text-gray-600 w-48 shrink-0">{row.stage}</span>
+              <div className="flex-1 bg-gray-100 rounded-full h-8 overflow-hidden">
                 <div
                   className="h-8 rounded-full bg-[#0070F3] transition-all"
                   style={{ width: `${maxFunnelCount > 0 ? Math.max(2, (row.count / maxFunnelCount) * 100) : 0}%` }}
                 />
               </div>
-              <span className="text-sm font-semibold text-white w-16 text-right">{row.count.toLocaleString()}</span>
-              <span className="text-xs text-slate-400 w-12 text-right">{maxFunnelCount > 0 ? Math.round((row.count / maxFunnelCount) * 100) : 0}%</span>
+              <span className="text-sm font-semibold text-gray-900 w-16 text-right">{row.count.toLocaleString()}</span>
+              <span className="text-xs text-gray-400 w-12 text-right">{maxFunnelCount > 0 ? Math.round((row.count / maxFunnelCount) * 100) : 0}%</span>
             </div>
           ))}
         </div>
@@ -364,17 +364,17 @@ const AdminAnalytics: React.FC = () => {
       {/* 3. Vendor Performance Table */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Vendor Performance</h2>
+          <h2 className="text-lg font-bold text-gray-900">Vendor Performance</h2>
           <button
             onClick={() => exportCSV(vendors as unknown as Record<string, unknown>[], 'vendor-performance.csv')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 border border-slate-600 rounded-lg hover:border-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-300 hover:text-gray-900 transition-colors"
           >
             <Download className="h-3.5 w-3.5" /> Export CSV
           </button>
         </div>
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/60 border-b border-slate-700">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 {[
                   { label: 'Company', key: 'company_name' },
@@ -386,30 +386,30 @@ const AdminAnalytics: React.FC = () => {
                   <th
                     key={col.key}
                     onClick={() => sortVendor(col.key as keyof VendorRow)}
-                    className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-white select-none"
+                    className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-800 select-none"
                   >
                     {col.label}
                     <SortIcon active={vendorSort.key === col.key} dir={vendorSort.dir} />
                   </th>
                 ))}
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Actions</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-gray-50">
               {sortedVendors.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500 text-sm">No vendors yet.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-gray-400 text-sm">No vendors yet.</td></tr>
               )}
               {sortedVendors.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-white">{v.company_name}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{v.projects_completed ?? 0}</td>
-                  <td className="px-5 py-3.5 text-slate-300">
+                <tr key={v.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-gray-900">{v.company_name}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{v.projects_completed ?? 0}</td>
+                  <td className="px-5 py-3.5 text-gray-600">
                     {v.projects_completed > 0 ? `${Math.round((v.dispute_outcome_count / v.projects_completed) * 100)}%` : '—'}
                   </td>
                   <td className="px-5 py-3.5"><StarRating rating={v.rating ?? 0} /></td>
-                  <td className="px-5 py-3.5 text-slate-400">{v.verified_at ? new Date(v.verified_at).toLocaleDateString('en-GB') : (v.is_verified ? 'Verified' : 'Pending')}</td>
+                  <td className="px-5 py-3.5 text-gray-500">{v.verified_at ? new Date(v.verified_at).toLocaleDateString('en-GB') : (v.is_verified ? 'Verified' : 'Pending')}</td>
                   <td className="px-5 py-3.5">
-                    <Link to={`/vendor/profile/${v.id}`} className="flex items-center gap-1 text-[#0070F3] hover:text-blue-300 text-xs font-medium">
+                    <Link to={`/vendor/profile/${v.id}`} className="flex items-center gap-1 text-[#0070F3] hover:text-blue-700 text-xs font-medium">
                       View profile <ExternalLink className="h-3 w-3" />
                     </Link>
                   </td>
@@ -423,17 +423,17 @@ const AdminAnalytics: React.FC = () => {
       {/* 4. Buyer Payment Reputation Table */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Buyer Payment Reputation</h2>
+          <h2 className="text-lg font-bold text-gray-900">Buyer Payment Reputation</h2>
           <button
             onClick={() => exportCSV(buyers as unknown as Record<string, unknown>[], 'payment-reputation.csv')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 border border-slate-600 rounded-lg hover:border-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-300 hover:text-gray-900 transition-colors"
           >
             <Download className="h-3.5 w-3.5" /> Export CSV
           </button>
         </div>
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/60 border-b border-slate-700">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 {[
                   { label: 'Buyer', key: 'company_name' },
@@ -444,29 +444,29 @@ const AdminAnalytics: React.FC = () => {
                   <th
                     key={col.key}
                     onClick={() => sortPay(col.key as keyof BuyerRow)}
-                    className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-white select-none"
+                    className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-800 select-none"
                   >
                     {col.label}
                     <SortIcon active={paySort.key === col.key} dir={paySort.dir} />
                   </th>
                 ))}
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Badge</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Badge</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-gray-50">
               {sortedBuyers.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500 text-sm">No funded milestones with due dates yet.</td></tr>
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">No funded milestones with due dates yet.</td></tr>
               )}
               {sortedBuyers.map(b => (
-                <tr key={b.id} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-white">{b.company_name}</td>
+                <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-gray-900">{b.company_name}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`font-semibold ${b.onTimeRate >= 95 ? 'text-green-400' : b.onTimeRate >= 80 ? 'text-amber-400' : 'text-red-400'}`}>
+                    <span className={`font-semibold ${b.onTimeRate >= 95 ? 'text-green-600' : b.onTimeRate >= 80 ? 'text-amber-600' : 'text-red-600'}`}>
                       {b.onTimeRate}%
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-300">{b.lateCount}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{b.disputeRatio}%</td>
+                  <td className="px-5 py-3.5 text-gray-600">{b.lateCount}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{b.disputeRatio}%</td>
                   <td className="px-5 py-3.5"><BadgeChip badge={b.badge} /></td>
                 </tr>
               ))}
@@ -478,30 +478,30 @@ const AdminAnalytics: React.FC = () => {
       {/* 5. Trust & Safety Log */}
       <section>
         <div className="flex items-center gap-2 mb-1">
-          <Ban className="h-4 w-4 text-red-400" />
-          <h2 className="text-lg font-bold text-white">Trust &amp; Safety Log</h2>
+          <Ban className="h-4 w-4 text-red-500" />
+          <h2 className="text-lg font-bold text-gray-900">Trust &amp; Safety Log</h2>
         </div>
-        <p className="text-xs text-slate-500 mb-4">Blacklist and restoration actions from <Link to="/admin/users" className="text-[#0070F3] hover:underline">User Management</Link>, most recent first.</p>
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
+        <p className="text-xs text-gray-400 mb-4">Blacklist and restoration actions from <Link to="/admin/users" className="text-[#0070F3] hover:underline">User Management</Link>, most recent first.</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/60 border-b border-slate-700">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Date</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Entity</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Event</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Reason</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Entity</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Event</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reason</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-gray-50">
               {blacklistLog.length === 0 && (
-                <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-500 text-sm">No blacklist activity yet.</td></tr>
+                <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-400 text-sm">No blacklist activity yet.</td></tr>
               )}
               {blacklistLog.map(row => (
-                <tr key={row.id} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3.5 text-slate-400">{new Date(row.timestamp).toLocaleDateString('en-GB')}</td>
-                  <td className="px-5 py-3.5 font-medium text-white">{row.entity_name}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{BLACKLIST_EVENT_LABEL[row.event_type] ?? row.event_type}</td>
-                  <td className="px-5 py-3.5 text-slate-300">{row.reason ?? '—'}</td>
+                <tr key={row.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-5 py-3.5 text-gray-500">{new Date(row.timestamp).toLocaleDateString('en-GB')}</td>
+                  <td className="px-5 py-3.5 font-medium text-gray-900">{row.entity_name}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{BLACKLIST_EVENT_LABEL[row.event_type] ?? row.event_type}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{row.reason ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -511,39 +511,39 @@ const AdminAnalytics: React.FC = () => {
 
       {/* 5b. AI Usage & Cost */}
       <section>
-        <h2 className="text-lg font-bold text-white mb-1">AI Usage &amp; Estimated Cost</h2>
-        <p className="text-xs text-slate-500 mb-4">Every anthropic-generate call, by feature. Cost is estimated from Anthropic's published per-model token pricing.</p>
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">AI Usage &amp; Estimated Cost</h2>
+        <p className="text-xs text-gray-400 mb-4">Every anthropic-generate call, by feature. Cost is estimated from Anthropic's published per-model token pricing.</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/60 border-b border-slate-700">
+            <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Feature</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Calls</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Input tokens</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Output tokens</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Est. cost</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Feature</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Calls</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Input tokens</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Output tokens</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Est. cost</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-gray-50">
               {aiUsage.length === 0 && (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500 text-sm">No AI calls logged yet.</td></tr>
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">No AI calls logged yet.</td></tr>
               )}
               {aiUsage.map(row => (
-                <tr key={row.feature} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-white">{AI_FEATURE_LABEL[row.feature] ?? row.feature}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-300">{row.calls.toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-300">{row.inputTokens.toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-300">{row.outputTokens.toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-300">${row.costUsd.toFixed(4)}</td>
+                <tr key={row.feature} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-gray-900">{AI_FEATURE_LABEL[row.feature] ?? row.feature}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-600">{row.calls.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-600">{row.inputTokens.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-600">{row.outputTokens.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-600">${row.costUsd.toFixed(4)}</td>
                 </tr>
               ))}
               {aiUsage.length > 0 && (
-                <tr className="bg-slate-900/40 font-semibold">
-                  <td className="px-5 py-3.5 text-white">Total</td>
-                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.calls, 0).toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.inputTokens, 0).toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-200">{aiUsage.reduce((s, r) => s + r.outputTokens, 0).toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-right text-slate-200">${aiUsage.reduce((s, r) => s + r.costUsd, 0).toFixed(4)}</td>
+                <tr className="bg-gray-50/60 font-semibold">
+                  <td className="px-5 py-3.5 text-gray-900">Total</td>
+                  <td className="px-5 py-3.5 text-right text-gray-800">{aiUsage.reduce((s, r) => s + r.calls, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-800">{aiUsage.reduce((s, r) => s + r.inputTokens, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-800">{aiUsage.reduce((s, r) => s + r.outputTokens, 0).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-800">${aiUsage.reduce((s, r) => s + r.costUsd, 0).toFixed(4)}</td>
                 </tr>
               )}
             </tbody>
@@ -553,17 +553,17 @@ const AdminAnalytics: React.FC = () => {
 
       {/* 6. Phase 2 Placeholders */}
       <section>
-        <h2 className="text-lg font-bold text-white mb-4">Coming in Phase 2</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Coming in Phase 2</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-xl border-2 border-dashed border-slate-600 p-8 flex flex-col items-center justify-center gap-2 opacity-60">
+          <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 flex flex-col items-center justify-center gap-2 opacity-70">
             <span className="text-2xl">🗺️</span>
-            <span className="text-sm font-semibold text-slate-400">Supply-demand heatmap — Phase 2</span>
-            <span className="text-xs text-slate-500">Geographic demand vs vendor coverage overlay</span>
+            <span className="text-sm font-semibold text-gray-500">Supply-demand heatmap — Phase 2</span>
+            <span className="text-xs text-gray-400">Geographic demand vs vendor coverage overlay</span>
           </div>
-          <div className="rounded-xl border-2 border-dashed border-slate-600 p-8 flex flex-col items-center justify-center gap-2 opacity-60">
+          <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 flex flex-col items-center justify-center gap-2 opacity-70">
             <span className="text-2xl">📍</span>
-            <span className="text-sm font-semibold text-slate-400">Geographic activity breakdown — Phase 2</span>
-            <span className="text-xs text-slate-500">Regional buyer and vendor activity by city/region</span>
+            <span className="text-sm font-semibold text-gray-500">Geographic activity breakdown — Phase 2</span>
+            <span className="text-xs text-gray-400">Regional buyer and vendor activity by city/region</span>
           </div>
         </div>
       </section>

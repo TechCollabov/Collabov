@@ -22,7 +22,7 @@ type Tab = typeof TABS[number];
 
 function SavedBadge({ show }: { show: boolean }) {
   if (!show) return null;
-  return <span className="inline-flex items-center gap-1 text-xs text-green-400"><CheckCircle className="h-3.5 w-3.5" /> Saved</span>;
+  return <span className="inline-flex items-center gap-1 text-xs text-green-600"><CheckCircle className="h-3.5 w-3.5" /> Saved</span>;
 }
 
 const AdminContent: React.FC = () => {
@@ -123,20 +123,20 @@ const AdminContent: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-blue-400" size={32} /></div>;
+    return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-[#0070F3]" size={32} /></div>;
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-white">Content Management</h1>
+      <h1 className="text-2xl font-semibold text-gray-900">Content Management</h1>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-800 rounded-xl p-1.5 w-fit">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1.5 w-fit">
         {TABS.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab ? 'bg-[#0070F3] text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === tab ? 'bg-white shadow-sm text-[#0B2D59]' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {tab}
           </button>
@@ -147,35 +147,35 @@ const AdminContent: React.FC = () => {
       {activeTab === 'Market Insight' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-white">Market Insight Strip</h2>
-            <span className="text-xs text-slate-500">Feeds the market insight panel on search results.</span>
+            <h2 className="text-base font-bold text-gray-900">Market Insight Strip</h2>
+            <span className="text-xs text-gray-400">Feeds the market insight panel on search results.</span>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {Object.keys(INSIGHT_CATEGORY_LABELS).map(cat => {
               const draft = getInsightDraft(cat);
               const isDirty = !!insightDrafts[cat];
               return (
-                <div key={cat} className="bg-slate-800 rounded-xl p-5 space-y-3">
+                <div key={cat} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-white">{INSIGHT_CATEGORY_LABELS[cat]}</h3>
+                    <h3 className="text-sm font-semibold text-gray-900">{INSIGHT_CATEGORY_LABELS[cat]}</h3>
                     <SavedBadge show={savedInsight === cat} />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Rate benchmark</label>
-                    <input className="bg-slate-700 text-white rounded-lg px-3 py-2 text-sm w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none" value={draft.rate} onChange={e => updateInsightDraft(cat, 'rate', e.target.value)} />
+                    <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Rate benchmark</label>
+                    <input className="bg-white text-gray-900 rounded-lg px-3 py-2 text-sm w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none" value={draft.rate} onChange={e => updateInsightDraft(cat, 'rate', e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Demand signal</label>
-                    <input className="bg-slate-700 text-white rounded-lg px-3 py-2 text-sm w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none" value={draft.demand} onChange={e => updateInsightDraft(cat, 'demand', e.target.value)} />
+                    <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Demand signal</label>
+                    <input className="bg-white text-gray-900 rounded-lg px-3 py-2 text-sm w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none" value={draft.demand} onChange={e => updateInsightDraft(cat, 'demand', e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Tip</label>
-                    <textarea rows={2} className="bg-slate-700 text-white rounded-lg px-3 py-2 text-sm w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none resize-none" value={draft.tip} onChange={e => updateInsightDraft(cat, 'tip', e.target.value)} />
+                    <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Tip</label>
+                    <textarea rows={2} className="bg-white text-gray-900 rounded-lg px-3 py-2 text-sm w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none resize-none" value={draft.tip} onChange={e => updateInsightDraft(cat, 'tip', e.target.value)} />
                   </div>
                   <button
                     onClick={() => saveInsight(cat)}
                     disabled={!isDirty}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDirty ? 'bg-[#0070F3] text-white hover:bg-blue-700' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDirty ? 'bg-[#0070F3] text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                   >
                     <Save className="h-3.5 w-3.5" /> Save
                   </button>
@@ -190,28 +190,28 @@ const AdminContent: React.FC = () => {
       {activeTab === 'Homepage Stats' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-white">Homepage Stats</h2>
-            <span className="text-xs text-slate-500">Feeds the 4 stat cards on the homepage.</span>
+            <h2 className="text-base font-bold text-gray-900">Homepage Stats</h2>
+            <span className="text-xs text-gray-400">Feeds the 4 stat cards on the homepage.</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             {homepageStats.map((_stat, i) => {
               const draft = getStatDraft(i);
               const isDirty = !!statDrafts[i];
               return (
-                <div key={i} className="bg-slate-800 rounded-xl p-5 space-y-3">
+                <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold block">Value</label>
+                    <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold block">Value</label>
                     <SavedBadge show={savedStat === i} />
                   </div>
                   <input
-                    className="text-2xl font-bold text-white bg-slate-700 rounded-lg px-3 py-2 w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none"
+                    className="text-2xl font-bold text-gray-900 bg-white rounded-lg px-3 py-2 w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none"
                     value={draft.value}
                     onChange={e => updateStatDraft(i, 'value', e.target.value)}
                   />
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Label</label>
+                    <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Label</label>
                     <input
-                      className="text-sm text-slate-300 bg-slate-700 rounded-lg px-3 py-2 w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none"
+                      className="text-sm text-gray-600 bg-white rounded-lg px-3 py-2 w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none"
                       value={draft.label}
                       onChange={e => updateStatDraft(i, 'label', e.target.value)}
                     />
@@ -219,7 +219,7 @@ const AdminContent: React.FC = () => {
                   <button
                     onClick={() => saveStat(i)}
                     disabled={!isDirty}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDirty ? 'bg-[#0070F3] text-white hover:bg-blue-700' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDirty ? 'bg-[#0070F3] text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                   >
                     <Save className="h-3.5 w-3.5" /> Save changes
                   </button>
@@ -234,25 +234,25 @@ const AdminContent: React.FC = () => {
       {activeTab === 'Testimonials' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-white">Testimonials</h2>
-            <span className="text-xs text-slate-500">Changes apply immediately to homepage.</span>
+            <h2 className="text-base font-bold text-gray-900">Testimonials</h2>
+            <span className="text-xs text-gray-400">Changes apply immediately to homepage.</span>
           </div>
           <div className="space-y-4">
             {testimonials.map((_t, i) => {
               const draft = getTestDraft(i);
               const isDirty = !!testDrafts[i];
               return (
-                <div key={i} className="bg-slate-800 rounded-xl p-5 space-y-3">
+                <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${draft.type === 'buyer' ? 'bg-blue-900/40 text-blue-300 border border-blue-700/40' : 'bg-green-900/40 text-green-300 border border-green-700/40'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${draft.type === 'buyer' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                       {draft.type === 'buyer' ? 'Buyer' : 'Vendor'}
                     </span>
                     <SavedBadge show={savedTest === i} />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Quote</label>
+                    <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Quote</label>
                     <textarea
-                      className="text-sm text-slate-200 bg-slate-700 rounded-lg px-3 py-2 w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none resize-none"
+                      className="text-sm text-gray-700 bg-white rounded-lg px-3 py-2 w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none resize-none"
                       rows={4}
                       value={draft.quote}
                       onChange={e => updateTestDraft(i, 'quote', e.target.value)}
@@ -260,26 +260,26 @@ const AdminContent: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Name</label>
+                      <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Name</label>
                       <input
-                        className="text-sm text-white bg-slate-700 rounded-lg px-3 py-2 w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none"
+                        className="text-sm text-gray-900 bg-white rounded-lg px-3 py-2 w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none"
                         value={draft.name}
                         onChange={e => updateTestDraft(i, 'name', e.target.value)}
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Role</label>
+                      <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Role</label>
                       <input
-                        className="text-sm text-slate-300 bg-slate-700 rounded-lg px-3 py-2 w-full border border-slate-600 focus:border-[#0070F3] focus:outline-none"
+                        className="text-sm text-gray-600 bg-white rounded-lg px-3 py-2 w-full border border-gray-200 focus:border-[#0070F3] focus:outline-none"
                         value={draft.role}
                         onChange={e => updateTestDraft(i, 'role', e.target.value)}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 uppercase tracking-wide font-semibold mb-1 block">Type</label>
+                    <label className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1 block">Type</label>
                     <select
-                      className="text-sm text-white bg-slate-700 rounded-lg px-3 py-2 border border-slate-600 focus:border-[#0070F3] focus:outline-none"
+                      className="text-sm text-gray-900 bg-white rounded-lg px-3 py-2 border border-gray-200 focus:border-[#0070F3] focus:outline-none"
                       value={draft.type}
                       onChange={e => updateTestDraft(i, 'type', e.target.value)}
                     >
@@ -290,7 +290,7 @@ const AdminContent: React.FC = () => {
                   <button
                     onClick={() => saveTest(i)}
                     disabled={!isDirty}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDirty ? 'bg-[#0070F3] text-white hover:bg-blue-700' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isDirty ? 'bg-[#0070F3] text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                   >
                     <Save className="h-3.5 w-3.5" /> Save
                   </button>
@@ -305,20 +305,20 @@ const AdminContent: React.FC = () => {
       {activeTab === 'Coming Soon Flags' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-white">Coming Soon Flags</h2>
-            <span className="text-xs text-slate-500">Changes apply immediately. No deploy required.</span>
+            <h2 className="text-base font-bold text-gray-900">Coming Soon Flags</h2>
+            <span className="text-xs text-gray-400">Changes apply immediately. No deploy required.</span>
           </div>
           <div className="space-y-3">
-            <div className="bg-slate-800 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex items-center justify-between gap-4">
               <div>
-                <div className="text-sm font-semibold text-white">Market Insight nav badge</div>
-                <div className="text-xs text-slate-400 mt-0.5">
+                <div className="text-sm font-semibold text-gray-900">Market Insight nav badge</div>
+                <div className="text-xs text-gray-400 mt-0.5">
                   Shows a "Coming Soon" badge on the Market Insight nav link. The destination page itself isn't built
                   yet, so this only controls the badge — not a live feature toggle.
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-xs font-medium ${comingSoonFlags.market_insight ? 'text-amber-400' : 'text-green-400'}`}>
+                <span className={`text-xs font-medium ${comingSoonFlags.market_insight ? 'text-amber-600' : 'text-green-600'}`}>
                   {comingSoonFlags.market_insight ? 'Coming Soon' : 'Live'}
                 </span>
                 <button
