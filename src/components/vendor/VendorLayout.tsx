@@ -84,12 +84,12 @@ const VendorLayout: React.FC = () => {
               <Menu className="h-5 w-5 text-gray-500" />
             </button>
             <div className="flex items-center gap-3 ml-auto">
-              <button className="p-1.5 text-gray-400 hover:text-gray-600">
+              <Link to="/vendor/dashboard/notifications" className="p-1.5 text-gray-400 hover:text-gray-600">
                 <Bell className="h-5 w-5" />
-              </button>
-              <button className="p-1.5 text-gray-400 hover:text-gray-600">
+              </Link>
+              <Link to="/messages" className="p-1.5 text-gray-400 hover:text-gray-600">
                 <Mail className="h-5 w-5" />
-              </button>
+              </Link>
             </div>
           </div>
         </header>
