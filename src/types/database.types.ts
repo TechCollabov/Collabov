@@ -3291,6 +3291,7 @@ export type Database = {
           blacklisted_by: string | null
           booking_method: string | null
           business_type: string | null
+          business_type_secondary: string | null
           cal_diy_url: string | null
           calendly_url: string | null
           city: string | null
@@ -3368,6 +3369,7 @@ export type Database = {
           blacklisted_by?: string | null
           booking_method?: string | null
           business_type?: string | null
+          business_type_secondary?: string | null
           cal_diy_url?: string | null
           calendly_url?: string | null
           city?: string | null
@@ -3445,6 +3447,7 @@ export type Database = {
           blacklisted_by?: string | null
           booking_method?: string | null
           business_type?: string | null
+          business_type_secondary?: string | null
           cal_diy_url?: string | null
           calendly_url?: string | null
           city?: string | null

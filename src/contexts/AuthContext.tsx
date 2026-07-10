@@ -149,6 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user_type: userData.userType,
           company_name: userData.additionalData?.companyName ?? '',
           business_type: userData.additionalData?.businessType ?? null,
+          business_type_secondary: userData.additionalData?.businessTypeSecondary ?? null,
+          contact_phone: userData.additionalData?.contactPhone ?? null,
           country: userData.additionalData?.country ?? null,
           website_url: userData.additionalData?.website ?? null,
           description: userData.additionalData?.description ?? null,

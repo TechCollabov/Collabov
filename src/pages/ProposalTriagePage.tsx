@@ -15,6 +15,7 @@ interface Proposal {
   vendor_type: string;
   verified: boolean;
   vendor_business_type: string;
+  vendor_business_type_secondary: string | null;
   country: string;
   rating: number;
   reviews: number;
@@ -80,6 +81,9 @@ const ProposalTriagePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'keep' | 'maybe' | 'declined'>('all');
   const [toast, setToast] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ id: string; vendor: string; type: string; budget: number } | null>(null);
+  const [contractTypeChoice, setContractTypeChoice] = useState<string | null>(null);
+
+  const BUSINESS_TYPE_LABEL: Record<string, string> = { msp: 'Managed IT (MSP)', agency: 'IT Agency', staffaug: 'Staff Augmentation' };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -100,7 +104,7 @@ const ProposalTriagePage: React.FC = () => {
           id, proposal_content, approach_summary, proposed_budget, proposed_timeline,
           workflow_state, proposal_kind, submitted_at, accepted_at, milestones,
           enquiry_id, job_id, vendor_id, discovery_fee, spec_structure,
-          vendors (id, company_name, business_type, rating, review_count, referral_count, is_verified, country),
+          vendors (id, company_name, business_type, business_type_secondary, rating, review_count, referral_count, is_verified, country),
           enquiries (title, budget_to),
           jobs (title, budget_amount)
         `)
@@ -135,6 +139,7 @@ const ProposalTriagePage: React.FC = () => {
           vendor_type: vendor?.is_verified ? 'Verified Vendor' : 'Vendor',
           verified: !!vendor?.is_verified,
           vendor_business_type: businessType,
+          vendor_business_type_secondary: vendor?.business_type_secondary ?? null,
           country: vendor?.country ?? '',
           rating: vendor?.rating ?? 0,
           reviews: vendor?.review_count ?? 0,
@@ -195,9 +200,10 @@ const ProposalTriagePage: React.FC = () => {
 
   /** Accept one proposal: commit-to-negotiate. All other live proposals for the
    *  same request auto-decline with notification, then the SOW wizard opens. */
-  const acceptProposal = async (id: string) => {
+  const acceptProposal = async (id: string, contractType?: string) => {
     const chosen = proposals.find(p => p.id === id);
     if (!chosen || !user) return;
+    const resolvedType = contractType || chosen.vendor_business_type;
 
     await supabase.from('proposals')
       .update({ workflow_state: 'accepted', accepted_at: new Date().toISOString() })
@@ -222,7 +228,7 @@ const ProposalTriagePage: React.FC = () => {
 
     navigate(
       `/sow-wizard?proposal=${id}&vendorId=${chosen.vendor_id}` +
-      `&vendor=${encodeURIComponent(chosen.vendor)}&type=${chosen.vendor_business_type}` +
+      `&vendor=${encodeURIComponent(chosen.vendor)}&type=${resolvedType}` +
       `&budget=${chosen.total}&project=${encodeURIComponent(chosen.job_title)}` +
       (chosen.proposal_kind === 'discovery' ? '&discovery=1' : '')
     );
@@ -340,19 +346,44 @@ const ProposalTriagePage: React.FC = () => {
               All other proposals still in Keep or Maybe for this request will be automatically declined
               (their vendors are notified). This is commit-to-negotiate — not yet a signed contract.
             </p>
+            {(() => {
+              const p = proposals.find(pr => pr.id === confirmModal.id);
+              if (!p?.vendor_business_type_secondary) return null;
+              return (
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    This vendor offers two service types — which applies to this engagement?
+                  </label>
+                  <div className="flex gap-2">
+                    {[p.vendor_business_type, p.vendor_business_type_secondary].map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setContractTypeChoice(t)}
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border-2 transition-colors ${contractTypeChoice === t ? 'border-[#0070F3] bg-blue-50 text-[#0B2D59]' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                      >
+                        {BUSINESS_TYPE_LABEL[t] ?? t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="flex gap-3">
               <button
                 onClick={() => {
                   const id = confirmModal.id;
+                  const type = contractTypeChoice;
                   setConfirmModal(null);
-                  acceptProposal(id);
+                  setContractTypeChoice(null);
+                  acceptProposal(id, type ?? undefined);
                 }}
                 className="flex-1 py-2.5 bg-[#0070F3] text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors text-sm"
               >
                 Accept & create SOW
               </button>
               <button
-                onClick={() => setConfirmModal(null)}
+                onClick={() => { setConfirmModal(null); setContractTypeChoice(null); }}
                 className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors text-sm"
               >
                 Cancel
@@ -538,7 +569,7 @@ const ProposalTriagePage: React.FC = () => {
 
                       {proposal.triage === 'keep' && proposal.status !== 'accepted' && (
                         <button
-                          onClick={() => setConfirmModal({ id: proposal.id, vendor: proposal.vendor, type: proposal.vendor_type, budget: proposal.total })}
+                          onClick={() => { setConfirmModal({ id: proposal.id, vendor: proposal.vendor, type: proposal.vendor_type, budget: proposal.total }); setContractTypeChoice(proposal.vendor_business_type); }}
                           className="px-4 py-1.5 text-sm font-semibold bg-[#0070F3] text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                           Accept one → SOW
@@ -595,6 +626,7 @@ const ProposalTriagePage: React.FC = () => {
               onClick={() => {
                 const first = keepProposals[0];
                 setConfirmModal({ id: first.id, vendor: first.vendor, type: first.vendor_type, budget: first.total });
+                setContractTypeChoice(first.vendor_business_type);
               }}
               className="bg-white text-[#0070F3] px-5 py-2 rounded-xl text-sm font-bold hover:bg-blue-50 transition-colors"
             >
