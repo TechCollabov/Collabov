@@ -89,22 +89,11 @@ const EMPTY_VENDOR: VendorRow = {
 interface CaseStudyRow {
   id?: string;
   project_title: string;
-  industry: string;
-  services_delivered: string[];
-  tech_stack: string[];
-  duration: string;
-  team_size: number | null;
-  challenge: string;
-  solution: string;
-  outcomes: string[];
-  client_quote: string;
-  ai_keyword_tags?: string[];
+  file_url: string | null;
 }
 
 const emptyCaseStudy = (): CaseStudyRow => ({
-  project_title: '', industry: '', services_delivered: [], tech_stack: [],
-  duration: '', team_size: null, challenge: '', solution: '',
-  outcomes: ['', '', ''], client_quote: '',
+  project_title: '', file_url: null,
 });
 
 interface ReferralRow {
@@ -123,31 +112,6 @@ const emptyReferral = (): ReferralRow => ({
   contact_name: '', job_title: '', company: '', work_email: '',
   project_vouched_for: '', project_duration: '', project_value_band: '',
 });
-
-const extractCaseStudyKeywords = async (caseStudy: CaseStudyRow): Promise<string[]> => {
-  try {
-    const prompt = `Extract 3-5 keyword tags from this IT project case study. Return ONLY a JSON array of strings, no other text.
-
-Project: ${caseStudy.project_title}
-Industry: ${caseStudy.industry}
-Services: ${caseStudy.services_delivered.join(', ')}
-Tech stack: ${caseStudy.tech_stack.join(', ')}
-Challenge: ${caseStudy.challenge}
-Solution: ${caseStudy.solution}
-Outcomes: ${caseStudy.outcomes.filter(Boolean).join('. ')}
-
-Return 3-5 specific keyword tags as a JSON array, e.g. ["fintech", "real-time-payments", "aws-lambda"]`;
-
-    const { data: envelope, error } = await supabase.functions.invoke('anthropic-generate', {
-      body: { prompt, maxTokens: 200, feature: 'case_study_keywords' },
-    });
-    if (error) throw error;
-    const tags = JSON.parse(envelope?.text || '[]');
-    return Array.isArray(tags) ? tags : [];
-  } catch {
-    return [];
-  }
-};
 
 /* ── Small shared field components ── */
 function TagPicker({ options, selected, onToggle, custom, onAddCustom, onRemoveCustom }: {
@@ -210,6 +174,7 @@ const ManageListings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [vendor, setVendor] = useState<VendorRow>(EMPTY_VENDOR);
   const [caseStudies, setCaseStudies] = useState<CaseStudyRow[]>([emptyCaseStudy(), emptyCaseStudy(), emptyCaseStudy()]);
+  const [caseStudyFiles, setCaseStudyFiles] = useState<(File | null)[]>([null, null, null]);
   const [referrals, setReferrals] = useState<ReferralRow[]>([emptyReferral()]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [docFiles, setDocFiles] = useState<{ companies_house: File | null; vat_certificate: File | null; address_proof: File | null }>({ companies_house: null, vat_certificate: null, address_proof: null });
@@ -248,13 +213,7 @@ const ManageListings: React.FC = () => {
     }
     if (cs && cs.length > 0) {
       const loaded = cs.slice(0, 3).map((row: any): CaseStudyRow => ({
-        id: row.id, project_title: row.project_title ?? '', industry: row.industry ?? '',
-        services_delivered: Array.isArray(row.services_delivered) ? row.services_delivered : [],
-        tech_stack: Array.isArray(row.tech_stack) ? row.tech_stack : [],
-        duration: row.duration ?? '', team_size: row.team_size ?? null,
-        challenge: row.challenge ?? '', solution: row.solution ?? '',
-        outcomes: Array.isArray(row.outcomes) && row.outcomes.length > 0 ? [...row.outcomes, '', '', ''].slice(0, 3) : ['', '', ''],
-        client_quote: row.client_quote ?? '', ai_keyword_tags: row.ai_keyword_tags ?? [],
+        id: row.id, project_title: row.project_title ?? '', file_url: row.file_url ?? null,
       }));
       while (loaded.length < 3) loaded.push(emptyCaseStudy());
       setCaseStudies(loaded);
@@ -308,8 +267,10 @@ const ManageListings: React.FC = () => {
       const uploaded = await uploadLogo();
       if (uploaded) logo_url = uploaded;
     }
+    const trimmedUrl = vendor.website_url.trim();
+    const website_url = trimmedUrl && !/^https?:\/\//i.test(trimmedUrl) ? `https://${trimmedUrl}` : trimmedUrl;
     await saveVendorFields({
-      company_name: vendor.company_name, website_url: vendor.website_url, address: vendor.address,
+      company_name: vendor.company_name, website_url, address: vendor.address,
       city: vendor.city, state: vendor.state, country: vendor.country, description: vendor.description,
       tagline: vendor.tagline, team_size_band: vendor.team_size_band, founded_year: vendor.founded_year,
       logo_url,
@@ -341,22 +302,29 @@ const ManageListings: React.FC = () => {
   const saveCaseStudy = async (idx: number) => {
     if (!user) return;
     const cs = caseStudies[idx];
-    if (!cs.project_title.trim()) { setError('Project title is required before saving a case study.'); return; }
+    const file = caseStudyFiles[idx];
+    if (!cs.project_title.trim()) { setError('A title is required before saving a case study.'); return; }
+    if (!file && !cs.file_url) { setError('Upload a file before saving a case study.'); return; }
     setSaving(`cs${idx}`);
     setError(null);
-    const keywords = await extractCaseStudyKeywords(cs);
-    const payload = {
-      vendor_id: user.id, project_title: cs.project_title, industry: cs.industry,
-      services_delivered: cs.services_delivered, tech_stack: cs.tech_stack, duration: cs.duration,
-      team_size: cs.team_size, challenge: cs.challenge, solution: cs.solution,
-      outcomes: cs.outcomes.filter(Boolean), client_quote: cs.client_quote, ai_keyword_tags: keywords,
-    };
+
+    let file_url = cs.file_url;
+    if (file) {
+      const path = `${user.id}/case-study-${idx}-${Date.now()}.${file.name.split('.').pop()}`;
+      const { error: uploadErr } = await supabase.storage.from('case-study-files').upload(path, file, { upsert: true });
+      if (uploadErr) { setSaving(null); setError(uploadErr.message); return; }
+      const { data: pub } = supabase.storage.from('case-study-files').getPublicUrl(path);
+      file_url = pub.publicUrl;
+    }
+
+    const payload = { vendor_id: user.id, project_title: cs.project_title, file_url };
     const { data, error: err } = cs.id
       ? await supabase.from('case_studies').update(payload).eq('id', cs.id).select().maybeSingle()
       : await supabase.from('case_studies').insert(payload).select().maybeSingle();
     setSaving(null);
     if (err) { setError(err.message); return; }
-    setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, id: data?.id ?? f.id, ai_keyword_tags: keywords } : f));
+    setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, id: data?.id ?? f.id, file_url } : f));
+    setCaseStudyFiles(prev => prev.map((f, i) => i === idx ? null : f));
     markSaved(`cs${idx}`);
   };
 
@@ -409,12 +377,15 @@ const ManageListings: React.FC = () => {
     }));
   };
 
+  const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
+  const descriptionWords = wordCount(vendor.description);
+  const MAX_DESCRIPTION_WORDS = 200;
+
   // Completion, computed from real loaded data (steps 1, 4, 5, 6 are mandatory per spec)
-  const step1Complete = vendor.company_name.trim().length > 0 && vendor.description.trim().length >= 100;
+  const step1Complete = vendor.company_name.trim().length > 0 && vendor.description.trim().length > 0 && descriptionWords <= MAX_DESCRIPTION_WORDS;
   const step4Complete = vendor.service_categories.length > 0;
   const step5Complete = caseStudies.some(c => !!c.id) && referrals.some(r => !!r.id);
   const step6Complete = !!existingDocs['companies_house'] && !!existingDocs['address_proof'];
-  const descriptionLen = vendor.description.length;
   const taglineLen = vendor.tagline.length;
 
   if (loading) {
@@ -468,8 +439,8 @@ const ManageListings: React.FC = () => {
                 <div className="relative">
                   <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <input type="text" value={vendor.website_url}
-                    onChange={e => { let url = e.target.value; if (url && !url.match(/^https?:\/\//)) url = `https://${url}`; setVendor(p => ({ ...p, website_url: url })); }}
-                    placeholder="e.g., https://example.com"
+                    onChange={e => setVendor(p => ({ ...p, website_url: e.target.value }))}
+                    placeholder="e.g., example.com"
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
                 </div>
               </div>
@@ -541,15 +512,20 @@ const ManageListings: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Company Description <span className="text-gray-400 font-normal">(100–1000 characters)</span></label>
-              <textarea rows={5} maxLength={1000} value={vendor.description} onChange={e => setVendor(p => ({ ...p, description: e.target.value }))}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Company Description <span className="text-gray-400 font-normal">(max 200 words)</span></label>
+              <textarea rows={5} value={vendor.description}
+                onChange={e => {
+                  const text = e.target.value;
+                  const words = text.trim().split(/\s+/).filter(Boolean);
+                  if (words.length <= MAX_DESCRIPTION_WORDS) setVendor(p => ({ ...p, description: text }));
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <p className={`text-xs mt-1 ${descriptionLen < 100 ? 'text-gray-400' : 'text-green-600'}`}>{descriptionLen}/1000 (min 100)</p>
+              <p className={`text-xs mt-1 ${descriptionWords > MAX_DESCRIPTION_WORDS ? 'text-red-600' : 'text-gray-400'}`}>{descriptionWords}/{MAX_DESCRIPTION_WORDS} words</p>
             </div>
 
             <SaveBar saving={saving === 'step1'} savedAt={savedAt.step1 ?? null} onSave={saveStep1}
-              disabled={!vendor.company_name.trim() || descriptionLen < 100}
-              disabledReason={descriptionLen < 100 ? 'Description needs at least 100 characters' : 'Company name is required'} />
+              disabled={!vendor.company_name.trim() || descriptionWords === 0 || descriptionWords > MAX_DESCRIPTION_WORDS}
+              disabledReason={descriptionWords > MAX_DESCRIPTION_WORDS ? 'Description must be 200 words or fewer' : 'Company name and description are required'} />
           </div>
         )}
 
@@ -631,7 +607,7 @@ const ManageListings: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Rate Band (£)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fixed Monthly Cost (£)</label>
                 <div className="flex gap-2">
                   <input type="number" placeholder="Min" value={vendor.monthly_rate_min ?? ''}
                     onChange={e => setVendor(p => ({ ...p, monthly_rate_min: e.target.value ? parseInt(e.target.value) : null }))}
@@ -696,67 +672,27 @@ const ManageListings: React.FC = () => {
                       {cs.id && (
                         <span className="text-xs text-green-600 flex items-center gap-1">
                           <CheckCircle className="h-3.5 w-3.5" /> Saved
-                          {cs.ai_keyword_tags && cs.ai_keyword_tags.length > 0 && <span className="ml-2 text-gray-400">· {cs.ai_keyword_tags.join(', ')}</span>}
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Project Title</label>
-                        <input type="text" value={cs.project_title} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, project_title: e.target.value } : f))}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" placeholder="e.g., Cloud Migration for NHS Trust" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Client Industry</label>
-                        <input type="text" value={cs.industry} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, industry: e.target.value } : f))}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" placeholder="e.g., Healthcare" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
-                        <input type="text" value={cs.duration} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, duration: e.target.value } : f))}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" placeholder="e.g., 4 months" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Team Size</label>
-                        <input type="number" value={cs.team_size ?? ''} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, team_size: e.target.value ? parseInt(e.target.value) : null } : f))}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                      <input type="text" value={cs.project_title} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, project_title: e.target.value } : f))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" placeholder="e.g., Cloud Migration for NHS Trust" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Services Delivered</label>
-                      <TagPicker options={SERVICE_CATEGORIES} selected={cs.services_delivered}
-                        onToggle={v => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, services_delivered: f.services_delivered.includes(v) ? f.services_delivered.filter(s => s !== v) : [...f.services_delivered, v] } : f))} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tech Stack</label>
-                      <TagPicker options={TECH_TAGS} selected={cs.tech_stack}
-                        onToggle={v => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, tech_stack: f.tech_stack.includes(v) ? f.tech_stack.filter(s => s !== v) : [...f.tech_stack, v] } : f))} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Challenge</label>
-                      <textarea rows={2} value={cs.challenge} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, challenge: e.target.value } : f))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Solution</label>
-                      <textarea rows={2} value={cs.solution} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, solution: e.target.value } : f))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">3 Measurable Outcomes</label>
-                      <div className="space-y-2">
-                        {[0, 1, 2].map(oi => (
-                          <input key={oi} type="text" value={cs.outcomes[oi] ?? ''}
-                            onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, outcomes: f.outcomes.map((o, oidx) => oidx === oi ? e.target.value : o) } : f))}
-                            placeholder={`Outcome ${oi + 1}, e.g. Reduced infrastructure costs by 35%`}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Client Quote <span className="text-gray-400 font-normal">(optional)</span></label>
-                      <input type="text" value={cs.client_quote} onChange={e => setCaseStudies(prev => prev.map((f, i) => i === idx ? { ...f, client_quote: e.target.value } : f))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Case Study File <span className="text-gray-400 font-normal">(PDF or image)</span></label>
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                        <Upload className="h-4 w-4" /> Choose file
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          onChange={e => setCaseStudyFiles(prev => prev.map((f, i) => i === idx ? (e.target.files?.[0] ?? null) : f))} />
+                      </label>
+                      {caseStudyFiles[idx] && <p className="text-xs text-gray-500 mt-2">{caseStudyFiles[idx]!.name}</p>}
+                      {cs.file_url && !caseStudyFiles[idx] && (
+                        <p className="text-sm mt-2">
+                          <a href={cs.file_url} target="_blank" rel="noopener noreferrer" className="text-[#0070F3] hover:underline">View uploaded file</a>
+                        </p>
+                      )}
                     </div>
                     <div className="flex justify-end">
                       <button type="button" onClick={() => saveCaseStudy(idx)} disabled={saving === `cs${idx}` || !cs.project_title.trim()}
