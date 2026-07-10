@@ -303,6 +303,14 @@ const ManageListings: React.FC = () => {
   const saveStep1 = async () => {
     setSaving('step1');
     setError(null);
+    if (vendor.company_name.trim()) {
+      const { data: rejected } = await supabase.rpc('check_vendor_rejected', { p_company_name: vendor.company_name.trim() });
+      if (rejected) {
+        setError('This company did not pass verification on a previous application. Contact support@collabov.com if you believe this is an error.');
+        setSaving(null);
+        return;
+      }
+    }
     let logo_url = vendor.logo_url;
     if (logoFile) {
       const uploaded = await uploadLogo();
