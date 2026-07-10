@@ -233,6 +233,7 @@ export type Database = {
           client_quote: string | null
           created_at: string | null
           duration: string | null
+          file_url: string | null
           id: string
           industry: string | null
           outcomes: Json | null
@@ -251,6 +252,7 @@ export type Database = {
           client_quote?: string | null
           created_at?: string | null
           duration?: string | null
+          file_url?: string | null
           id?: string
           industry?: string | null
           outcomes?: Json | null
@@ -269,6 +271,7 @@ export type Database = {
           client_quote?: string | null
           created_at?: string | null
           duration?: string | null
+          file_url?: string | null
           id?: string
           industry?: string | null
           outcomes?: Json | null

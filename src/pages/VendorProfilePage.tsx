@@ -321,11 +321,8 @@ interface DBReview {
 interface DBCaseStudy {
   id: string;
   vendor_id: string;
-  title: string;
-  challenge: string | null;
-  solution: string | null;
-  outcome: string | null;
-  tech_stack: string[] | null;
+  project_title: string;
+  file_url: string | null;
   created_at: string;
 }
 
@@ -666,7 +663,9 @@ function Sidebar({ vendor, onRFP }: { vendor: any; onRFP: () => void }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-20 space-y-3">
+      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fixed Monthly Cost</div>
       <div className="text-3xl font-black text-[#0B2D59]">From £{monthlyRate.toLocaleString()}/month</div>
+      <p className="text-xs text-gray-400 -mt-2">Starts from the date your agreement is signed.</p>
       <div className="text-sm text-gray-500">From £{hourlyRate}/hour</div>
       <hr className="border-gray-100" />
       {[
@@ -1114,6 +1113,7 @@ type CaseStudy = {
   services?: string[];
   outcomes?: ({ metric: string; description: string } | string)[];
   client_quote?: string | null;
+  file_url?: string | null;
 };
 
 function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
@@ -1135,6 +1135,19 @@ function CaseStudiesTab({ caseStudies }: { caseStudies: CaseStudy[] }) {
         const services = cs.services || cs.services_delivered || [];
         const rawOutcomes = cs.outcomes || (cs.outcome ? [cs.outcome] : []);
         const outcomes = rawOutcomes.map(o => typeof o === 'string' ? { metric: o, description: '' } : o);
+
+        if (cs.file_url) {
+          return (
+            <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6 flex items-center justify-between gap-4">
+              <h3 className="font-bold text-gray-800">{title}</h3>
+              <a href={cs.file_url} target="_blank" rel="noopener noreferrer"
+                className="text-[#0070F3] text-sm font-medium hover:underline flex-shrink-0">
+                View Case Study
+              </a>
+            </div>
+          );
+        }
+
         return (
           <div key={cs.id} className="bg-white rounded-xl border border-gray-100 p-6">
             <div className="flex items-start justify-between gap-4">
