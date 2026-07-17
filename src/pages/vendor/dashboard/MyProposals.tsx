@@ -55,7 +55,7 @@ const MyProposals: React.FC = () => {
         .select(`
           id, proposal_kind, proposed_budget, proposed_timeline, workflow_state,
           submitted_at, enquiry_id, job_id,
-          enquiries (title),
+          enquiries (subject),
           jobs (title)
         `)
         .eq('vendor_id', user.id)
@@ -74,7 +74,7 @@ const MyProposals: React.FC = () => {
             submitted_at: p.submitted_at,
             enquiry_id: p.enquiry_id,
             job_id: p.job_id,
-            enquiry_title: enquiry?.title ?? null,
+            enquiry_title: enquiry?.subject ?? null,
             job_title: job?.title ?? null,
           };
         });
