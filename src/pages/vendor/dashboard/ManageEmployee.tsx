@@ -35,6 +35,15 @@ const AVAILABILITY_BADGE: Record<string, { label: string; cls: string }> = {
   engaged: { label: 'Engaged', cls: 'bg-gray-200 text-gray-600' },
 };
 
+interface EngagementOption {
+  id: string;
+  project_title: string | null;
+  status: string;
+  assigned_employee_id: string | null;
+  contract_id: string | null;
+  contract_number: string | null;
+}
+
 const emptyForm = {
   name: '', job_title: '', seniority: 'Mid', core_domain: '',
   primary_skills: '', secondary_skills: '', years_experience: '', languages: 'English',
@@ -53,6 +62,8 @@ const ManageEmployee: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [assignedElsewhere, setAssignedElsewhere] = useState<Set<string>>(new Set());
+  const [engagements, setEngagements] = useState<EngagementOption[]>([]);
+  const [assigning, setAssigning] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -64,14 +75,27 @@ const ManageEmployee: React.FC = () => {
       .order('created_at', { ascending: false });
     setEmployees((data as Employee[]) ?? []);
 
-    // Delete guard: employees assigned to any active/pending engagement can't be deleted.
+    // Engagements assignable to employees; also used as the delete guard.
     const { data: engs } = await supabase
       .from('engagements')
-      .select('assigned_employee_id')
+      .select('id, project_title, status, assigned_employee_id, contract_id')
       .eq('vendor_id', user.id)
-      .in('status', ['pending_signature', 'pending_ir35', 'active', 'closing'])
-      .not('assigned_employee_id', 'is', null);
-    setAssignedElsewhere(new Set((engs ?? []).map((e: any) => e.assigned_employee_id)));
+      .in('status', ['pending_signature', 'pending_ir35', 'active', 'closing']);
+    const contractIds = (engs ?? []).map((e: any) => e.contract_id).filter(Boolean);
+    const { data: cons } = contractIds.length
+      ? await supabase.from('contracts').select('id, contract_number').in('id', contractIds)
+      : { data: [] as any[] };
+    const conMap = new Map((cons ?? []).map((c: any) => [c.id, c.contract_number]));
+    const engOptions: EngagementOption[] = (engs ?? []).map((e: any) => ({
+      id: e.id,
+      project_title: e.project_title,
+      status: e.status,
+      assigned_employee_id: e.assigned_employee_id,
+      contract_id: e.contract_id,
+      contract_number: e.contract_id ? conMap.get(e.contract_id) ?? null : null,
+    }));
+    setEngagements(engOptions);
+    setAssignedElsewhere(new Set(engOptions.filter(e => e.assigned_employee_id).map(e => e.assigned_employee_id as string)));
     setLoading(false);
   }, [user]);
 
@@ -146,6 +170,44 @@ const ManageEmployee: React.FC = () => {
     await load();
   };
 
+  const engagementLabel = (eng: EngagementOption) =>
+    eng.project_title || eng.contract_number || `Engagement ${eng.id.slice(0, 8)}`;
+
+  const assignEmployee = async (emp: Employee, engagementId: string) => {
+    const currentAssignment = engagements.find(e => e.assigned_employee_id === emp.id);
+
+    if (!engagementId) {
+      // Unassign
+      if (currentAssignment) {
+        await supabase.from('engagements').update({ assigned_employee_id: null }).eq('id', currentAssignment.id);
+        await load();
+      }
+      return;
+    }
+
+    if (currentAssignment && currentAssignment.id === engagementId) return;
+
+    const target = engagements.find(e => e.id === engagementId);
+    if (target?.assigned_employee_id && target.assigned_employee_id !== emp.id) {
+      const otherName = employees.find(e => e.id === target.assigned_employee_id)?.name ?? 'another employee';
+      const confirmed = window.confirm(
+        `${engagementLabel(target)} is already assigned to ${otherName}. Reassign it to ${emp.name}?`
+      );
+      if (!confirmed) return;
+    }
+
+    setAssigning(emp.id);
+    try {
+      if (currentAssignment) {
+        await supabase.from('engagements').update({ assigned_employee_id: null }).eq('id', currentAssignment.id);
+      }
+      await supabase.from('engagements').update({ assigned_employee_id: emp.id }).eq('id', engagementId);
+      await load();
+    } finally {
+      setAssigning(null);
+    }
+  };
+
   const filtered = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (e.job_title ?? '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -195,16 +257,18 @@ const ManageEmployee: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain / Skills</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rates</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Availability</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">No team members yet.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-400">No team members yet.</td></tr>
               )}
               {filtered.map((employee) => {
                 const badge = AVAILABILITY_BADGE[employee.availability_status] ?? AVAILABILITY_BADGE.available;
                 const guarded = assignedElsewhere.has(employee.id);
+                const currentAssignment = engagements.find(e => e.assigned_employee_id === employee.id);
                 return (
                   <tr key={employee.id}>
                     <td className="px-6 py-4">
@@ -231,6 +295,24 @@ const ManageEmployee: React.FC = () => {
                         {badge.label}{employee.availability_status === 'available_from' && employee.available_from ? ` ${employee.available_from}` : ''}
                         {employee.availability_status === 'engaged' && employee.engaged_until ? ` until ${employee.engaged_until}` : ''}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {currentAssignment ? (
+                        <div className="text-sm text-gray-900 mb-1">{engagementLabel(currentAssignment)}</div>
+                      ) : (
+                        <div className="text-sm text-gray-400 mb-1">Unassigned</div>
+                      )}
+                      <select
+                        className="w-full text-xs px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                        value={currentAssignment?.id ?? ''}
+                        disabled={assigning === employee.id}
+                        onChange={(e) => assignEmployee(employee, e.target.value)}
+                      >
+                        <option value="">Unassigned</option>
+                        {engagements.map(eng => (
+                          <option key={eng.id} value={eng.id}>{engagementLabel(eng)}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button onClick={() => openEdit(employee)} className="text-[#0070F3] hover:text-blue-700 mr-3">Edit</button>
