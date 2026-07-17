@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Search, ShieldCheck, X, Loader2 } from 'lucide-react';
+import { Search, ShieldCheck, X, Loader2, Star, MapPin, MessageSquare, Check, Minus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { logEvent, hasCompanyProfile, isBuyerBlacklisted } from '../lib/workflows';
+import { logEvent, notify, hasCompanyProfile, isBuyerBlacklisted } from '../lib/workflows';
+import { normalizeFeatureRows, FeatureRow } from '../lib/packageFeatures';
 import CompanyProfileGateModal from '../components/ui/CompanyProfileGateModal';
 
 interface PackageRow {
@@ -13,16 +14,57 @@ interface PackageRow {
   description: string | null;
   price: number;
   billing_period: string;
-  features: string[] | null;
+  featureRows: FeatureRow[];
   vendor?: {
     company_name: string;
     business_type: string | null;
     is_verified: boolean;
     logo_url: string | null;
+    rating: number | null;
+    review_count: number | null;
+    city: string | null;
+    country: string | null;
   };
 }
 
 const CATEGORIES = ['All', 'Software Development', 'Managed IT', 'Cybersecurity', 'Cloud & Infrastructure', 'DevOps', 'QA & Testing'];
+
+const AVATAR_COLOURS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500', 'bg-teal-500'];
+
+function VendorLogo({ name, url }: { name: string; url?: string | null }) {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        className="h-14 w-14 rounded-xl object-cover border border-gray-100 flex-shrink-0 bg-white"
+      />
+    );
+  }
+  const initials = name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+  const colour = AVATAR_COLOURS[(name.charCodeAt(0) || 0) % AVATAR_COLOURS.length];
+  return (
+    <div className={`h-14 w-14 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${colour}`}>
+      {initials}
+    </div>
+  );
+}
+
+function Stars({ rating }: { rating: number }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star key={i} className={`h-3.5 w-3.5 ${i <= Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-200'}`} />
+      ))}
+    </span>
+  );
+}
+
+function FeatureValueCell({ value }: { value: FeatureRow['value'] }) {
+  if (value === true) return <Check className="h-4 w-4 text-green-500 flex-shrink-0" />;
+  if (value === false) return <Minus className="h-4 w-4 text-gray-300 flex-shrink-0" />;
+  return <span className="text-sm text-gray-500 text-right">{value}</span>;
+}
 
 const PackagesPage: React.FC = () => {
   const { user } = useAuth();
@@ -40,14 +82,14 @@ const PackagesPage: React.FC = () => {
     async function load() {
       const { data } = await supabase
         .from('vendor_packages')
-        .select('id, vendor_id, name, description, price, billing_period, features, vendors(company_name, business_type, is_verified, logo_url)')
+        .select('id, vendor_id, name, description, price, billing_period, features, vendors(company_name, business_type, is_verified, logo_url, rating, review_count, city, country)')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
       if (cancelled) return;
       const rows: PackageRow[] = (data ?? [])
         .map((p: any) => ({
           ...p,
-          features: Array.isArray(p.features) ? p.features : [],
+          featureRows: normalizeFeatureRows(p.features),
           vendor: Array.isArray(p.vendors) ? p.vendors[0] : p.vendors,
         }))
         // Packages exist for Managed IT and project agencies only — never staff aug.
@@ -85,6 +127,26 @@ const PackagesPage: React.FC = () => {
     );
   };
 
+  // Reuses the same direct-message mechanism as the vendor profile's
+  // "Book a Discovery Call" flow: insert into `messages`, notify the vendor,
+  // then land the buyer on the shared /messages inbox where the thread lives.
+  const getInTouch = async (pkg: PackageRow) => {
+    if (!user) { navigate('/signin'); return; }
+    try {
+      await supabase.from('messages').insert({
+        sender_id: user.id,
+        recipient_id: pkg.vendor_id,
+        content: `Hi, I'm interested in your "${pkg.name}" package. Could you tell me more?`,
+        thread_type: 'pre_engagement',
+      });
+      await notify(pkg.vendor_id, 'message', 'New message',
+        `A buyer is interested in your "${pkg.name}" package.`, '/messages');
+    } catch (e) {
+      console.error('Could not start conversation:', e);
+    }
+    navigate('/messages');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero */}
@@ -119,42 +181,75 @@ const PackagesPage: React.FC = () => {
         ) : (
           <>
             {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filtered.map(pkg => (
-                <div key={pkg.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs bg-blue-50 text-[#0070F3] font-semibold px-2.5 py-1 rounded-full w-fit">
-                      {pkg.billing_period === 'monthly' ? 'Monthly' : 'Fixed scope'}
-                    </span>
-                    {pkg.vendor?.is_verified && (
-                      <span className="flex items-center gap-1 text-xs text-teal-600 font-medium">
-                        <ShieldCheck className="h-3.5 w-3.5" /> Verified
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-bold text-[#0B2D59] text-sm mb-1">{pkg.name}</h3>
-                  <div className="text-xs text-gray-400 mb-3">by {pkg.vendor?.company_name ?? 'Vendor'}</div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="text-2xl font-bold text-[#0070F3]">£{Number(pkg.price).toLocaleString('en-GB')}</span>
-                    <span className="text-xs text-gray-400">{pkg.billing_period === 'monthly' ? '/month' : 'fixed'}</span>
-                  </div>
-                  <ul className="space-y-1.5 mb-4 flex-1">
-                    {(pkg.features ?? []).slice(0, 4).map((i, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#0070F3] flex-shrink-0" />{String(i)}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex gap-2">
-                    <Link to={`/vendor/profile/${pkg.vendor_id}`} className="flex-1 flex items-center justify-center gap-1 py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                      Vendor
-                    </Link>
-                    <button
-                      onClick={() => setConfirming(pkg)}
-                      className="flex-[2] flex items-center justify-center gap-1 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Purchase Package <ArrowRight className="h-4 w-4" />
-                    </button>
+                <div key={pkg.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                  <div className="grid grid-cols-1 md:grid-cols-2">
+                    {/* Left half — vendor */}
+                    <div className="p-6 flex flex-col gap-3 md:border-r md:border-b-0 border-b border-gray-100">
+                      <Link to={`/vendor/profile/${pkg.vendor_id}`} className="flex items-center gap-3">
+                        <VendorLogo name={pkg.vendor?.company_name ?? pkg.name} url={pkg.vendor?.logo_url} />
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-gray-900 text-lg leading-tight truncate">{pkg.name}</h3>
+                          <div className="text-xs text-gray-400 truncate">by {pkg.vendor?.company_name ?? 'Vendor'}</div>
+                        </div>
+                      </Link>
+
+                      <div className="flex items-center gap-1.5">
+                        <Stars rating={pkg.vendor?.rating ?? 0} />
+                        <span className="text-xs text-gray-500">
+                          {(pkg.vendor?.rating ?? 0).toFixed(1)} ({pkg.vendor?.review_count ?? 0})
+                        </span>
+                      </div>
+
+                      {(pkg.vendor?.city || pkg.vendor?.country) && (
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                          {[pkg.vendor?.city, pkg.vendor?.country].filter(Boolean).join(', ')}
+                        </div>
+                      )}
+
+                      {pkg.vendor?.is_verified && (
+                        <span className="inline-flex items-center gap-1 text-xs bg-teal-50 text-teal-700 font-medium px-2.5 py-1 rounded-full w-fit">
+                          <ShieldCheck className="h-3.5 w-3.5" /> Verified
+                        </span>
+                      )}
+
+                      <button
+                        onClick={() => getInTouch(pkg)}
+                        className="mt-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 border border-[#0070F3] text-[#0070F3] text-sm font-semibold rounded-lg hover:bg-blue-50 transition-colors w-fit"
+                      >
+                        <MessageSquare className="h-4 w-4" /> Get in Touch
+                      </button>
+                    </div>
+
+                    {/* Right half — price + features */}
+                    <div className="p-6 flex flex-col">
+                      <div className="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1">Starting at</div>
+                          <div className="text-2xl font-bold text-[#0070F3]">
+                            £{Number(pkg.price).toLocaleString('en-GB')}
+                            <span className="text-sm font-normal text-gray-400 ml-1">{pkg.billing_period === 'monthly' ? '/month' : 'fixed'}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setConfirming(pkg)}
+                          className="flex-shrink-0 px-4 py-2.5 bg-accent-500 text-white text-sm font-semibold rounded-lg hover:bg-accent-600 transition-colors"
+                        >
+                          View Package
+                        </button>
+                      </div>
+
+                      <div className="flex-1">
+                        {pkg.featureRows.slice(0, 5).map((row, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
+                            <span className="text-sm text-gray-600">{row.label}</span>
+                            <FeatureValueCell value={row.value} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -189,13 +284,14 @@ const PackagesPage: React.FC = () => {
                 £{Number(confirming.price).toLocaleString('en-GB')}
                 <span className="text-sm font-normal text-gray-400 ml-1">{confirming.billing_period === 'monthly' ? '/month' : 'fixed'}</span>
               </div>
-              <ul className="space-y-1.5">
-                {(confirming.features ?? []).map((i, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#0070F3] flex-shrink-0" />{String(i)}
-                  </li>
+              <div className="space-y-1">
+                {confirming.featureRows.map((row, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-gray-600">{row.label}</span>
+                    <FeatureValueCell value={row.value} />
+                  </div>
                 ))}
-              </ul>
+              </div>
               <p className="text-xs text-gray-400">
                 Next: the Statement of Work opens pre-populated from this package. You can edit it before anything
                 is signed — no payment is taken until you fund the milestone.

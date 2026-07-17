@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Package, Pencil, Trash2, Clock, DollarSign, Check, Loader2, X } from 'lucide-react';
+import { Plus, Package, Pencil, Trash2, Clock, DollarSign, Check, Minus, Loader2, X } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
+import { normalizeFeatureRows, FeatureRow, FeatureValue } from '../../../lib/packageFeatures';
 
 const CATEGORIES = ['Cloud & Infrastructure', 'Managed IT', 'Software Development', 'Cybersecurity', 'DevOps', 'QA & Testing', 'Staff Augmentation'];
 const TECH_TAGS = ['React', 'Node.js', 'Python', '.NET', 'Java', 'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'Terraform'];
@@ -13,7 +14,7 @@ interface PackageRow {
   price: number;
   billing_period: string | null;
   delivery_days: number | null;
-  features: string[];
+  featureRows: FeatureRow[];
   tech_stack: string[];
   ideal_for: string | null;
   is_active: boolean;
@@ -26,15 +27,25 @@ interface FormState {
   price: string;
   billing_period: string;
   delivery_days: string;
-  features: string; // one per line in the textarea
+  features: FeatureRow[];
   tech_stack: string[];
   ideal_for: string;
 }
 
+const blankRow = (): FeatureRow => ({ label: '', value: true });
+
 const emptyForm = (): FormState => ({
   id: null, name: '', category: CATEGORIES[0], price: '', billing_period: 'one_time',
-  delivery_days: '', features: '', tech_stack: [], ideal_for: '',
+  delivery_days: '', features: [blankRow(), blankRow(), blankRow()], tech_stack: [], ideal_for: '',
 });
+
+type FeatureRowMode = 'included' | 'not_included' | 'custom';
+
+function modeOf(value: FeatureValue): FeatureRowMode {
+  if (value === true) return 'included';
+  if (value === false) return 'not_included';
+  return 'custom';
+}
 
 const Packages: React.FC = () => {
   const { user } = useAuth();
@@ -57,7 +68,7 @@ const Packages: React.FC = () => {
     setPackages((pkgs || []).map((p: any) => ({
       id: p.id, name: p.name, category: p.category, price: Number(p.price) || 0,
       billing_period: p.billing_period, delivery_days: p.delivery_days,
-      features: Array.isArray(p.features) ? p.features : [],
+      featureRows: normalizeFeatureRows(p.features),
       tech_stack: Array.isArray(p.tech_stack) ? p.tech_stack : [],
       ideal_for: p.ideal_for, is_active: !!p.is_active,
     })));
@@ -72,8 +83,10 @@ const Packages: React.FC = () => {
   const handleSubmit = async () => {
     if (!user) return;
     if (!form.name.trim() || !form.price) { setError('Package title and price are required.'); return; }
-    const features = form.features.split('\n').map(f => f.trim()).filter(Boolean);
-    if (features.length < 3) { setError('Add at least 3 included items (one per line).'); return; }
+    const features = form.features
+      .map(r => ({ label: r.label.trim(), value: typeof r.value === 'string' ? r.value.trim() : r.value }))
+      .filter(r => r.label.length > 0);
+    if (features.length < 3) { setError('Add at least 3 rows with a label.'); return; }
     setSaving(true);
     setError(null);
     const payload = {
@@ -102,10 +115,20 @@ const Packages: React.FC = () => {
     setForm({
       id: pkg.id, name: pkg.name, category: pkg.category || CATEGORIES[0], price: String(pkg.price),
       billing_period: pkg.billing_period || 'one_time', delivery_days: pkg.delivery_days ? String(pkg.delivery_days) : '',
-      features: pkg.features.join('\n'), tech_stack: pkg.tech_stack, ideal_for: pkg.ideal_for || '',
+      features: pkg.featureRows.length > 0 ? pkg.featureRows.map(r => ({ ...r })) : [blankRow(), blankRow(), blankRow()],
+      tech_stack: pkg.tech_stack, ideal_for: pkg.ideal_for || '',
     });
     setTab('builder');
   };
+
+  const updateRow = (idx: number, patch: Partial<FeatureRow>) => {
+    setForm(f => ({ ...f, features: f.features.map((r, i) => (i === idx ? { ...r, ...patch } : r)) }));
+  };
+  const setRowMode = (idx: number, mode: FeatureRowMode) => {
+    updateRow(idx, { value: mode === 'included' ? true : mode === 'not_included' ? false : '' });
+  };
+  const addRow = () => setForm(f => ({ ...f, features: [...f.features, blankRow()] }));
+  const removeRow = (idx: number) => setForm(f => ({ ...f, features: f.features.filter((_, i) => i !== idx) }));
 
   const handleDelete = async (id: string) => {
     if (activeEngagementPackageIds.has(id)) return; // guarded in UI too, belt-and-braces
@@ -179,9 +202,17 @@ const Packages: React.FC = () => {
                       )}
                     </div>
                     <ul className="space-y-1 mb-3">
-                      {pkg.features.map(item => (
-                        <li key={item} className="flex items-center gap-1.5 text-xs text-gray-500">
-                          <Check className="h-3.5 w-3.5 text-[#0070F3] flex-shrink-0" />{item}
+                      {pkg.featureRows.map((row, idx) => (
+                        <li key={idx} className="flex items-center justify-between gap-3 text-xs text-gray-500 max-w-sm">
+                          <span className="flex items-center gap-1.5">
+                            {row.value === false
+                              ? <Minus className="h-3.5 w-3.5 text-gray-300 flex-shrink-0" />
+                              : <Check className="h-3.5 w-3.5 text-[#0070F3] flex-shrink-0" />}
+                            {row.label}
+                          </span>
+                          {typeof row.value === 'string' && row.value && (
+                            <span className="text-gray-400">{row.value}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -247,10 +278,60 @@ const Packages: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">What's Included <span className="text-gray-400 font-normal">(min 3, one per line)</span></label>
-              <textarea value={form.features} onChange={e => setForm(f => ({ ...f, features: e.target.value }))} rows={4}
-                placeholder={'e.g.\nCurrent state review\nArchitecture recommendations\nCost optimisation report'}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                What's Included <span className="text-gray-400 font-normal">(min 3 rows)</span>
+              </label>
+              <p className="text-xs text-gray-400 mb-2">
+                Each row is a feature label plus either "Included", "Not included", or a custom value like "1 FTE".
+              </p>
+              <div className="space-y-2">
+                {form.features.map((row, idx) => {
+                  const mode = modeOf(row.value);
+                  return (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={row.label}
+                        onChange={e => updateRow(idx, { label: e.target.value })}
+                        placeholder="e.g. Team size"
+                        className="flex-1 min-w-0 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                      />
+                      <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-1 flex-shrink-0">
+                        <button type="button" onClick={() => setRowMode(idx, 'included')} title="Included"
+                          className={`p-1.5 rounded-md transition-colors ${mode === 'included' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setRowMode(idx, 'not_included')} title="Not included"
+                          className={`p-1.5 rounded-md transition-colors ${mode === 'not_included' ? 'bg-white shadow-sm text-gray-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setRowMode(idx, 'custom')} title="Custom value"
+                          className={`px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${mode === 'custom' ? 'bg-white shadow-sm text-[#0070F3]' : 'text-gray-400 hover:text-gray-600'}`}>
+                          Custom
+                        </button>
+                      </div>
+                      {mode === 'custom' && (
+                        <input
+                          type="text"
+                          value={typeof row.value === 'string' ? row.value : ''}
+                          onChange={e => updateRow(idx, { value: e.target.value })}
+                          placeholder="e.g. 1 FTE"
+                          className="w-28 flex-shrink-0 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                        />
+                      )}
+                      <button type="button" onClick={() => removeRow(idx)} disabled={form.features.length <= 1}
+                        title="Remove row"
+                        className="p-2 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={addRow}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0070F3] hover:text-blue-700">
+                <Plus className="h-3.5 w-3.5" /> Add row
+              </button>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ideal For <span className="text-gray-400 font-normal">(optional)</span></label>
