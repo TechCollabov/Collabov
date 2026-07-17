@@ -12,6 +12,7 @@ import AccountSettings from './dashboard/AccountSettings';
 import JobBoard from './dashboard/JobBoard';
 import VendorAnalytics from './dashboard/VendorAnalytics';
 import VendorPayments from './dashboard/VendorPayments';
+import MyProposals from './dashboard/MyProposals';
 
 const VendorDashboard: React.FC = () => {
   return (
@@ -28,6 +29,7 @@ const VendorDashboard: React.FC = () => {
         <Route path="jobs" element={<JobBoard />} />
         <Route path="analytics" element={<VendorAnalytics />} />
         <Route path="payments" element={<VendorPayments />} />
+        <Route path="proposals" element={<MyProposals />} />
       </Route>
     </Routes>
   );

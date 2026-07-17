@@ -3,12 +3,14 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Package, MessageSquare, Bell, Users, Settings,
   Menu, X, LogOut, Globe, ClipboardList, Mail, Briefcase,
-  CreditCard, BarChart2
+  CreditCard, BarChart2, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const VendorLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isFindOpen, setIsFindOpen] = useState(false);
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const location = useLocation();
   const { signOut } = useAuth();
 
@@ -83,6 +85,66 @@ const VendorLayout: React.FC = () => {
             <button className="lg:hidden" onClick={() => setIsSidebarOpen(true)}>
               <Menu className="h-5 w-5 text-gray-500" />
             </button>
+
+            <nav className="hidden lg:flex items-center gap-6">
+              {/* Find Dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={() => setIsFindOpen(true)}
+                onMouseLeave={() => setIsFindOpen(false)}
+              >
+                <button className="flex items-center gap-1 text-[#0B2D59] font-medium text-sm hover:text-[#0070F3] transition-colors duration-200 py-2">
+                  Find <ChevronDown className="h-4 w-4" />
+                </button>
+
+                {isFindOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
+                    <div className="px-3">
+                      <Link
+                        to="/vendor/dashboard/jobs"
+                        className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm"
+                        onClick={() => setIsFindOpen(false)}
+                      >
+                        Jobs and Tenders
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Workspace Dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={() => setIsWorkspaceOpen(true)}
+                onMouseLeave={() => setIsWorkspaceOpen(false)}
+              >
+                <button className="flex items-center gap-1 text-[#0B2D59] font-medium text-sm hover:text-[#0070F3] transition-colors duration-200 py-2">
+                  Workspace <ChevronDown className="h-4 w-4" />
+                </button>
+
+                {isWorkspaceOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
+                    <div className="px-3 space-y-1">
+                      <Link
+                        to="/vendor/dashboard/proposals"
+                        className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm"
+                        onClick={() => setIsWorkspaceOpen(false)}
+                      >
+                        Proposals
+                      </Link>
+                      <Link
+                        to="/vendor/dashboard/contracts"
+                        className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm"
+                        onClick={() => setIsWorkspaceOpen(false)}
+                      >
+                        Contracts
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </nav>
+
             <div className="flex items-center gap-3 ml-auto">
               <Link to="/vendor/dashboard/notifications" className="p-1.5 text-gray-400 hover:text-gray-600">
                 <Bell className="h-5 w-5" />
