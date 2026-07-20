@@ -20,6 +20,18 @@ type VendorDocument = {
   admin_notes?: string | null;
 };
 
+type VendorCertification = {
+  id: string;
+  vendor_id: string;
+  cert_type: string;
+  issuer: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  document_url: string | null;
+  verification_status: string;
+  admin_notes: string | null;
+};
+
 type VendorReferral = {
   id: string;
   contact_name: string;
@@ -48,6 +60,7 @@ type QueueItem = {
   monthly_rate?: number;
   referral_count?: number;
   vendor_documents?: VendorDocument[];
+  listing_submitted_at?: string | null;
   // UI-only status field (derived from is_verified / rejected_at)
   status: string;
 };
@@ -65,6 +78,7 @@ const DOC_LABELS: Record<string, string> = {
 const EXPECTED_DOC_COUNT = 3; // companies_house, address_proof, vat_certificate
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
+  draft:              { label: 'Not Submitted',        color: 'bg-gray-100 text-gray-600' },
   submitted:          { label: 'Pending Review',      color: 'bg-amber-100 text-amber-700' },
   under_review:       { label: 'Under Review',        color: 'bg-blue-100 text-blue-700' },
   changes_requested:  { label: 'Changes Requested',   color: 'bg-orange-100 text-orange-700' },
@@ -74,6 +88,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 
 const TABS = [
   { key: 'all',                label: 'All' },
+  { key: 'draft',               label: 'Not Submitted' },
   { key: 'submitted',          label: 'Pending' },
   { key: 'changes_requested', label: 'Changes Requested' },
   { key: 'approved',           label: 'Approved' },
@@ -338,10 +353,11 @@ function IR35StampQueue() {
   );
 }
 
-function deriveStatus(v: { is_verified: boolean; rejected_at?: string | null; verification_status?: string | null }): string {
+function deriveStatus(v: { is_verified: boolean; rejected_at?: string | null; verification_status?: string | null; listing_submitted_at?: string | null }): string {
   if (v.is_verified) return 'approved';
   if (v.rejected_at) return 'rejected';
   if (v.verification_status === 'changes_requested') return 'changes_requested';
+  if (!v.listing_submitted_at) return 'draft';
   return 'submitted';
 }
 
@@ -361,6 +377,10 @@ const AdminVerification: React.FC = () => {
   const [referrals, setReferrals] = useState<VendorReferral[]>([]);
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [referralStatus, setReferralStatus] = useState<Record<string, { confirmed: number; total: number }>>({});
+  const [certifications, setCertifications] = useState<VendorCertification[]>([]);
+  const [certSignedUrls, setCertSignedUrls] = useState<Record<string, string>>({});
+  const [adminCertStatus, setAdminCertStatus] = useState<Record<string, DocAdminStatus>>({});
+  const [certNotes, setCertNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -372,7 +392,7 @@ const AdminVerification: React.FC = () => {
           .select(`
             id, company_name, tagline, description, country, city,
             contact_email, monthly_rate, is_verified, created_at,
-            rejected_at, rejection_reason, verification_status, referral_count,
+            rejected_at, rejection_reason, verification_status, referral_count, listing_submitted_at,
             vendor_documents (
               id, vendor_id, document_type, document_url, verified, uploaded_at,
               verification_status, admin_notes
@@ -396,6 +416,7 @@ const AdminVerification: React.FC = () => {
           monthly_rate: v.monthly_rate,
           referral_count: v.referral_count,
           vendor_documents: v.vendor_documents || [],
+          listing_submitted_at: v.listing_submitted_at,
           status: deriveStatus(v),
         }));
         setVendors(mapped);
@@ -452,6 +473,39 @@ const AdminVerification: React.FC = () => {
     return () => { cancelled = true; };
   }, [selectedVendor?.id]);
 
+  useEffect(() => {
+    if (!selectedVendor) { setCertifications([]); setCertSignedUrls({}); return; }
+    let cancelled = false;
+    supabase
+      .from('vendor_certifications')
+      .select('*')
+      .eq('vendor_id', selectedVendor.id)
+      .order('created_at', { ascending: true })
+      .then(async ({ data }) => {
+        if (cancelled) return;
+        const certs = (data || []) as VendorCertification[];
+        setCertifications(certs);
+        const status: Record<string, DocAdminStatus> = {};
+        const notes: Record<string, string> = {};
+        certs.forEach(c => {
+          if (c.verification_status && c.verification_status !== 'submitted') status[c.id] = c.verification_status as DocAdminStatus;
+          if (c.admin_notes) notes[c.id] = c.admin_notes;
+        });
+        setAdminCertStatus(status);
+        setCertNotes(notes);
+        const urlEntries = await Promise.all(certs.map(async c => {
+          if (!c.document_url) return null;
+          const { data: signed } = await supabase.storage.from('vendor-documents').createSignedUrl(c.document_url, 3600);
+          return signed?.signedUrl ? [c.id, signed.signedUrl] as const : null;
+        }));
+        if (cancelled) return;
+        const signedMap: Record<string, string> = {};
+        urlEntries.forEach(e => { if (e) signedMap[e[0]] = e[1]; });
+        setCertSignedUrls(signedMap);
+      });
+    return () => { cancelled = true; };
+  }, [selectedVendor?.id]);
+
   const filteredQueue = vendors.filter(v =>
     activeTab === 'all' ? true : v.status === activeTab
   );
@@ -465,6 +519,18 @@ const AdminVerification: React.FC = () => {
         verification_status: status,
         admin_notes: docNotes[doc.id] || null,
       }).eq('id', doc.id);
+    }));
+  };
+
+  const persistCertDecisions = async (vendorId: string) => {
+    if (!selectedVendor || selectedVendor.id !== vendorId) return;
+    await Promise.all(certifications.map(cert => {
+      const status = adminCertStatus[cert.id];
+      if (!status) return Promise.resolve();
+      return supabase.from('vendor_certifications').update({
+        verification_status: status,
+        admin_notes: certNotes[cert.id] || null,
+      }).eq('id', cert.id);
     }));
   };
 
@@ -491,6 +557,7 @@ const AdminVerification: React.FC = () => {
         .eq('id', selectedVendor.id);
       if (error) throw error;
       await persistDocDecisions(selectedVendor.id);
+      await persistCertDecisions(selectedVendor.id);
       if (user) await auditLog(user.id, 'vendor_verify', selectedVendor.id, adminNotes);
       await notifyVendor(selectedVendor.id, 'Verification approved', 'Your company profile has been verified. You can now appear in search and receive proposals.');
       setVendors(q => q.map(v => v.id === selectedVendor.id ? { ...v, is_verified: true, rejected_at: null, rejection_reason: null, status: 'approved' } : v));
@@ -515,6 +582,7 @@ const AdminVerification: React.FC = () => {
         .eq('id', selectedVendor.id);
       if (error) throw error;
       await persistDocDecisions(selectedVendor.id);
+      await persistCertDecisions(selectedVendor.id);
       if (user) await auditLog(user.id, 'vendor_request_changes', selectedVendor.id, adminNotes);
       await notifyVendor(selectedVendor.id, 'Changes requested on your verification', adminNotes);
       setVendors(q => q.map(v => v.id === selectedVendor.id ? { ...v, status: 'changes_requested' } : v));
@@ -539,6 +607,7 @@ const AdminVerification: React.FC = () => {
         .eq('id', selectedVendor.id);
       if (error) throw error;
       await persistDocDecisions(selectedVendor.id);
+      await persistCertDecisions(selectedVendor.id);
       if (user) await auditLog(user.id, 'vendor_reject', selectedVendor.id, fullReason);
       await notifyVendor(selectedVendor.id, 'Verification application rejected', fullReason);
       setVendors(q => q.map(v => v.id === selectedVendor.id ? { ...v, is_verified: false, rejected_at: new Date().toISOString(), rejection_reason: fullReason, status: 'rejected' } : v));
@@ -751,6 +820,74 @@ const AdminVerification: React.FC = () => {
                               value={docNotes[doc.id] || ''}
                               onChange={e => setDocNotes(prev => ({ ...prev, [doc.id]: e.target.value }))}
                               placeholder="Notes on this document…"
+                              className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {/* Section 2b — Certifications */}
+              <section>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" /> Certifications
+                </h3>
+                {certifications.length === 0 ? (
+                  <p className="text-sm text-gray-400">No certifications submitted.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {certifications.map(cert => {
+                      const adminSt = adminCertStatus[cert.id] || '';
+                      return (
+                        <div key={cert.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {cert.verification_status === 'valid'
+                                ? <CheckCircle className="h-4 w-4 text-green-500" />
+                                : <AlertTriangle className="h-4 w-4 text-amber-400" />
+                              }
+                              <span className="text-sm font-medium text-gray-700">
+                                {cert.cert_type}
+                                {cert.issuer && <span className="font-normal text-gray-400"> · {cert.issuer}</span>}
+                              </span>
+                            </div>
+                            {certSignedUrls[cert.id] && (
+                              <a href={certSignedUrls[cert.id]} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-[#0070F3] font-semibold hover:underline">
+                                <Eye className="h-3.5 w-3.5" /> View Document
+                              </a>
+                            )}
+                          </div>
+                          {(cert.issue_date || cert.expiry_date) && (
+                            <p className="text-xs text-gray-400 mb-2">
+                              {cert.issue_date && <>Issued {cert.issue_date}</>}
+                              {cert.expiry_date && <> · Expires {cert.expiry_date}</>}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-4 mb-2">
+                            {(['valid', 'invalid', 'cannot_verify'] as DocAdminStatus[]).map(opt => (
+                              <label key={opt} className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-gray-600">
+                                <input
+                                  type="radio"
+                                  name={`adminCert_${cert.id}`}
+                                  value={opt}
+                                  checked={adminSt === opt}
+                                  onChange={() => setAdminCertStatus(prev => ({ ...prev, [cert.id]: opt }))}
+                                  className="accent-[#0070F3]"
+                                />
+                                {opt === 'cannot_verify' ? 'Cannot Verify' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                              </label>
+                            ))}
+                          </div>
+                          {(adminSt === 'invalid' || adminSt === 'cannot_verify') && (
+                            <textarea
+                              rows={2}
+                              value={certNotes[cert.id] || ''}
+                              onChange={e => setCertNotes(prev => ({ ...prev, [cert.id]: e.target.value }))}
+                              placeholder="Notes on this certification…"
                               className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0070F3] resize-none"
                             />
                           )}
