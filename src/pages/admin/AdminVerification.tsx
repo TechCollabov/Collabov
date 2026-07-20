@@ -60,6 +60,7 @@ type QueueItem = {
   monthly_rate?: number;
   referral_count?: number;
   vendor_documents?: VendorDocument[];
+  listing_submitted_at?: string | null;
   // UI-only status field (derived from is_verified / rejected_at)
   status: string;
 };
@@ -77,6 +78,7 @@ const DOC_LABELS: Record<string, string> = {
 const EXPECTED_DOC_COUNT = 3; // companies_house, address_proof, vat_certificate
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
+  draft:              { label: 'Not Submitted',        color: 'bg-gray-100 text-gray-600' },
   submitted:          { label: 'Pending Review',      color: 'bg-amber-100 text-amber-700' },
   under_review:       { label: 'Under Review',        color: 'bg-blue-100 text-blue-700' },
   changes_requested:  { label: 'Changes Requested',   color: 'bg-orange-100 text-orange-700' },
@@ -86,6 +88,7 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
 
 const TABS = [
   { key: 'all',                label: 'All' },
+  { key: 'draft',               label: 'Not Submitted' },
   { key: 'submitted',          label: 'Pending' },
   { key: 'changes_requested', label: 'Changes Requested' },
   { key: 'approved',           label: 'Approved' },
@@ -350,10 +353,11 @@ function IR35StampQueue() {
   );
 }
 
-function deriveStatus(v: { is_verified: boolean; rejected_at?: string | null; verification_status?: string | null }): string {
+function deriveStatus(v: { is_verified: boolean; rejected_at?: string | null; verification_status?: string | null; listing_submitted_at?: string | null }): string {
   if (v.is_verified) return 'approved';
   if (v.rejected_at) return 'rejected';
   if (v.verification_status === 'changes_requested') return 'changes_requested';
+  if (!v.listing_submitted_at) return 'draft';
   return 'submitted';
 }
 
@@ -388,7 +392,7 @@ const AdminVerification: React.FC = () => {
           .select(`
             id, company_name, tagline, description, country, city,
             contact_email, monthly_rate, is_verified, created_at,
-            rejected_at, rejection_reason, verification_status, referral_count,
+            rejected_at, rejection_reason, verification_status, referral_count, listing_submitted_at,
             vendor_documents (
               id, vendor_id, document_type, document_url, verified, uploaded_at,
               verification_status, admin_notes
@@ -412,6 +416,7 @@ const AdminVerification: React.FC = () => {
           monthly_rate: v.monthly_rate,
           referral_count: v.referral_count,
           vendor_documents: v.vendor_documents || [],
+          listing_submitted_at: v.listing_submitted_at,
           status: deriveStatus(v),
         }));
         setVendors(mapped);

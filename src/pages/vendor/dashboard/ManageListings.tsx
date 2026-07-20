@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Globe, Upload, Building2, Mail, Phone, User, Users,
-  CheckCircle, X, Loader2, Plus, Trash2, Award, AlertTriangle, ExternalLink
+  CheckCircle, X, Loader2, Plus, Trash2, Award, AlertTriangle, ExternalLink, Send
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
@@ -132,6 +132,7 @@ interface VendorRow {
   swift_code: string;
   tax_id_primary: string;
   tax_id_secondary: string;
+  listing_submitted_at: string | null;
 }
 
 const EMPTY_VENDOR: VendorRow = {
@@ -144,6 +145,7 @@ const EMPTY_VENDOR: VendorRow = {
   minimum_project_value: null, ir35_compliant: false, gdpr_ready: false, business_type: null,
   registered_name: '', account_number: '', ifsc_code: '', bank_address: '', bank_name: '', registered_email: '',
   swift_code: '', tax_id_primary: '', tax_id_secondary: '',
+  listing_submitted_at: null,
 };
 
 interface CaseStudyRow {
@@ -230,7 +232,7 @@ function SaveBar({ saving, savedAt, onSave, disabled, disabledReason }: { saving
       <button type="button" onClick={onSave} disabled={saving || disabled}
         className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-        {saving ? 'Saving...' : 'Save this step'}
+        {saving ? 'Saving...' : 'Save as Draft'}
       </button>
       {savedAt && !saving && <span className="text-xs text-green-600">Saved</span>}
       {disabled && disabledReason && <span className="text-xs text-gray-400">{disabledReason}</span>}
@@ -253,6 +255,7 @@ const ManageListings: React.FC = () => {
   const [saving, setSaving] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
+  const [submittingListing, setSubmittingListing] = useState(false);
 
   // Certifications (step 6)
   const [certifications, setCertifications] = useState<CertificationRow[]>([]);
@@ -290,6 +293,7 @@ const ManageListings: React.FC = () => {
         registered_name: v.registered_name ?? '', account_number: v.account_number ?? '', ifsc_code: v.ifsc_code ?? '',
         bank_address: v.bank_address ?? '', bank_name: v.bank_name ?? '', registered_email: v.registered_email ?? '',
         swift_code: v.swift_code ?? '', tax_id_primary: v.tax_id_primary ?? '', tax_id_secondary: v.tax_id_secondary ?? '',
+        listing_submitted_at: v.listing_submitted_at ?? null,
       });
     }
     if (cs && cs.length > 0) {
@@ -403,6 +407,17 @@ const ManageListings: React.FC = () => {
   const saveStep8 = () => saveVendorFields({
     tax_id_primary: vendor.tax_id_primary, tax_id_secondary: vendor.tax_id_secondary,
   }, 'step8');
+
+  const submitForReview = async () => {
+    if (!user) return;
+    setSubmittingListing(true);
+    setError(null);
+    const submittedAt = new Date().toISOString();
+    const { error: err } = await supabase.from('vendors').update({ listing_submitted_at: submittedAt }).eq('id', user.id);
+    setSubmittingListing(false);
+    if (err) { setError(err.message); return; }
+    setVendor(prev => ({ ...prev, listing_submitted_at: submittedAt }));
+  };
 
   const saveCaseStudy = async (idx: number) => {
     if (!user) return;
@@ -529,6 +544,7 @@ const ManageListings: React.FC = () => {
   const step4Complete = vendor.service_categories.length > 0;
   const step5Complete = caseStudies.some(c => !!c.id) && referrals.some(r => !!r.id);
   const step6Complete = !!existingDocs['companies_house'] && !!existingDocs['address_proof'];
+  const allRequiredComplete = step1Complete && step4Complete && step5Complete && step6Complete;
   const taglineLen = vendor.tagline.length;
 
   if (loading) {
@@ -1168,6 +1184,30 @@ const ManageListings: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <div className="pt-6 border-t border-gray-100">
+              <h3 className="text-lg font-semibold mb-1">Submit for Review</h3>
+              {vendor.listing_submitted_at ? (
+                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 text-green-700 text-sm rounded-lg">
+                  <CheckCircle className="h-4 w-4" />
+                  Submitted — our team will review your listing shortly.
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 mb-3">Once you're happy with your listing, submit it for our team to review before it goes live.</p>
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={submitForReview} disabled={submittingListing || !allRequiredComplete}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+                      {submittingListing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      {submittingListing ? 'Submitting...' : 'Submit for Review'}
+                    </button>
+                    {!allRequiredComplete && (
+                      <span className="text-xs text-gray-400">Complete steps 1, 4, 5 and 6 before submitting.</span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
           );
         })()}
