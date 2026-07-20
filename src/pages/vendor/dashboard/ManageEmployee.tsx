@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Plus, Search, User, X, Trash2, Loader2, AlertCircle,
+  Plus, Search, User, X, Trash2, Loader2, AlertCircle, Pencil,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
@@ -29,11 +29,10 @@ interface Employee {
 const SENIORITY = ['Junior', 'Mid', 'Senior', 'Lead', 'Principal'];
 const ENGAGEMENT_TYPES = ['Full-time', 'Part-time', 'Project-based'];
 
-const AVAILABILITY_BADGE: Record<string, { label: string; cls: string }> = {
-  available: { label: 'Available Now', cls: 'bg-green-100 text-green-700' },
-  available_from: { label: 'Available From', cls: 'bg-amber-100 text-amber-700' },
-  engaged: { label: 'Engaged', cls: 'bg-gray-200 text-gray-600' },
-};
+// Availability is now a simple binary toggle. Anything that isn't exactly
+// 'available' (including legacy 'available_from' rows) reads as unavailable,
+// and we write 'engaged' as the "off" position going forward.
+const isAvailable = (status: string) => status === 'available';
 
 interface EngagementOption {
   id: string;
@@ -48,7 +47,7 @@ const emptyForm = {
   name: '', job_title: '', seniority: 'Mid', core_domain: '',
   primary_skills: '', secondary_skills: '', years_experience: '', languages: 'English',
   hourly_rate: '', monthly_rate: '', engagement_type: 'Full-time',
-  availability_status: 'available', available_from: '', engaged_until: '',
+  availability_status: 'available',
 };
 
 const ManageEmployee: React.FC = () => {
@@ -64,6 +63,10 @@ const ManageEmployee: React.FC = () => {
   const [assignedElsewhere, setAssignedElsewhere] = useState<Set<string>>(new Set());
   const [engagements, setEngagements] = useState<EngagementOption[]>([]);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [assignModalFor, setAssignModalFor] = useState<Employee | null>(null);
+  const [assignTab, setAssignTab] = useState<'contract' | 'project'>('contract');
+  const [assignSearch, setAssignSearch] = useState('');
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -114,8 +117,6 @@ const ManageEmployee: React.FC = () => {
       monthly_rate: emp.monthly_rate != null ? String(emp.monthly_rate) : '',
       engagement_type: emp.engagement_type ?? 'Full-time',
       availability_status: emp.availability_status,
-      available_from: emp.available_from ?? '',
-      engaged_until: emp.engaged_until ?? '',
     });
     setError('');
     setShowModal(true);
@@ -143,8 +144,6 @@ const ManageEmployee: React.FC = () => {
         monthly_rate: form.monthly_rate ? Number(form.monthly_rate) : null,
         engagement_type: form.engagement_type,
         availability_status: form.availability_status,
-        available_from: form.availability_status === 'available_from' ? (form.available_from || null) : null,
-        engaged_until: form.availability_status === 'engaged' ? (form.engaged_until || null) : null,
         is_active: true,
       };
       if (editing) {
@@ -208,12 +207,50 @@ const ManageEmployee: React.FC = () => {
     }
   };
 
+  const toggleAvailability = async (emp: Employee) => {
+    const next = isAvailable(emp.availability_status) ? 'engaged' : 'available';
+    setTogglingId(emp.id);
+    setEmployees(prev => prev.map(e => (e.id === emp.id ? { ...e, availability_status: next } : e)));
+    try {
+      const { error: err } = await supabase.from('vendor_employees').update({ availability_status: next }).eq('id', emp.id);
+      if (err) {
+        // Revert on failure
+        setEmployees(prev => prev.map(e => (e.id === emp.id ? { ...e, availability_status: emp.availability_status } : e)));
+      }
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const openAssignModal = (emp: Employee) => {
+    setAssignModalFor(emp);
+    setAssignTab('contract');
+    setAssignSearch('');
+  };
+
+  const filteredAssignOptions = useMemo(() => {
+    if (assignTab === 'contract') {
+      return engagements.filter(e => !!e.contract_id);
+    }
+    const q = assignSearch.trim().toLowerCase();
+    if (!q) return engagements;
+    return engagements.filter(e =>
+      (e.project_title ?? '').toLowerCase().includes(q) || e.id.toLowerCase().includes(q)
+    );
+  }, [engagements, assignTab, assignSearch]);
+
+  const handlePickEngagement = async (engagementId: string) => {
+    if (!assignModalFor) return;
+    await assignEmployee(assignModalFor, engagementId);
+    setAssignModalFor(null);
+  };
+
   const filtered = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (e.job_title ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const availableCount = employees.filter(e => e.availability_status !== 'engaged').length;
+  const availableCount = employees.filter(e => isAvailable(e.availability_status)).length;
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 text-[#0070F3] animate-spin" /></div>;
 
@@ -266,7 +303,7 @@ const ManageEmployee: React.FC = () => {
                 <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-400">No team members yet.</td></tr>
               )}
               {filtered.map((employee) => {
-                const badge = AVAILABILITY_BADGE[employee.availability_status] ?? AVAILABILITY_BADGE.available;
+                const available = isAvailable(employee.availability_status);
                 const guarded = assignedElsewhere.has(employee.id);
                 const currentAssignment = engagements.find(e => e.assigned_employee_id === employee.id);
                 return (
@@ -291,28 +328,61 @@ const ManageEmployee: React.FC = () => {
                       <div className="text-sm text-gray-500">{employee.monthly_rate ? `£${employee.monthly_rate}/mo` : ''}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${badge.cls}`}>
-                        {badge.label}{employee.availability_status === 'available_from' && employee.available_from ? ` ${employee.available_from}` : ''}
-                        {employee.availability_status === 'engaged' && employee.engaged_until ? ` until ${employee.engaged_until}` : ''}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={available}
+                          disabled={togglingId === employee.id}
+                          onClick={() => toggleAvailability(employee)}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${available ? 'bg-green-500' : 'bg-gray-300'}`}
+                        >
+                          <span
+                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${available ? 'translate-x-4' : 'translate-x-1'}`}
+                          />
+                        </button>
+                        <span className={`text-xs font-medium ${available ? 'text-green-700' : 'text-gray-500'}`}>
+                          {available ? 'Available' : 'Unavailable'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {currentAssignment ? (
-                        <div className="text-sm text-gray-900 mb-1">{engagementLabel(currentAssignment)}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-900">{engagementLabel(currentAssignment)}</span>
+                          <button
+                            type="button"
+                            title="Change assignment"
+                            disabled={assigning === employee.id}
+                            onClick={() => openAssignModal(employee)}
+                            className="text-gray-400 hover:text-[#0070F3] disabled:opacity-50"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Unassign"
+                            disabled={assigning === employee.id}
+                            onClick={() => assignEmployee(employee, '')}
+                            className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       ) : (
-                        <div className="text-sm text-gray-400 mb-1">Unassigned</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-400">Unassigned</span>
+                          <button
+                            type="button"
+                            title="Assign to engagement"
+                            disabled={assigning === employee.id}
+                            onClick={() => openAssignModal(employee)}
+                            className="inline-flex items-center justify-center h-6 w-6 rounded-full border border-gray-300 text-gray-500 hover:border-[#0070F3] hover:text-[#0070F3] disabled:opacity-50"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )}
-                      <select
-                        className="w-full text-xs px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
-                        value={currentAssignment?.id ?? ''}
-                        disabled={assigning === employee.id}
-                        onChange={(e) => assignEmployee(employee, e.target.value)}
-                      >
-                        <option value="">Unassigned</option>
-                        {engagements.map(eng => (
-                          <option key={eng.id} value={eng.id}>{engagementLabel(eng)}</option>
-                        ))}
-                      </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button onClick={() => openEdit(employee)} className="text-[#0070F3] hover:text-blue-700 mr-3">Edit</button>
@@ -418,23 +488,22 @@ const ManageEmployee: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Availability</label>
-                  <div className="flex gap-2 mb-2">
-                    {([['available', 'Available Now'], ['available_from', 'Available From'], ['engaged', 'Engaged Until']] as const).map(([val, label]) => (
-                      <button key={val} type="button"
-                        onClick={() => setForm(f => ({ ...f, availability_status: val }))}
-                        className={`flex-1 px-3 py-2 rounded-lg border text-xs font-medium ${form.availability_status === val ? 'border-[#0070F3] bg-blue-50 text-[#0070F3]' : 'border-gray-200 text-gray-600'}`}>
-                        {label}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={form.availability_status === 'available'}
+                      onClick={() => setForm(f => ({ ...f, availability_status: f.availability_status === 'available' ? 'engaged' : 'available' }))}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${form.availability_status === 'available' ? 'bg-green-500' : 'bg-gray-300'}`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${form.availability_status === 'available' ? 'translate-x-4' : 'translate-x-1'}`}
+                      />
+                    </button>
+                    <span className={`text-xs font-medium ${form.availability_status === 'available' ? 'text-green-700' : 'text-gray-500'}`}>
+                      {form.availability_status === 'available' ? 'Available' : 'Unavailable'}
+                    </span>
                   </div>
-                  {form.availability_status === 'available_from' && (
-                    <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={form.available_from}
-                      onChange={e => setForm(f => ({ ...f, available_from: e.target.value }))} />
-                  )}
-                  {form.availability_status === 'engaged' && (
-                    <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={form.engaged_until}
-                      onChange={e => setForm(f => ({ ...f, engaged_until: e.target.value }))} />
-                  )}
                 </div>
 
                 {error && <p className="text-sm text-red-600">{error}</p>}
@@ -447,6 +516,80 @@ const ManageEmployee: React.FC = () => {
                     {editing ? 'Save Changes' : 'Add Employee'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {assignModalFor && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <motion.div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Assign {assignModalFor.name}</h3>
+                <button className="text-gray-400 hover:text-gray-600" onClick={() => setAssignModalFor(null)}><X className="h-6 w-6" /></button>
+              </div>
+
+              <div className="flex border-b border-gray-200 mb-4">
+                <button
+                  type="button"
+                  onClick={() => { setAssignTab('contract'); setAssignSearch(''); }}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${assignTab === 'contract' ? 'border-[#0070F3] text-[#0070F3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                  By Contract
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAssignTab('project'); setAssignSearch(''); }}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${assignTab === 'project' ? 'border-[#0070F3] text-[#0070F3]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                  By Project Name/ID
+                </button>
+              </div>
+
+              {assignTab === 'project' && (
+                <div className="relative mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search by project name or engagement ID..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+                    value={assignSearch}
+                    onChange={(e) => setAssignSearch(e.target.value)}
+                  />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                </div>
+              )}
+
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => handlePickEngagement('')}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200 hover:border-[#0070F3] text-left"
+                >
+                  <span className="text-sm text-gray-500">Unassigned</span>
+                </button>
+                {filteredAssignOptions.length === 0 && (
+                  <p className="text-sm text-gray-400 px-3 py-4 text-center">No matching engagements.</p>
+                )}
+                {filteredAssignOptions.map(eng => (
+                  <button
+                    key={eng.id}
+                    type="button"
+                    onClick={() => handlePickEngagement(eng.id)}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-gray-200 hover:border-[#0070F3] text-left"
+                  >
+                    <div>
+                      <div className="text-sm text-gray-900">{engagementLabel(eng)}</div>
+                      <div className="text-xs text-gray-400">
+                        {eng.contract_number ? `Contract ${eng.contract_number}` : `ID ${eng.id.slice(0, 8)}`}
+                      </div>
+                    </div>
+                    {eng.assigned_employee_id && eng.assigned_employee_id !== assignModalFor.id && (
+                      <span className="text-xs text-amber-600 flex-shrink-0">Assigned</span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
           </motion.div>
