@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Globe, Upload, Building2, Mail, Phone, User, Users,
-  CheckCircle, X, Loader2, Plus, Trash2
+  CheckCircle, X, Loader2, Plus, Trash2, Award, AlertTriangle, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
@@ -37,7 +37,63 @@ const STEPS = [
   { n: 5, label: 'Case Studies & Referrals' },
   { n: 6, label: 'Verification Docs' },
   { n: 7, label: 'Bank Details' },
+  { n: 8, label: 'Tax & Compliance' },
 ];
+
+const COMMON_CERT_TYPES = [
+  'Microsoft Certified Partner', 'AWS Partner', 'Google Cloud Partner',
+  'SOC 2', 'ISO 27001', 'ISO 9001', 'Cyber Essentials', 'Other',
+];
+
+const CERT_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  submitted:      { label: 'Pending Review', color: 'bg-amber-100 text-amber-700' },
+  valid:          { label: 'Valid',          color: 'bg-green-100 text-green-700' },
+  invalid:        { label: 'Invalid',        color: 'bg-red-100 text-red-700' },
+  cannot_verify:  { label: 'Cannot Verify',  color: 'bg-gray-100 text-gray-600' },
+};
+
+/* ── Country-aware field labels ── */
+function getBankFieldLabels(country: string) {
+  if (country === 'United Kingdom') {
+    return { sortLabel: 'Sort Code', sortHint: 'e.g. 12-34-56', accountLabel: 'Account Number (8 digits)' };
+  }
+  if (country === 'United States') {
+    return { sortLabel: 'Routing Number', sortHint: '9-digit ABA routing number', accountLabel: 'Account Number' };
+  }
+  if (country === 'India') {
+    return { sortLabel: 'IFSC Code', sortHint: 'e.g. HDFC0001234', accountLabel: 'Account Number' };
+  }
+  return { sortLabel: 'Sort Code / IFSC / Routing Number', sortHint: '', accountLabel: 'Account Number' };
+}
+
+function getTaxFieldLabels(country: string) {
+  if (country === 'United Kingdom') {
+    return { primaryLabel: 'VAT Number', secondaryLabel: 'UTR (Unique Taxpayer Reference)', showSecondary: true };
+  }
+  if (country === 'United States') {
+    return { primaryLabel: 'EIN (Employer Identification Number)', secondaryLabel: '', showSecondary: false };
+  }
+  if (country === 'India') {
+    return { primaryLabel: 'PAN Number', secondaryLabel: 'GST Number', showSecondary: true };
+  }
+  return { primaryLabel: 'Tax ID', secondaryLabel: 'Additional Tax Reference (optional)', showSecondary: true };
+}
+
+// Required compliance documents by country. vat_certificate is already
+// collected in Step 6 (Verification Docs) for UK vendors, so it's not
+// duplicated here.
+function getComplianceDocs(country: string): { key: 'w9_form' | 'pan' | 'gst'; label: string; hint: string }[] {
+  if (country === 'United States') {
+    return [{ key: 'w9_form', label: 'IRS Form W-9', hint: 'Request for Taxpayer Identification Number and Certification' }];
+  }
+  if (country === 'India') {
+    return [
+      { key: 'pan', label: 'PAN Card', hint: 'Permanent Account Number document' },
+      { key: 'gst', label: 'GST Registration Certificate', hint: 'GST registration document' },
+    ];
+  }
+  return [];
+}
 
 /* ── Types matching the real vendors/case_studies/vendor_referrals columns ── */
 interface VendorRow {
@@ -73,6 +129,9 @@ interface VendorRow {
   bank_address: string;
   bank_name: string;
   registered_email: string;
+  swift_code: string;
+  tax_id_primary: string;
+  tax_id_secondary: string;
 }
 
 const EMPTY_VENDOR: VendorRow = {
@@ -84,6 +143,7 @@ const EMPTY_VENDOR: VendorRow = {
   hourly_rate_min: null, hourly_rate_max: null, monthly_rate_min: null, monthly_rate_max: null,
   minimum_project_value: null, ir35_compliant: false, gdpr_ready: false, business_type: null,
   registered_name: '', account_number: '', ifsc_code: '', bank_address: '', bank_name: '', registered_email: '',
+  swift_code: '', tax_id_primary: '', tax_id_secondary: '',
 };
 
 interface CaseStudyRow {
@@ -112,6 +172,17 @@ const emptyReferral = (): ReferralRow => ({
   contact_name: '', job_title: '', company: '', work_email: '',
   project_vouched_for: '', project_duration: '', project_value_band: '',
 });
+
+interface CertificationRow {
+  id: string;
+  cert_type: string;
+  issuer: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  document_url: string | null;
+  verification_status: string;
+  admin_notes: string | null;
+}
 
 /* ── Small shared field components ── */
 function TagPicker({ options, selected, onToggle, custom, onAddCustom, onRemoveCustom }: {
@@ -177,20 +248,29 @@ const ManageListings: React.FC = () => {
   const [caseStudyFiles, setCaseStudyFiles] = useState<(File | null)[]>([null, null, null]);
   const [referrals, setReferrals] = useState<ReferralRow[]>([emptyReferral()]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [docFiles, setDocFiles] = useState<{ companies_house: File | null; vat_certificate: File | null; address_proof: File | null }>({ companies_house: null, vat_certificate: null, address_proof: null });
+  const [docFiles, setDocFiles] = useState<Record<string, File | null>>({ companies_house: null, vat_certificate: null, address_proof: null, w9_form: null, pan: null, gst: null });
   const [existingDocs, setExistingDocs] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
 
+  // Certifications (step 6)
+  const [certifications, setCertifications] = useState<CertificationRow[]>([]);
+  const [certSignedUrls, setCertSignedUrls] = useState<Record<string, string>>({});
+  const [showAddCert, setShowAddCert] = useState(false);
+  const [certForm, setCertForm] = useState({ cert_type: COMMON_CERT_TYPES[0], custom_type: '', issuer: '', issue_date: '', expiry_date: '' });
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certSaving, setCertSaving] = useState(false);
+
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [{ data: v }, { data: cs }, { data: refs }, { data: docs }] = await Promise.all([
+    const [{ data: v }, { data: cs }, { data: refs }, { data: docs }, { data: certs }] = await Promise.all([
       supabase.from('vendors').select('*').eq('id', user.id).maybeSingle(),
       supabase.from('case_studies').select('*').eq('vendor_id', user.id).order('created_at', { ascending: true }),
       supabase.from('vendor_referrals').select('*').eq('vendor_id', user.id).order('created_at', { ascending: true }),
       supabase.from('vendor_documents').select('document_type, document_url').eq('vendor_id', user.id),
+      supabase.from('vendor_certifications').select('*').eq('vendor_id', user.id).order('created_at', { ascending: true }),
     ]);
     if (v) {
       setVendor({
@@ -209,6 +289,7 @@ const ManageListings: React.FC = () => {
         ir35_compliant: !!v.ir35_compliant, gdpr_ready: !!v.gdpr_ready, business_type: v.business_type ?? null,
         registered_name: v.registered_name ?? '', account_number: v.account_number ?? '', ifsc_code: v.ifsc_code ?? '',
         bank_address: v.bank_address ?? '', bank_name: v.bank_name ?? '', registered_email: v.registered_email ?? '',
+        swift_code: v.swift_code ?? '', tax_id_primary: v.tax_id_primary ?? '', tax_id_secondary: v.tax_id_secondary ?? '',
       });
     }
     if (cs && cs.length > 0) {
@@ -230,6 +311,17 @@ const ManageListings: React.FC = () => {
       const map: Record<string, string> = {};
       docs.forEach((d: any) => { map[d.document_type] = d.document_url; });
       setExistingDocs(map);
+    }
+    if (certs) {
+      setCertifications(certs as CertificationRow[]);
+      const urlEntries = await Promise.all(certs.map(async (c: any) => {
+        if (!c.document_url) return null;
+        const { data: signed } = await supabase.storage.from('vendor-documents').createSignedUrl(c.document_url, 3600);
+        return signed?.signedUrl ? [c.id, signed.signedUrl] as const : null;
+      }));
+      const signedMap: Record<string, string> = {};
+      urlEntries.forEach(e => { if (e) signedMap[e[0]] = e[1]; });
+      setCertSignedUrls(signedMap);
     }
     setLoading(false);
   }, [user]);
@@ -305,7 +397,12 @@ const ManageListings: React.FC = () => {
   const saveStep7 = () => saveVendorFields({
     registered_name: vendor.registered_name, account_number: vendor.account_number, ifsc_code: vendor.ifsc_code,
     bank_address: vendor.bank_address, bank_name: vendor.bank_name, registered_email: vendor.registered_email,
+    swift_code: vendor.swift_code,
   }, 'step7');
+
+  const saveStep8 = () => saveVendorFields({
+    tax_id_primary: vendor.tax_id_primary, tax_id_secondary: vendor.tax_id_secondary,
+  }, 'step8');
 
   const saveCaseStudy = async (idx: number) => {
     if (!user) return;
@@ -359,7 +456,7 @@ const ManageListings: React.FC = () => {
     markSaved(`ref${idx}`);
   };
 
-  const uploadDoc = async (type: 'companies_house' | 'vat_certificate' | 'address_proof') => {
+  const uploadDoc = async (type: 'companies_house' | 'vat_certificate' | 'address_proof' | 'w9_form' | 'pan' | 'gst') => {
     const file = docFiles[type];
     if (!file || !user) return;
     setSaving(`doc_${type}`);
@@ -376,6 +473,44 @@ const ManageListings: React.FC = () => {
     setExistingDocs(prev => ({ ...prev, [type]: path }));
     setDocFiles(prev => ({ ...prev, [type]: null }));
     markSaved(`doc_${type}`);
+  };
+
+  const addCertification = async () => {
+    if (!user) return;
+    const cert_type = certForm.cert_type === 'Other' ? certForm.custom_type.trim() : certForm.cert_type;
+    if (!cert_type) { setError('Select or enter a certification type.'); return; }
+    if (!certFile) { setError('Upload a document before adding a certification.'); return; }
+    setCertSaving(true);
+    setError(null);
+    const path = `${user.id}/cert-${Date.now()}.${certFile.name.split('.').pop()}`;
+    const { error: uploadErr } = await supabase.storage.from('vendor-documents').upload(path, certFile);
+    if (uploadErr) { setCertSaving(false); setError(uploadErr.message); return; }
+    const { data, error: dbErr } = await supabase.from('vendor_certifications').insert({
+      vendor_id: user.id,
+      cert_type,
+      issuer: certForm.issuer || null,
+      issue_date: certForm.issue_date || null,
+      expiry_date: certForm.expiry_date || null,
+      document_url: path,
+      verification_status: 'submitted',
+    }).select().maybeSingle();
+    setCertSaving(false);
+    if (dbErr) { setError(dbErr.message); return; }
+    if (data) {
+      setCertifications(prev => [...prev, data as CertificationRow]);
+      const { data: signed } = await supabase.storage.from('vendor-documents').createSignedUrl(path, 3600);
+      if (signed?.signedUrl) setCertSignedUrls(prev => ({ ...prev, [(data as CertificationRow).id]: signed.signedUrl }));
+    }
+    setCertForm({ cert_type: COMMON_CERT_TYPES[0], custom_type: '', issuer: '', issue_date: '', expiry_date: '' });
+    setCertFile(null);
+    setShowAddCert(false);
+  };
+
+  const deleteCertification = async (id: string) => {
+    setError(null);
+    const { error: err } = await supabase.from('vendor_certifications').delete().eq('id', id);
+    if (err) { setError(err.message); return; }
+    setCertifications(prev => prev.filter(c => c.id !== id));
   };
 
   const toggleArrayField = (field: 'industry_focus' | 'operating_locations' | 'service_categories' | 'tech_stack', value: string) => {
@@ -404,7 +539,7 @@ const ManageListings: React.FC = () => {
     <div className="p-6 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">My Listing</h1>
-        <p className="text-gray-600 mt-1 text-sm">7 steps, any order — each saves independently. Steps 1, 4, 5 and 6 are required before your profile can go live.</p>
+        <p className="text-gray-600 mt-1 text-sm">8 steps, any order — each saves independently. Steps 1, 4, 5 and 6 are required before your profile can go live.</p>
       </div>
 
       {/* Step tracker — clickable, any order */}
@@ -830,11 +965,110 @@ const ManageListings: React.FC = () => {
                 </div>
               ))}
             </div>
+
+            {/* Certifications */}
+            <div className="pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-semibold flex items-center gap-2"><Award className="h-5 w-5 text-gray-400" /> Certifications</h3>
+                <button type="button" onClick={() => setShowAddCert(s => !s)}
+                  className="inline-flex items-center gap-2 text-sm text-[#0070F3] font-medium hover:underline">
+                  <Plus className="h-4 w-4" /> Add Certification
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">Microsoft Certified Partner, SOC 2, ISO 27001, or any other certification — each is reviewed independently.</p>
+
+              {showAddCert && (
+                <div className="border border-gray-200 rounded-xl p-5 space-y-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Certification Type</label>
+                      <select value={certForm.cert_type} onChange={e => setCertForm(p => ({ ...p, cert_type: e.target.value }))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        {COMMON_CERT_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      {certForm.cert_type === 'Other' && (
+                        <input type="text" value={certForm.custom_type} onChange={e => setCertForm(p => ({ ...p, custom_type: e.target.value }))}
+                          placeholder="Enter certification name" className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Issuer</label>
+                      <input type="text" value={certForm.issuer} onChange={e => setCertForm(p => ({ ...p, issuer: e.target.value }))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+                      <input type="date" value={certForm.issue_date} onChange={e => setCertForm(p => ({ ...p, issue_date: e.target.value }))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                      <input type="date" value={certForm.expiry_date} onChange={e => setCertForm(p => ({ ...p, expiry_date: e.target.value }))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Certificate Document</label>
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                      <Upload className="h-4 w-4" /> Choose file
+                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setCertFile(e.target.files?.[0] ?? null)} />
+                    </label>
+                    {certFile && <p className="text-xs text-gray-500 mt-2">{certFile.name}</p>}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowAddCert(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                    <button type="button" onClick={addCertification} disabled={certSaving}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#0070F3] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+                      {certSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Save Certification
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {certifications.length === 0 ? (
+                <p className="text-sm text-gray-400">No certifications added yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {certifications.map(c => {
+                    const status = CERT_STATUS_MAP[c.verification_status] || CERT_STATUS_MAP.submitted;
+                    return (
+                      <div key={c.id} className="border border-gray-200 rounded-xl p-4 flex items-start justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-800">{c.cert_type}</span>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {c.issuer && <>Issuer: {c.issuer} · </>}
+                            {c.issue_date && <>Issued {c.issue_date}</>}
+                            {c.expiry_date && <> · Expires {c.expiry_date}</>}
+                          </p>
+                          {c.admin_notes && (c.verification_status === 'invalid' || c.verification_status === 'cannot_verify') && (
+                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {c.admin_notes}</p>
+                          )}
+                          {certSignedUrls[c.id] && (
+                            <a href={certSignedUrls[c.id]} target="_blank" rel="noopener noreferrer" className="text-xs text-[#0070F3] hover:underline inline-flex items-center gap-1 mt-1">
+                              View document <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => deleteCertification(c.id)} className="text-gray-400 hover:text-red-500 flex-shrink-0">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* Step 7 — Bank Details (reference only — real payouts run through Stripe Connect) */}
-        {currentStep === 7 && (
+        {currentStep === 7 && (() => {
+          const { sortLabel, sortHint, accountLabel } = getBankFieldLabels(vendor.country);
+          return (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold">Bank Details</h2>
             <p className="text-xs text-gray-400 -mt-4">Reference only — actual payouts run through Stripe Connect in Account Settings.</p>
@@ -845,19 +1079,26 @@ const ManageListings: React.FC = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Number</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{accountLabel}</label>
                 <input type="text" value={vendor.account_number} onChange={e => setVendor(p => ({ ...p, account_number: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Sort Code / IFSC</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{sortLabel}</label>
                 <input type="text" value={vendor.ifsc_code} onChange={e => setVendor(p => ({ ...p, ifsc_code: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                {sortHint && <p className="text-xs text-gray-400 mt-1">{sortHint}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
                 <input type="text" value={vendor.bank_name} onChange={e => setVendor(p => ({ ...p, bank_name: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">SWIFT / BIC Code <span className="text-gray-400 font-normal">(optional)</span></label>
+                <input type="text" value={vendor.swift_code} onChange={e => setVendor(p => ({ ...p, swift_code: e.target.value }))}
+                  placeholder="e.g. HDFCINBB" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <p className="text-xs text-gray-400 mt-1">For international wire transfers.</p>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Bank Address</label>
@@ -872,7 +1113,64 @@ const ManageListings: React.FC = () => {
             </div>
             <SaveBar saving={saving === 'step7'} savedAt={savedAt.step7 ?? null} onSave={saveStep7} />
           </div>
-        )}
+          );
+        })()}
+
+        {/* Step 8 — Tax & Compliance */}
+        {currentStep === 8 && (() => {
+          const { primaryLabel, secondaryLabel, showSecondary } = getTaxFieldLabels(vendor.country);
+          const complianceDocs = getComplianceDocs(vendor.country);
+          return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold">Tax & Compliance</h2>
+            <p className="text-xs text-gray-400 -mt-4">Not required to go live — helps buyers and finance teams process invoices correctly for your country.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{primaryLabel}</label>
+                <input type="text" value={vendor.tax_id_primary} onChange={e => setVendor(p => ({ ...p, tax_id_primary: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              {showSecondary && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{secondaryLabel}</label>
+                  <input type="text" value={vendor.tax_id_secondary} onChange={e => setVendor(p => ({ ...p, tax_id_secondary: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              )}
+            </div>
+            <SaveBar saving={saving === 'step8'} savedAt={savedAt.step8 ?? null} onSave={saveStep8} />
+
+            {complianceDocs.length > 0 && (
+              <div className="pt-4 border-t border-gray-100">
+                <h3 className="text-lg font-semibold mb-1">Required Compliance Documents</h3>
+                <p className="text-sm text-gray-500 mb-4">Based on your country ({vendor.country || 'not set'}). Reviewed by the Collabov team — never shown publicly.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {complianceDocs.map(doc => (
+                    <div key={doc.key} className="border border-gray-200 rounded-xl p-5">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{doc.label}</label>
+                      <p className="text-xs text-gray-400 mb-3">{doc.hint}</p>
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                        <Upload className="h-4 w-4" /> Choose file
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={e => setDocFiles(prev => ({ ...prev, [doc.key]: e.target.files?.[0] ?? null }))} />
+                      </label>
+                      {docFiles[doc.key] && <p className="text-xs text-gray-500 mt-2">{docFiles[doc.key]!.name}</p>}
+                      {existingDocs[doc.key] && !docFiles[doc.key] && <p className="text-sm text-green-600 mt-2 flex items-center gap-1"><CheckCircle className="h-4 w-4" /> Uploaded</p>}
+                      {docFiles[doc.key] && (
+                        <button type="button" onClick={() => uploadDoc(doc.key)} disabled={saving === `doc_${doc.key}`}
+                          className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-[#0070F3] text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                          {saving === `doc_${doc.key}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                          Upload
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          );
+        })()}
       </motion.div>
     </div>
   );
