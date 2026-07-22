@@ -83,7 +83,7 @@ const ManageEmployee: React.FC = () => {
       .from('engagements')
       .select('id, project_title, status, assigned_employee_id, contract_id')
       .eq('vendor_id', user.id)
-      .in('status', ['pending_signature', 'pending_ir35', 'active', 'closing']);
+      .not('status', 'in', '(closed,terminated)');
     const contractIds = (engs ?? []).map((e: any) => e.contract_id).filter(Boolean);
     const { data: cons } = contractIds.length
       ? await supabase.from('contracts').select('id, contract_number').in('id', contractIds)
@@ -570,7 +570,11 @@ const ManageEmployee: React.FC = () => {
                   <span className="text-sm text-gray-500">Unassigned</span>
                 </button>
                 {filteredAssignOptions.length === 0 && (
-                  <p className="text-sm text-gray-400 px-3 py-4 text-center">No matching engagements.</p>
+                  <p className="text-sm text-gray-400 px-3 py-4 text-center">
+                    {engagements.length === 0
+                      ? "You don't have any active projects or contracts yet. Once a buyer engages you, you'll be able to assign team members here."
+                      : 'No engagements match your search.'}
+                  </p>
                 )}
                 {filteredAssignOptions.map(eng => (
                   <button

@@ -7,6 +7,14 @@ import { normalizeFeatureRows, FeatureRow, FeatureValue } from '../../../lib/pac
 const CATEGORIES = ['Cloud & Infrastructure', 'Managed IT', 'Software Development', 'Cybersecurity', 'DevOps', 'QA & Testing', 'Staff Augmentation'];
 const TECH_TAGS = ['React', 'Node.js', 'Python', '.NET', 'Java', 'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'Terraform'];
 
+type VatTreatment = 'inclusive' | 'exclusive' | 'not_applicable';
+
+const VAT_OPTIONS: { value: VatTreatment; label: string }[] = [
+  { value: 'inclusive', label: 'Price includes VAT' },
+  { value: 'exclusive', label: 'VAT added on top' },
+  { value: 'not_applicable', label: 'Not VAT applicable' },
+];
+
 interface PackageRow {
   id: string;
   name: string;
@@ -18,6 +26,7 @@ interface PackageRow {
   tech_stack: string[];
   ideal_for: string | null;
   is_active: boolean;
+  vat_treatment: VatTreatment;
 }
 
 interface FormState {
@@ -30,6 +39,7 @@ interface FormState {
   features: FeatureRow[];
   tech_stack: string[];
   ideal_for: string;
+  vat_treatment: VatTreatment;
 }
 
 const blankRow = (): FeatureRow => ({ label: '', value: true });
@@ -37,6 +47,7 @@ const blankRow = (): FeatureRow => ({ label: '', value: true });
 const emptyForm = (): FormState => ({
   id: null, name: '', category: CATEGORIES[0], price: '', billing_period: 'one_time',
   delivery_days: '', features: [blankRow(), blankRow(), blankRow()], tech_stack: [], ideal_for: '',
+  vat_treatment: 'not_applicable',
 });
 
 type FeatureRowMode = 'included' | 'not_included' | 'custom';
@@ -71,6 +82,7 @@ const Packages: React.FC = () => {
       featureRows: normalizeFeatureRows(p.features),
       tech_stack: Array.isArray(p.tech_stack) ? p.tech_stack : [],
       ideal_for: p.ideal_for, is_active: !!p.is_active,
+      vat_treatment: (p.vat_treatment as VatTreatment) || 'not_applicable',
     })));
     setActiveEngagementPackageIds(new Set((engs || []).map((e: any) => e.package_id).filter(Boolean)));
     setLoading(false);
@@ -99,6 +111,7 @@ const Packages: React.FC = () => {
       features,
       tech_stack: form.tech_stack,
       ideal_for: form.ideal_for || null,
+      vat_treatment: form.vat_treatment,
       is_active: true,
     };
     const { error: err } = form.id
@@ -117,6 +130,7 @@ const Packages: React.FC = () => {
       billing_period: pkg.billing_period || 'one_time', delivery_days: pkg.delivery_days ? String(pkg.delivery_days) : '',
       features: pkg.featureRows.length > 0 ? pkg.featureRows.map(r => ({ ...r })) : [blankRow(), blankRow(), blankRow()],
       tech_stack: pkg.tech_stack, ideal_for: pkg.ideal_for || '',
+      vat_treatment: pkg.vat_treatment,
     });
     setTab('builder');
   };
@@ -196,6 +210,12 @@ const Packages: React.FC = () => {
                     <div className="flex items-center gap-3 text-sm mb-3">
                       <span className="flex items-center gap-1 text-[#0070F3] font-bold">
                         <DollarSign className="h-4 w-4" />£{pkg.price.toLocaleString()} <span className="text-xs text-gray-400 font-normal">{pkg.billing_period === 'monthly' ? '/month' : 'fixed'}</span>
+                        {pkg.vat_treatment === 'exclusive' && (
+                          <span className="text-xs text-gray-400 font-normal">+ VAT</span>
+                        )}
+                        {pkg.vat_treatment === 'inclusive' && (
+                          <span className="text-xs text-gray-400 font-normal">inc. VAT</span>
+                        )}
                       </span>
                       {pkg.delivery_days != null && (
                         <span className="flex items-center gap-1 text-gray-500 text-xs"><Clock className="h-3.5 w-3.5" />{pkg.delivery_days} days</span>
@@ -332,6 +352,17 @@ const Packages: React.FC = () => {
                 className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0070F3] hover:text-blue-700">
                 <Plus className="h-3.5 w-3.5" /> Add row
               </button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">VAT Treatment</label>
+              <div className="flex gap-1 bg-gray-50 border border-gray-200 rounded-xl p-1 w-fit">
+                {VAT_OPTIONS.map(opt => (
+                  <button key={opt.value} type="button" onClick={() => setForm(f => ({ ...f, vat_treatment: opt.value }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.vat_treatment === opt.value ? 'bg-white shadow-sm text-[#0070F3]' : 'text-gray-500 hover:text-gray-700'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ideal For <span className="text-gray-400 font-normal">(optional)</span></label>
