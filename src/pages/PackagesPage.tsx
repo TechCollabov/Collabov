@@ -14,6 +14,7 @@ interface PackageRow {
   description: string | null;
   price: number;
   billing_period: string;
+  vat_treatment: 'inclusive' | 'exclusive' | 'not_applicable' | null;
   featureRows: FeatureRow[];
   vendor?: {
     company_name: string;
@@ -60,6 +61,12 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
+function vatSuffix(vat: PackageRow['vat_treatment']) {
+  if (vat === 'inclusive') return 'inc. VAT';
+  if (vat === 'exclusive') return '+ VAT';
+  return null;
+}
+
 function FeatureValueCell({ value }: { value: FeatureRow['value'] }) {
   if (value === true) return <Check className="h-4 w-4 text-green-500 flex-shrink-0" />;
   if (value === false) return <Minus className="h-4 w-4 text-gray-300 flex-shrink-0" />;
@@ -82,7 +89,7 @@ const PackagesPage: React.FC = () => {
     async function load() {
       const { data } = await supabase
         .from('vendor_packages')
-        .select('id, vendor_id, name, description, price, billing_period, features, vendors(company_name, business_type, is_verified, logo_url, rating, review_count, city, country)')
+        .select('id, vendor_id, name, description, price, billing_period, vat_treatment, features, vendors(company_name, business_type, is_verified, logo_url, rating, review_count, city, country)')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
       if (cancelled) return;
@@ -231,6 +238,9 @@ const PackagesPage: React.FC = () => {
                           <div className="text-2xl font-bold text-[#0070F3]">
                             £{Number(pkg.price).toLocaleString('en-GB')}
                             <span className="text-sm font-normal text-gray-400 ml-1">{pkg.billing_period === 'monthly' ? '/month' : 'fixed'}</span>
+                            {vatSuffix(pkg.vat_treatment) && (
+                              <span className="text-sm font-normal text-gray-400 ml-1">{vatSuffix(pkg.vat_treatment)}</span>
+                            )}
                           </div>
                         </div>
                         <button
@@ -283,6 +293,9 @@ const PackagesPage: React.FC = () => {
               <div className="text-2xl font-bold text-[#0070F3]">
                 £{Number(confirming.price).toLocaleString('en-GB')}
                 <span className="text-sm font-normal text-gray-400 ml-1">{confirming.billing_period === 'monthly' ? '/month' : 'fixed'}</span>
+                {vatSuffix(confirming.vat_treatment) && (
+                  <span className="text-sm font-normal text-gray-400 ml-1">{vatSuffix(confirming.vat_treatment)}</span>
+                )}
               </div>
               <div className="space-y-1">
                 {confirming.featureRows.map((row, idx) => (
