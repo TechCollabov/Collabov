@@ -43,6 +43,15 @@ export default {
           900: '#7e2a10',
           950: '#441206',
         },
+        brand: {
+          primary: '#1E3A5F',
+          accent: '#2E86AB',
+          success: '#1A7A4A',
+          warning: '#D48B00',
+          danger: '#C0392B',
+          bg: '#F7F9FB',
+          card: '#FFFFFF',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
