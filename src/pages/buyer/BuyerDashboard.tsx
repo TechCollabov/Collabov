@@ -3,15 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import {
-  Plus, FileText, Bot, Bookmark,
-  FolderOpen, FileCheck, CreditCard, MessageSquare,
-  AlertTriangle, HelpCircle, Search,
-  Bell, Settings, LogOut, ChevronDown, User, Globe,
-  Edit, CheckCircle,
+  AlertTriangle, Search,
+  CheckCircle,
   Sparkles, ShieldAlert, Scale, Brain, Lock, Info,
-  UserPlus
+  X,
 } from 'lucide-react';
 import { sweepProposalExpiry, sweepRehirePrompts, sweepPendingEngagementFollowups } from '../../lib/workflows';
+import BuyerLayout from '../../components/buyer/BuyerLayout';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +76,7 @@ const FindWithAIModule: React.FC<{ recentlyViewed: RecentlyViewedVendor[] }> = (
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+    <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-100 p-8 flex flex-col transition-shadow">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
@@ -150,7 +148,7 @@ interface WorkspaceModuleProps { activeCount: number; engagements: WorkspaceEnga
 const WorkspaceModule: React.FC<WorkspaceModuleProps> = ({ activeCount, engagements }) => {
   const hasOverdue = engagements.some((e) => e.overdue);
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+    <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-100 p-8 flex flex-col transition-shadow">
       <div className="flex items-center gap-3 mb-5">
         <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
           <FolderOpen className="h-5 w-5 text-teal-300" />
@@ -214,7 +212,7 @@ interface MilestonePaymentsModuleProps {
   unfundedCount: number;
 }
 const MilestonePaymentsModule: React.FC<MilestonePaymentsModuleProps> = ({ pendingEscrow, releasedMTD, awaitingReview, unfundedCount }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+  <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-100 p-8 flex flex-col transition-shadow">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
         <CreditCard className="h-5 w-5 text-emerald-300" />
@@ -252,7 +250,7 @@ const MilestonePaymentsModule: React.FC<MilestonePaymentsModuleProps> = ({ pendi
 
 interface RiskDashboardModuleProps { activeCount: number; contractsSignedCount: number; pendingIR35Count: number; staffAugCount: number; }
 const RiskDashboardModule: React.FC<RiskDashboardModuleProps> = ({ activeCount, contractsSignedCount, pendingIR35Count, staffAugCount }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+  <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-100 p-8 flex flex-col transition-shadow">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
         <ShieldAlert className="h-5 w-5 text-orange-300" />
@@ -297,7 +295,7 @@ const RiskDashboardModule: React.FC<RiskDashboardModuleProps> = ({ activeCount, 
 interface GovernanceContract { id: string; vendorName: string; status: string; }
 interface GovernanceModuleProps { contracts: GovernanceContract[]; openDisputesCount: number; }
 const GovernanceModule: React.FC<GovernanceModuleProps> = ({ contracts, openDisputesCount }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+  <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-100 p-8 flex flex-col transition-shadow">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
         <Scale className="h-5 w-5 text-purple-300" />
@@ -342,7 +340,7 @@ const GovernanceModule: React.FC<GovernanceModuleProps> = ({ contracts, openDisp
 
 interface Insight { text: string; type: 'info' | 'warning'; }
 const IntelligenceModule: React.FC<{ insights: Insight[] }> = ({ insights }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
+  <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-100 p-8 flex flex-col transition-shadow">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
         <Brain className="h-5 w-5 text-violet-300" />
@@ -383,7 +381,7 @@ const IntelligenceModule: React.FC<{ insights: Insight[] }> = ({ insights }) => 
 interface MessagePreview { id: string; name: string; subject: string; preview: string; time: string; unread: boolean; }
 interface MessagesModuleProps { unreadMessages: number; previews: MessagePreview[]; }
 const MessagesModule: React.FC<MessagesModuleProps> = ({ unreadMessages, previews }) => (
-  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col lg:col-span-2">
+  <div className="bg-white rounded-3xl shadow-sm hover:shadow-xl border-2 border-slate-100 p-8 flex flex-col transition-shadow md:col-span-2">
     <div className="flex items-center gap-3 mb-5">
       <div className="bg-[#0B2D59] rounded-xl w-11 h-11 flex items-center justify-center flex-shrink-0">
         <MessageSquare className="h-5 w-5 text-cyan-300" />
@@ -430,13 +428,18 @@ const MessagesModule: React.FC<MessagesModuleProps> = ({ unreadMessages, preview
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const WIDGET_LABELS: Record<string, string> = {
+  'find-ai': 'Find with AI',
+  workspace: 'Workspace',
+  payments: 'Escrow',
+  risk: 'Risk Dashboard',
+  governance: 'Governance',
+  intelligence: 'Intelligence',
+  messages: 'Messages',
+};
+
 const BuyerDashboard: React.FC = () => {
-  const navigate = useNavigate();
-  const { profile, user, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const { profile, user } = useAuth();
   const [showPaymentAlert, setShowPaymentAlert] = useState(true);
   const [paymentAlert, setPaymentAlert] = useState<{ vendorName: string; projectTitle: string } | null>(null);
   const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedVendor[]>([]);
@@ -447,44 +450,44 @@ const BuyerDashboard: React.FC = () => {
   const [governance, setGovernance] = useState<{ contracts: GovernanceContract[]; openDisputesCount: number }>({ contracts: [], openDisputesCount: 0 });
   const [insights, setInsights] = useState<Insight[]>([]);
   const [messagePreviews, setMessagePreviews] = useState<MessagePreview[]>([]);
-  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [layout, setLayout] = useState<string[]>([]);
+  const [layoutLoaded, setLayoutLoaded] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
-  const toggleNotifications = () => {
-    setShowNotifications(v => !v);
-    setShowUserDropdown(false);
-    setShowMoreMenu(false);
-  };
-  const toggleUserDropdown = () => {
-    setShowUserDropdown(v => !v);
-    setShowNotifications(false);
-    setShowMoreMenu(false);
-  };
-  const toggleMoreMenu = () => {
-    setShowMoreMenu(v => !v);
-    setShowNotifications(false);
-    setShowUserDropdown(false);
-  };
-
-  const loadNotifications = useCallback(async () => {
+  // Load the buyer's persisted widget layout.
+  useEffect(() => {
     if (!user) return;
-    const { data } = await supabase
-      .from('notifications')
-      .select('id, type, title, message, link_url, is_read, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    setNotifications(data || []);
+    (async () => {
+      const { data } = await supabase.from('buyers').select('dashboard_layout').eq('id', user.id).maybeSingle();
+      const saved = Array.isArray(data?.dashboard_layout) ? (data!.dashboard_layout as string[]) : [];
+      setLayout(saved.filter((id) => WIDGET_LABELS[id]));
+      setLayoutLoaded(true);
+    })();
   }, [user]);
 
-  useEffect(() => { loadNotifications(); }, [loadNotifications]);
+  const persistLayout = useCallback(async (next: string[]) => {
+    if (!user) return;
+    await supabase.from('buyers').update({ dashboard_layout: next }).eq('id', user.id);
+  }, [user]);
 
-  const unreadNotificationCount = notifications.filter(n => !n.is_read).length;
+  const addWidget = (widgetId: string) => {
+    if (!WIDGET_LABELS[widgetId] || layout.includes(widgetId)) return;
+    const next = [...layout, widgetId];
+    setLayout(next);
+    persistLayout(next);
+  };
 
-  const markNotificationRead = async (n: NotificationRow) => {
-    setNotifications(ns => ns.map(x => x.id === n.id ? { ...x, is_read: true } : x));
-    await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('id', n.id);
-    setShowNotifications(false);
-    if (n.link_url) navigate(n.link_url);
+  const removeWidget = (widgetId: string) => {
+    const next = layout.filter((id) => id !== widgetId);
+    setLayout(next);
+    persistLayout(next);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const widgetId = e.dataTransfer.getData('text/widget-id');
+    if (widgetId) addWidget(widgetId);
   };
 
   useEffect(() => {
@@ -638,256 +641,99 @@ const BuyerDashboard: React.FC = () => {
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
 
-  const navigationTabs = [
-    { id: 'post-job', label: 'Post a Job', icon: Plus },
-    { id: 'create-tender', label: 'Create a Tender', icon: FileText },
-    { id: 'ai-matchmaking', label: 'Find Vendors', icon: Bot },
-    { id: 'saved-talent', label: 'Shortlisted', icon: Bookmark },
-    { id: 'my-projects', label: 'My Projects', icon: FolderOpen },
-    { id: 'contracts', label: 'Governance', icon: FileCheck },
-    { id: 'invoices', label: 'Payments', icon: CreditCard },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
-  const moreTabs = [
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
-    { id: 'disputes', label: 'Disputes', icon: AlertTriangle },
-    { id: 'help', label: 'Help Center', icon: HelpCircle },
-    { id: 'invite-vendor', label: 'Invite a Vendor', icon: UserPlus },
-  ];
-
-  const handleTabClick = (tabId: string) => {
-    setShowMoreMenu(false);
-    if (tabId === 'invite-vendor') navigate('/buyer/byov');
-    else if (tabId === 'post-job') navigate('/buyer/post-job');
-    else if (tabId === 'create-tender') navigate('/buyer/post-job?type=tender');
-    else if (tabId === 'contracts' || tabId === 'disputes') navigate('/buyer/governance');
-    else if (tabId === 'invoices') navigate('/buyer/payments');
-    else if (tabId === 'settings') navigate('/buyer/settings');
-    else if (tabId === 'ai-matchmaking') navigate('/results');
-    else if (tabId === 'saved-talent') navigate('/buyer/shortlist');
-    else if (tabId === 'my-projects') navigate('/buyer/my-vendors');
-    else if (tabId === 'messages') navigate('/messages');
-    else if (tabId === 'help') navigate('/help');
-    else setActiveTab(tabId);
+  const renderWidget = (widgetId: string) => {
+    switch (widgetId) {
+      case 'find-ai':
+        return <FindWithAIModule recentlyViewed={recentlyViewed} />;
+      case 'workspace':
+        return <WorkspaceModule activeCount={workspace.activeCount} engagements={workspace.engagements} />;
+      case 'payments':
+        return <MilestonePaymentsModule {...escrowStats} />;
+      case 'risk':
+        return <RiskDashboardModule {...risk} />;
+      case 'governance':
+        return <GovernanceModule contracts={governance.contracts} openDisputesCount={governance.openDisputesCount} />;
+      case 'intelligence':
+        return <IntelligenceModule insights={insights} />;
+      case 'messages':
+        return <MessagesModule unreadMessages={unreadMessages} previews={messagePreviews} />;
+      default:
+        return null;
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ── Top Navigation Bar ──────────────────────────────────────────── */}
-      <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2">
-              <Globe className="h-8 w-8 text-[#0070F3]" />
-              <span className="text-xl font-bold text-[#0B2D59]">Collabov</span>
-            </Link>
-
-            {/* Center tabs */}
-            <div className="hidden lg:flex items-center space-x-1">
-              {navigationTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.id)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-[#0070F3] text-white'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-              <div className="relative">
-                <button
-                  onClick={toggleMoreMenu}
-                  className="flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                >
-                  <span>More</span>
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                {showMoreMenu && (
-                  <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                    {moreTabs.map(tab => (
-                      <button
-                        key={tab.id}
-                        onClick={() => handleTabClick(tab.id)}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                      >
-                        <tab.icon className="h-4 w-4" />
-                        <span>{tab.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Right: notifications + user */}
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <button
-                  className="p-2 text-gray-400 hover:text-gray-600 relative"
-                  onClick={toggleNotifications}
-                >
-                  <Bell className="h-6 w-6" />
-                  {unreadNotificationCount > 0 && (
-                    <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full" />
-                  )}
-                </button>
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                    <div className="px-4 py-2 border-b border-gray-100">
-                      <h3 className="font-medium text-gray-900">Notifications</h3>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-sm text-gray-400">No notifications yet</div>
-                      ) : (
-                        notifications.map(n => (
-                          <button
-                            key={n.id}
-                            onClick={() => markNotificationRead(n)}
-                            className={`w-full text-left px-4 py-3 hover:bg-gray-50 ${n.is_read ? '' : 'bg-blue-50/40'}`}
-                          >
-                            <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                            <p className="text-xs text-gray-500">{n.message}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{timeAgo(n.created_at)}</p>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative">
-                <button
-                  onClick={toggleUserDropdown}
-                  className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-full bg-[#0070F3] flex items-center justify-center">
-                    <User className="h-5 w-5 text-white" />
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                </button>
-                {showUserDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                    <div className="px-4 py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{profile?.full_name ?? user?.email}</p>
-                      <p className="text-xs text-gray-500">{user?.email}</p>
-                    </div>
-                    <button
-                      onClick={() => { setShowUserDropdown(false); navigate('/buyer/settings'); }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span>Edit Profile</span>
-                    </button>
-                    <button
-                      onClick={() => { setShowUserDropdown(false); navigate('/help'); }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                    >
-                      <HelpCircle className="h-4 w-4" />
-                      <span>Support</span>
-                    </button>
-                    <hr className="my-2" />
-                    <button
-                      onClick={() => { setShowUserDropdown(false); signOut(); navigate('/'); }}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span>Logout</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile nav */}
-          <div className="lg:hidden border-t border-gray-200 py-2">
-            <div className="flex space-x-1 overflow-x-auto">
-              {navigationTabs.slice(0, 4).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.id)}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-[#0070F3] text-white'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+    <BuyerLayout insights={insights}>
+      {/* Page header */}
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-4xl font-black italic text-brand-primary">
+            Good {getGreeting()}, {firstName}.
+          </h1>
+          <p className="text-xs font-semibold tracking-[0.25em] text-slate-400 mt-1 uppercase">
+            Command Centre Summary · Custom Dashboard
+          </p>
         </div>
-      </nav>
+        {layout.length > 0 && (
+          <button
+            onClick={() => { setLayout([]); persistLayout([]); }}
+            className="text-[10px] font-bold uppercase tracking-widest text-slate-500 border border-slate-200 rounded-full px-4 py-2 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors"
+          >
+            Clear Layout
+          </button>
+        )}
+      </div>
 
-      {/* ── Main Content ─────────────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20">
-        {/* Page header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-black text-[#0B2D59]">
-              Good {getGreeting()}, {firstName}.
-            </h1>
-            <p className="text-xs font-semibold tracking-[0.25em] text-gray-400 mt-1 uppercase">
-              Command Centre Summary · Custom Dashboard
+      {/* Payment failure alert — real overdue-unfunded milestone, persistent & non-removable */}
+      {paymentAlert && showPaymentAlert && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-8 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-brand-danger flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800">
+              Milestone funding overdue for {paymentAlert.vendorName} — {paymentAlert.projectTitle}. Fund this milestone to keep the engagement active.
+            </p>
+            <div className="flex gap-3 mt-2">
+              <Link to="/buyer/payments" className="text-xs bg-brand-danger text-white rounded-lg px-3 py-1.5 font-semibold">Fund now</Link>
+              <Link to="/contact" className="text-xs text-gray-500">Contact support</Link>
+            </div>
+          </div>
+          <button onClick={() => setShowPaymentAlert(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+        </div>
+      )}
+
+      {/* Widget grid / drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`rounded-3xl transition-colors ${dragOver ? 'bg-brand-accent/5 ring-2 ring-brand-accent/40' : ''}`}
+      >
+        {layoutLoaded && layout.length === 0 ? (
+          <div className="border-2 border-dashed border-slate-200 rounded-3xl p-16 text-center">
+            <Sparkles className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-500">Your Command Centre is empty</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Drag an item marked <span className="font-bold text-brand-accent">Drag +</span> from the Workspace, Finance or Governance menus above onto this area to add a live widget.
             </p>
           </div>
-          <button className="text-xs font-semibold text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors mt-1">
-            CLEAR LAYOUT
-          </button>
-        </div>
-
-        {/* Payment failure alert — real overdue-unfunded milestone, not a simulated Stripe decline */}
-        {paymentAlert && showPaymentAlert && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-red-800">
-                Milestone funding overdue for {paymentAlert.vendorName} — {paymentAlert.projectTitle}. Fund this milestone to keep the engagement active.
-              </p>
-              <div className="flex gap-3 mt-2">
-                <Link to="/buyer/payments" className="text-xs bg-red-600 text-white rounded-lg px-3 py-1.5 font-medium">Fund now</Link>
-                <Link to="/contact" className="text-xs text-gray-500">Contact support</Link>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+            {layout.map((widgetId) => (
+              <div key={widgetId} className="relative group">
+                <button
+                  onClick={() => removeWidget(widgetId)}
+                  title="Remove widget"
+                  className="absolute -top-2 -right-2 z-10 w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                {renderWidget(widgetId)}
               </div>
-            </div>
-            <button onClick={() => setShowPaymentAlert(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+            ))}
           </div>
         )}
-
-        {/* 7-module grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <FindWithAIModule recentlyViewed={recentlyViewed} />
-          <WorkspaceModule activeCount={workspace.activeCount} engagements={workspace.engagements} />
-          <MilestonePaymentsModule {...escrowStats} />
-          <RiskDashboardModule {...risk} />
-          <GovernanceModule contracts={governance.contracts} openDisputesCount={governance.openDisputesCount} />
-          <IntelligenceModule insights={insights} />
-          <MessagesModule unreadMessages={unreadMessages} previews={messagePreviews} />
-        </div>
-      </main>
-
-      {/* ── AI Assistant bar (fixed bottom) ─────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg px-8 py-4 z-40 flex items-center gap-4">
-        <div className="w-11 h-11 bg-gray-200 rounded-xl flex items-center justify-center flex-shrink-0">
-          <Bot className="h-5 w-5 text-gray-400" />
-        </div>
-        <input
-          disabled
-          placeholder="AI vendor matching coming soon in V2"
-          className="flex-1 bg-gray-100 rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-400 cursor-not-allowed"
-          title="AI matching available in V2"
-        />
-        <button disabled className="px-6 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed">
-          ASK AI
-        </button>
       </div>
-    </div>
+    </BuyerLayout>
   );
 };
 
