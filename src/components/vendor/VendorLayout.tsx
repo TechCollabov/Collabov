@@ -89,7 +89,7 @@ const VendorLayout: React.FC = () => {
             <nav className="hidden lg:flex items-center gap-6">
               {/* Find Dropdown */}
               <div
-                className="relative"
+                className="relative pb-2"
                 onMouseEnter={() => setIsFindOpen(true)}
                 onMouseLeave={() => setIsFindOpen(false)}
               >
@@ -114,7 +114,7 @@ const VendorLayout: React.FC = () => {
 
               {/* Workspace Dropdown */}
               <div
-                className="relative"
+                className="relative pb-2"
                 onMouseEnter={() => setIsWorkspaceOpen(true)}
                 onMouseLeave={() => setIsWorkspaceOpen(false)}
               >

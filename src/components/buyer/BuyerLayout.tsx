@@ -134,7 +134,7 @@ const IconSidebar: React.FC = () => (
 const NavDropdown: React.FC<{ group: NavGroup }> = ({ group }) => {
   const [open, setOpen] = useState(false);
   return (
-    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div className="relative pb-2" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button className="flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-slate-900 hover:text-brand-accent transition-colors py-2">
         {group.label}
         <ChevronDown className="h-3.5 w-3.5" />
