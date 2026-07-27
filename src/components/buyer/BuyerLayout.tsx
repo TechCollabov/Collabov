@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Globe, ChevronDown, Bell, MessageSquare, User, Settings, LogOut,
@@ -133,8 +133,29 @@ const IconSidebar: React.FC = () => (
 
 const NavDropdown: React.FC<{ group: NavGroup }> = ({ group }) => {
   const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const openNow = useCallback(() => {
+    cancelClose();
+    setOpen(true);
+  }, [cancelClose]);
+
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 250);
+  }, [cancelClose]);
+
+  useEffect(() => () => cancelClose(), [cancelClose]);
+
   return (
-    <div className="relative pb-2" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div className="relative pb-2" onMouseEnter={openNow} onMouseLeave={scheduleClose}>
       <button className="flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-slate-900 hover:text-brand-accent transition-colors py-2">
         {group.label}
         <ChevronDown className="h-3.5 w-3.5" />

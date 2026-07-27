@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Package, MessageSquare, Bell, Users, Settings,
@@ -7,10 +7,39 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
+// Hover-dropdown with a short close delay so moving the cursor from the
+// trigger into the panel (crossing the small visual gap between them)
+// doesn't fire a leave before the click lands.
+function useHoverDropdown() {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const openNow = useCallback(() => {
+    cancelClose();
+    setOpen(true);
+  }, [cancelClose]);
+
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 250);
+  }, [cancelClose]);
+
+  useEffect(() => () => cancelClose(), [cancelClose]);
+
+  return { open, setOpen, onMouseEnter: openNow, onMouseLeave: scheduleClose };
+}
+
 const VendorLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isFindOpen, setIsFindOpen] = useState(false);
-  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const find = useHoverDropdown();
+  const workspace = useHoverDropdown();
   const location = useLocation();
   const { signOut } = useAuth();
 
@@ -90,20 +119,20 @@ const VendorLayout: React.FC = () => {
               {/* Find Dropdown */}
               <div
                 className="relative pb-2"
-                onMouseEnter={() => setIsFindOpen(true)}
-                onMouseLeave={() => setIsFindOpen(false)}
+                onMouseEnter={find.onMouseEnter}
+                onMouseLeave={find.onMouseLeave}
               >
                 <button className="flex items-center gap-1 text-[#0B2D59] font-medium text-sm hover:text-[#0070F3] transition-colors duration-200 py-2">
                   Find <ChevronDown className="h-4 w-4" />
                 </button>
 
-                {isFindOpen && (
+                {find.open && (
                   <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
                     <div className="px-3">
                       <Link
                         to="/vendor/dashboard/jobs"
                         className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm"
-                        onClick={() => setIsFindOpen(false)}
+                        onClick={() => find.setOpen(false)}
                       >
                         Jobs and Tenders
                       </Link>
@@ -115,27 +144,27 @@ const VendorLayout: React.FC = () => {
               {/* Workspace Dropdown */}
               <div
                 className="relative pb-2"
-                onMouseEnter={() => setIsWorkspaceOpen(true)}
-                onMouseLeave={() => setIsWorkspaceOpen(false)}
+                onMouseEnter={workspace.onMouseEnter}
+                onMouseLeave={workspace.onMouseLeave}
               >
                 <button className="flex items-center gap-1 text-[#0B2D59] font-medium text-sm hover:text-[#0070F3] transition-colors duration-200 py-2">
                   Workspace <ChevronDown className="h-4 w-4" />
                 </button>
 
-                {isWorkspaceOpen && (
+                {workspace.open && (
                   <div className="absolute top-full left-0 mt-1 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
                     <div className="px-3 space-y-1">
                       <Link
                         to="/vendor/dashboard/proposals"
                         className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm"
-                        onClick={() => setIsWorkspaceOpen(false)}
+                        onClick={() => workspace.setOpen(false)}
                       >
                         Proposals
                       </Link>
                       <Link
                         to="/vendor/dashboard/contracts"
                         className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm"
-                        onClick={() => setIsWorkspaceOpen(false)}
+                        onClick={() => workspace.setOpen(false)}
                       >
                         Contracts
                       </Link>
