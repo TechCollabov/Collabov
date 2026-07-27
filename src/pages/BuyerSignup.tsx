@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Globe, Eye, EyeOff, CheckCircle, ArrowRight, Search, Briefcase, Users } from 'lucide-react';
+import { Globe, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getRedirectPath } from '../utils/authRedirect';
 import { isBusinessEmail } from '../lib/workflows';
@@ -45,8 +45,6 @@ const BuyerSignup: React.FC = () => {
   const [headcount, setHeadcount] = useState('');
   const [country, setCountry] = useState('United Kingdom');
 
-  const [firstName, setFirstName] = useState('');
-
   useEffect(() => {
     if (!loading && user && profile && step < 3) {
       const redirectPath = getRedirectPath(profile.user_type);
@@ -84,8 +82,6 @@ const BuyerSignup: React.FC = () => {
     setIsLoading(true);
     try {
       const name = legalName.trim();
-      const extractedFirst = name.split(' ')[0];
-      setFirstName(extractedFirst);
       await signUp(email, password, {
         fullName: name,
         userType: 'buyer',
@@ -98,7 +94,7 @@ const BuyerSignup: React.FC = () => {
           country,
         },
       });
-      setStep(3);
+      navigate('/buyer/dashboard', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Sign up failed. Please try again.');
     } finally {
@@ -236,43 +232,6 @@ const BuyerSignup: React.FC = () => {
         )}
 
         {/* Step 3 — Welcome */}
-        {step === 3 && (
-          <div className="text-center py-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="h-8 w-8 text-green-500" />
-            </div>
-            <h1 className="text-2xl font-bold text-[#0B2D59] mb-2">
-              You are all set{firstName ? `, ${firstName}` : ''}!
-            </h1>
-            <p className="text-gray-500 mb-8">What would you like to do first?</p>
-            <div className="grid grid-cols-1 gap-4">
-              <Link to="/results" className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors text-left">
-                <Search className="h-6 w-6 text-[#0070F3] flex-shrink-0" />
-                <div>
-                  <div className="font-semibold text-[#0B2D59]">Search for vendors</div>
-                  <div className="text-sm text-gray-500">Browse verified MSPs, agencies, and dedicated teams</div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-gray-400 ml-auto" />
-              </Link>
-              <Link to="/buyer/dashboard" className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors text-left">
-                <Briefcase className="h-6 w-6 text-[#0070F3] flex-shrink-0" />
-                <div>
-                  <div className="font-semibold text-[#0B2D59]">Post your first job</div>
-                  <div className="text-sm text-gray-500">Receive proposals from verified vendors within 24 hours</div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-gray-400 ml-auto" />
-              </Link>
-              <Link to="/buyer/dashboard" className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors text-left">
-                <Users className="h-6 w-6 text-[#0070F3] flex-shrink-0" />
-                <div>
-                  <div className="font-semibold text-[#0B2D59]">Invite your existing agency</div>
-                  <div className="text-sm text-gray-500">Bring your current vendor onto the platform</div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-gray-400 ml-auto" />
-              </Link>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
