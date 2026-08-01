@@ -15,6 +15,7 @@ export interface Insight { text: string; type: 'info' | 'warning'; }
 export interface NavItem {
   id: string;
   label: string;
+  subtitle?: string;
   to?: string;
   widgetId?: string;
 }
@@ -28,15 +29,12 @@ export interface NavGroup {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    id: 'find-hire',
-    label: 'Find & Hire',
+    id: 'discover',
+    label: 'Discover',
     items: [
-      { id: 'find-vendors', label: 'Find Vendors', to: '/results' },
-      { id: 'post-job', label: 'Post a Job', to: '/buyer/post-job' },
-      { id: 'create-tender', label: 'Create a Tender', to: '/buyer/post-job?type=tender' },
-      { id: 'compare-vendors', label: 'Compare Vendors', to: '/compare' },
-      { id: 'browse-packages', label: 'Browse Packages', to: '/packages' },
-      { id: 'invite-vendor', label: 'Invite a Vendor', to: '/buyer/byov' },
+      { id: 'discover-msp', label: 'MSP', subtitle: 'Network, Security, Full IT Support', to: '/results?type=msp' },
+      { id: 'discover-agency', label: 'Agencies', subtitle: 'Mobile, Web Services, IT Support', to: '/results?type=agency' },
+      { id: 'discover-staffaug', label: 'Staff Augmentation', subtitle: 'Dedicated team for long term', to: '/results?type=staffaug' },
     ],
   },
   {
@@ -50,6 +48,11 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'shortlisted', label: 'Shortlisted', to: '/buyer/shortlist' },
       { id: 'proposals', label: 'Proposals', to: '/proposals' },
       { id: 'create-sow', label: 'Create SOW', to: '/sow-wizard' },
+      { id: 'post-job', label: 'Post a Job', to: '/buyer/post-job' },
+      { id: 'create-tender', label: 'Create a Tender', to: '/buyer/post-job?type=tender' },
+      { id: 'compare-vendors', label: 'Compare Vendors', to: '/compare' },
+      { id: 'browse-packages', label: 'Browse Packages', to: '/packages' },
+      { id: 'invite-vendor', label: 'Invite a Vendor', to: '/buyer/byov' },
       { id: 'messages', label: 'Messages', to: '/messages' },
       { id: 'messages-widget', label: 'Messages Feed', widgetId: 'messages' },
     ],
@@ -161,7 +164,7 @@ const NavDropdown: React.FC<{ group: NavGroup }> = ({ group }) => {
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
+        <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
           {group.items.map((item) =>
             item.widgetId ? (
               <button
@@ -182,7 +185,8 @@ const NavDropdown: React.FC<{ group: NavGroup }> = ({ group }) => {
                 onClick={() => setOpen(false)}
                 className="block px-4 py-2 text-sm text-slate-700 hover:bg-brand-bg hover:text-brand-primary"
               >
-                {item.label}
+                <span className="block font-semibold">{item.label}</span>
+                {item.subtitle && <span className="block text-xs text-slate-400 mt-0.5">{item.subtitle}</span>}
               </Link>
             )
           )}
