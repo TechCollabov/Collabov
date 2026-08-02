@@ -56,6 +56,7 @@ import MyVendorsPage from './pages/buyer/MyVendorsPage';
 import ShortlistPage from './pages/buyer/ShortlistPage';
 import BuyerPayments from './pages/buyer/BuyerPayments';
 import BuyerGovernance from './pages/buyer/BuyerGovernance';
+import BuyerRiskPage from './pages/buyer/BuyerRiskPage';
 import BuyerSettings from './pages/buyer/BuyerSettings';
 import TalkToExpertPage from './pages/buyer/TalkToExpertPage';
 
@@ -170,7 +171,7 @@ function AppContent() {
           <Route path="/buyer/billing" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/tax" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/kyc" element={<BuyerRoute><BuyerKycPage /></BuyerRoute>} />
-          <Route path="/buyer/risk" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
+          <Route path="/buyer/risk" element={<BuyerRoute><BuyerRiskPage /></BuyerRoute>} />
           <Route path="/buyer/talk-to-expert" element={<BuyerRoute><TalkToExpertPage /></BuyerRoute>} />
 
           {/* Vendor */}
