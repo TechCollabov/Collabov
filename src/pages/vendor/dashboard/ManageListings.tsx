@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
+import { getTaxFieldLabels } from '../../../lib/taxFields';
 
 /* ── Shared option lists (kept local to this page, matching the pattern
    used by VendorSignup.tsx rather than introducing a new shared module) ── */
@@ -64,19 +65,6 @@ function getBankFieldLabels(country: string) {
     return { sortLabel: 'IFSC Code', sortHint: 'e.g. HDFC0001234', accountLabel: 'Account Number' };
   }
   return { sortLabel: 'Sort Code / IFSC / Routing Number', sortHint: '', accountLabel: 'Account Number' };
-}
-
-function getTaxFieldLabels(country: string) {
-  if (country === 'United Kingdom') {
-    return { primaryLabel: 'VAT Number', secondaryLabel: 'UTR (Unique Taxpayer Reference)', showSecondary: true };
-  }
-  if (country === 'United States') {
-    return { primaryLabel: 'EIN (Employer Identification Number)', secondaryLabel: '', showSecondary: false };
-  }
-  if (country === 'India') {
-    return { primaryLabel: 'PAN Number', secondaryLabel: 'GST Number', showSecondary: true };
-  }
-  return { primaryLabel: 'Tax ID', secondaryLabel: 'Additional Tax Reference (optional)', showSecondary: true };
 }
 
 // Required compliance documents by country. vat_certificate is already
