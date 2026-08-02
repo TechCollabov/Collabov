@@ -25,6 +25,7 @@ import PackagesPage from './pages/PackagesPage';
 import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
 import BuyerDashboard from './pages/buyer/BuyerDashboard';
+import BuyerTaxPage from './pages/buyer/BuyerTaxPage';
 import PostJobPage from './pages/buyer/PostJobPage';
 import BYOVPage from './pages/buyer/BYOVPage';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -165,7 +166,7 @@ function AppContent() {
           <Route path="/buyer/team" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/calendar" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/billing" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/tax" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
+          <Route path="/buyer/tax" element={<BuyerRoute><BuyerTaxPage /></BuyerRoute>} />
           <Route path="/buyer/kyc" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/risk" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/talk-to-expert" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
