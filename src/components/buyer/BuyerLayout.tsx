@@ -11,13 +11,15 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export interface Insight { text: string; type: 'info' | 'warning'; }
 
-/** A single nav-dropdown entry. `widgetId` marks it draggable onto the dashboard. */
+/** A single nav-dropdown entry. `widgetId` marks it draggable onto the dashboard.
+ *  `sectionHeader` renders a small labeled divider immediately above this item. */
 export interface NavItem {
   id: string;
   label: string;
   subtitle?: string;
   to?: string;
   widgetId?: string;
+  sectionHeader?: string;
 }
 export interface NavGroup {
   id: string;
@@ -35,34 +37,40 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'discover-msp', label: 'MSP', subtitle: 'Network, Security, Full IT Support', to: '/results?type=msp' },
       { id: 'discover-agency', label: 'Agencies', subtitle: 'Mobile, Web Services, IT Support', to: '/results?type=agency' },
       { id: 'discover-staffaug', label: 'Staff Augmentation', subtitle: 'Dedicated team for long term', to: '/results?type=staffaug' },
+      { id: 'post-job', label: 'Post a Job', to: '/buyer/post-job', sectionHeader: 'Other' },
+      { id: 'create-tender', label: 'Create a Tender', to: '/buyer/post-job?type=tender' },
+      { id: 'browse-packages', label: 'Browse Packages', to: '/packages' },
     ],
   },
   {
     id: 'workspace',
     label: 'Workspace',
     items: [
-      { id: 'dashboard', label: 'Dashboard', to: '/buyer/dashboard' },
-      { id: 'find-ai-widget', label: 'Find with AI', widgetId: 'find-ai' },
-      { id: 'my-projects', label: 'My Projects', to: '/buyer/my-vendors' },
-      { id: 'workspace-widget', label: 'Active Engagements', widgetId: 'workspace' },
-      { id: 'shortlisted', label: 'Shortlisted', to: '/buyer/shortlist' },
-      { id: 'proposals', label: 'Proposals', to: '/proposals' },
+      { id: 'proposals', label: 'Proposals', subtitle: 'Requested, Unread, All', to: '/proposals' },
+      { id: 'shortlisted', label: 'Shortlisted Vendors', to: '/buyer/shortlist' },
+      { id: 'my-projects', label: 'My Projects', subtitle: 'Includes new and old projects', to: '/buyer/my-vendors' },
+      { id: 'active-engagements', label: 'Active Engagements', to: '/buyer/my-vendors?tab=active' },
+      { id: 'my-team', label: 'My Team', subtitle: 'Former & active team, rate & review', to: '/buyer/team' },
+      { id: 'calendar', label: 'Calendar', to: '/buyer/calendar' },
       { id: 'create-sow', label: 'Create SOW', to: '/sow-wizard' },
-      { id: 'post-job', label: 'Post a Job', to: '/buyer/post-job' },
-      { id: 'create-tender', label: 'Create a Tender', to: '/buyer/post-job?type=tender' },
-      { id: 'compare-vendors', label: 'Compare Vendors', to: '/compare' },
-      { id: 'browse-packages', label: 'Browse Packages', to: '/packages' },
-      { id: 'invite-vendor', label: 'Invite a Vendor', to: '/buyer/byov' },
+      { id: 'add-existing', label: 'Add an Existing Project & Vendor', to: '/buyer/byov' },
+      { id: 'dashboard', label: 'Dashboard', to: '/buyer/dashboard' },
       { id: 'messages', label: 'Messages', to: '/messages' },
-      { id: 'messages-widget', label: 'Messages Feed', widgetId: 'messages' },
+      { id: 'compare-vendors', label: 'Compare Vendors', to: '/compare' },
+      { id: 'find-ai-widget', label: 'Find with AI', widgetId: 'find-ai' },
+      { id: 'workspace-widget', label: 'Active Engagements (Widget)', widgetId: 'workspace' },
+      { id: 'messages-widget', label: 'Messages Feed (Widget)', widgetId: 'messages' },
     ],
   },
   {
     id: 'finance',
     label: 'Finance',
     items: [
-      { id: 'payments', label: 'Payments & Escrow', to: '/buyer/payments' },
-      { id: 'payments-widget', label: 'Escrow Snapshot', widgetId: 'payments' },
+      { id: 'escrow', label: 'Escrow', to: '/buyer/payments' },
+      { id: 'billing', label: 'Billing', subtitle: 'Due bills, upcoming payments', to: '/buyer/billing' },
+      { id: 'invoices', label: 'Invoices', subtitle: 'History', to: '/buyer/payments' },
+      { id: 'tax', label: 'Tax', to: '/buyer/tax' },
+      { id: 'payments-widget', label: 'Escrow Snapshot (Widget)', widgetId: 'payments' },
     ],
   },
   {
@@ -70,17 +78,32 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Governance',
     items: [
       { id: 'governance-centre', label: 'Governance Centre', to: '/buyer/governance' },
-      { id: 'governance-widget', label: 'Governance Snapshot', widgetId: 'governance' },
-      { id: 'risk-widget', label: 'Risk Dashboard', widgetId: 'risk' },
-      { id: 'ir35', label: 'IR35 Guidance', to: '/ir35-guidance' },
+      { id: 'contracts-sow', label: 'Contracts and SOW', to: '/buyer/governance?tab=contracts' },
+      { id: 'gdpr', label: 'GDPR', to: '/buyer/governance?tab=gdpr' },
+      { id: 'ir35-guidance', label: 'IR35 Guidance', to: '/ir35-guidance' },
+      { id: 'ir35-status', label: 'IR35 Status', to: '/buyer/governance?tab=ir35' },
+      { id: 'kyc', label: 'KYC Information', to: '/buyer/kyc' },
+      { id: 'governance-widget', label: 'Governance Snapshot (Widget)', widgetId: 'governance' },
     ],
   },
   {
     id: 'intelligence',
     label: 'Intelligence',
     items: [
+      { id: 'outsourcing-calculator', label: 'Outsourcing Calculator', to: '/ai-calculator' },
+      { id: 'risk', label: 'Risk', to: '/buyer/risk' },
       { id: 'discovery-brief', label: 'Discovery Brief', to: '/discovery-brief' },
-      { id: 'intelligence-widget', label: 'Intelligence Digest', widgetId: 'intelligence' },
+      { id: 'risk-widget', label: 'Risk Dashboard (Widget)', widgetId: 'risk' },
+      { id: 'intelligence-widget', label: 'Intelligence Digest (Widget)', widgetId: 'intelligence' },
+    ],
+  },
+  {
+    id: 'help',
+    label: 'Help & Support',
+    items: [
+      { id: 'dispute-management', label: 'Dispute Management', to: '/buyer/governance?tab=disputes' },
+      { id: 'raise-issue', label: 'Raise an Issue', to: '/contact' },
+      { id: 'talk-to-expert', label: 'Talk to an Expert', to: '/buyer/talk-to-expert' },
     ],
   },
 ];
@@ -164,32 +187,37 @@ const NavDropdown: React.FC<{ group: NavGroup }> = ({ group }) => {
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
-          {group.items.map((item) =>
-            item.widgetId ? (
-              <button
-                key={item.id}
-                draggable
-                onDragStart={(e) => onWidgetDragStart(e, item.widgetId!)}
-                onClick={() => item.to && setOpen(false)}
-                title="Drag onto your dashboard to add this widget"
-                className="w-full flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-brand-bg cursor-grab active:cursor-grabbing"
-              >
-                <span>{item.label}</span>
-                <span className="text-[9px] font-bold uppercase tracking-wide text-brand-accent">Drag +</span>
-              </button>
-            ) : (
-              <Link
-                key={item.id}
-                to={item.to!}
-                onClick={() => setOpen(false)}
-                className="block px-4 py-2 text-sm text-slate-700 hover:bg-brand-bg hover:text-brand-primary"
-              >
-                <span className="block font-semibold">{item.label}</span>
-                {item.subtitle && <span className="block text-xs text-slate-400 mt-0.5">{item.subtitle}</span>}
-              </Link>
-            )
-          )}
+        <div className="absolute top-full left-0 mt-1 w-72 max-h-[70vh] overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50">
+          {group.items.map((item) => (
+            <React.Fragment key={item.id}>
+              {item.sectionHeader && (
+                <div className="mt-2 mb-1 px-4 pt-2 border-t border-gray-100 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  {item.sectionHeader}
+                </div>
+              )}
+              {item.widgetId ? (
+                <button
+                  draggable
+                  onDragStart={(e) => onWidgetDragStart(e, item.widgetId!)}
+                  onClick={() => item.to && setOpen(false)}
+                  title="Drag onto your dashboard to add this widget"
+                  className="w-full flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-brand-bg cursor-grab active:cursor-grabbing"
+                >
+                  <span>{item.label}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-brand-accent">Drag +</span>
+                </button>
+              ) : (
+                <Link
+                  to={item.to!}
+                  onClick={() => setOpen(false)}
+                  className="block px-4 py-2 text-sm text-slate-700 hover:bg-brand-bg hover:text-brand-primary"
+                >
+                  <span className="block font-semibold">{item.label}</span>
+                  {item.subtitle && <span className="block text-xs text-slate-400 mt-0.5">{item.subtitle}</span>}
+                </Link>
+              )}
+            </React.Fragment>
+          ))}
         </div>
       )}
     </div>

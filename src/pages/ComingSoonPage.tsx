@@ -18,6 +18,41 @@ const pageTitles: Record<string, { title: string; subtitle: string; launch: stri
     subtitle: 'Discover AI-powered service packages and automation solutions from verified vendors.',
     launch: 'Launching Q4 2026',
   },
+  '/buyer/team': {
+    title: 'My Team',
+    subtitle: 'See every vendor employee across your engagements, track former vs. active team members, and rate individual contributors.',
+    launch: 'Launching soon',
+  },
+  '/buyer/calendar': {
+    title: 'Calendar',
+    subtitle: 'A unified view of milestones, kickoffs, and vendor availability across all your engagements.',
+    launch: 'Launching soon',
+  },
+  '/buyer/billing': {
+    title: 'Billing',
+    subtitle: 'Track due bills and upcoming payments across all your active engagements in one place.',
+    launch: 'Launching soon',
+  },
+  '/buyer/tax': {
+    title: 'Tax',
+    subtitle: 'Manage your tax details and download the documents your finance team needs.',
+    launch: 'Launching soon',
+  },
+  '/buyer/kyc': {
+    title: 'KYC Information',
+    subtitle: 'Manage the identity and business verification details vendors and partners may request.',
+    launch: 'Launching soon',
+  },
+  '/buyer/risk': {
+    title: 'Risk Centre',
+    subtitle: 'A dedicated view of engagement, compliance, and delivery risk across your vendor portfolio.',
+    launch: 'Launching soon',
+  },
+  '/buyer/talk-to-expert': {
+    title: 'Talk to an Expert',
+    subtitle: 'Book time with a Collabov outsourcing specialist to talk through your engagement strategy.',
+    launch: 'Launching soon',
+  },
 };
 
 const ComingSoonPage: React.FC = () => {

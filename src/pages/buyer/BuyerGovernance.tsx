@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Scale, ShieldCheck, Download, Clock, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -9,7 +9,10 @@ type Tab = 'contracts' | 'disputes' | 'ir35' | 'gdpr';
 
 const BuyerGovernance: React.FC = () => {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>('contracts');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const validTabs: Tab[] = ['contracts', 'disputes', 'ir35', 'gdpr'];
+  const [tab, setTab] = useState<Tab>(validTabs.includes(tabParam as Tab) ? (tabParam as Tab) : 'contracts');
   const [loading, setLoading] = useState(true);
   const [contracts, setContracts] = useState<any[]>([]);
   const [disputes, setDisputes] = useState<any[]>([]);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Star, RefreshCw, MessageSquare, ExternalLink, X, CheckCircle2, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -343,9 +343,15 @@ export default function MyVendorsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const validTabs: FilterTab[] = ['all', 'active', 'completed', 'invited'];
+
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<FilterTab>('all');
+  const [activeTab, setActiveTab] = useState<FilterTab>(
+    validTabs.includes(tabParam as FilterTab) ? (tabParam as FilterTab) : 'all'
+  );
   const [rehireVendor, setRehireVendor] = useState<Vendor | null>(null);
 
   useEffect(() => {
