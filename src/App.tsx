@@ -55,6 +55,7 @@ import ShortlistPage from './pages/buyer/ShortlistPage';
 import BuyerPayments from './pages/buyer/BuyerPayments';
 import BuyerGovernance from './pages/buyer/BuyerGovernance';
 import BuyerSettings from './pages/buyer/BuyerSettings';
+import TalkToExpertPage from './pages/buyer/TalkToExpertPage';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -168,7 +169,7 @@ function AppContent() {
           <Route path="/buyer/tax" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/kyc" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/risk" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/talk-to-expert" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
+          <Route path="/buyer/talk-to-expert" element={<BuyerRoute><TalkToExpertPage /></BuyerRoute>} />
 
           {/* Vendor */}
           <Route path="/vendor/dashboard/*" element={<VendorRoute><VendorDashboard /></VendorRoute>} />
