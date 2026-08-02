@@ -26,6 +26,7 @@ import PackagesPage from './pages/PackagesPage';
 import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
 import BuyerDashboard from './pages/buyer/BuyerDashboard';
+import BuyerCalendarPage from './pages/buyer/BuyerCalendarPage';
 import PostJobPage from './pages/buyer/PostJobPage';
 import BYOVPage from './pages/buyer/BYOVPage';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -56,6 +57,7 @@ import ShortlistPage from './pages/buyer/ShortlistPage';
 import BuyerPayments from './pages/buyer/BuyerPayments';
 import BuyerGovernance from './pages/buyer/BuyerGovernance';
 import BuyerSettings from './pages/buyer/BuyerSettings';
+import TalkToExpertPage from './pages/buyer/TalkToExpertPage';
 
 const hideNavbarFooterPaths = [
   '/admin',
@@ -164,12 +166,12 @@ function AppContent() {
           <Route path="/buyer/post-job" element={<BuyerRoute><PostJobPage /></BuyerRoute>} />
           <Route path="/buyer/byov" element={<BuyerRoute><BYOVPage /></BuyerRoute>} />
           <Route path="/buyer/team" element={<BuyerRoute><BuyerTeamPage /></BuyerRoute>} />
-          <Route path="/buyer/calendar" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/billing" element={<BuyerRoute><BuyerBillingPage /></BuyerRoute>} />
+          <Route path="/buyer/calendar" element={<BuyerRoute><BuyerCalendarPage /></BuyerRoute>} />
+          <Route path="/buyer/billing" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/tax" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/kyc" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/risk" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/talk-to-expert" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
+          <Route path="/buyer/talk-to-expert" element={<BuyerRoute><TalkToExpertPage /></BuyerRoute>} />
 
           {/* Vendor */}
           <Route path="/vendor/dashboard/*" element={<VendorRoute><VendorDashboard /></VendorRoute>} />
