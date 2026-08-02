@@ -26,6 +26,7 @@ import PackagesPage from './pages/PackagesPage';
 import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
 import BuyerDashboard from './pages/buyer/BuyerDashboard';
+import BuyerKycPage from './pages/buyer/BuyerKycPage';
 import BuyerCalendarPage from './pages/buyer/BuyerCalendarPage';
 import PostJobPage from './pages/buyer/PostJobPage';
 import BYOVPage from './pages/buyer/BYOVPage';
@@ -56,6 +57,7 @@ import MyVendorsPage from './pages/buyer/MyVendorsPage';
 import ShortlistPage from './pages/buyer/ShortlistPage';
 import BuyerPayments from './pages/buyer/BuyerPayments';
 import BuyerGovernance from './pages/buyer/BuyerGovernance';
+import BuyerRiskPage from './pages/buyer/BuyerRiskPage';
 import BuyerSettings from './pages/buyer/BuyerSettings';
 import TalkToExpertPage from './pages/buyer/TalkToExpertPage';
 
@@ -169,8 +171,8 @@ function AppContent() {
           <Route path="/buyer/calendar" element={<BuyerRoute><BuyerCalendarPage /></BuyerRoute>} />
           <Route path="/buyer/billing" element={<BuyerRoute><BuyerBillingPage /></BuyerRoute>} />
           <Route path="/buyer/tax" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/kyc" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/risk" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
+          <Route path="/buyer/kyc" element={<BuyerRoute><BuyerKycPage /></BuyerRoute>} />
+          <Route path="/buyer/risk" element={<BuyerRoute><BuyerRiskPage /></BuyerRoute>} />
           <Route path="/buyer/talk-to-expert" element={<BuyerRoute><TalkToExpertPage /></BuyerRoute>} />
 
           {/* Vendor */}
