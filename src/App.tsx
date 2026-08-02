@@ -12,6 +12,7 @@ import AiCalculatorPage from './pages/AiCalculatorPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import ContactPage from './pages/ContactPage';
 import ComingSoonPage from './pages/ComingSoonPage';
+import BuyerBillingPage from './pages/buyer/BuyerBillingPage';
 import UserTypeSelection from './pages/UserTypeSelection';
 import BuyerSignup from './pages/BuyerSignup';
 import SignInPage from './pages/SignInPage';
@@ -164,7 +165,7 @@ function AppContent() {
           <Route path="/buyer/byov" element={<BuyerRoute><BYOVPage /></BuyerRoute>} />
           <Route path="/buyer/team" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/calendar" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/billing" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
+          <Route path="/buyer/billing" element={<BuyerRoute><BuyerBillingPage /></BuyerRoute>} />
           <Route path="/buyer/tax" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/kyc" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/risk" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
