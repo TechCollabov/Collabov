@@ -12,6 +12,8 @@ import AiCalculatorPage from './pages/AiCalculatorPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import ContactPage from './pages/ContactPage';
 import ComingSoonPage from './pages/ComingSoonPage';
+import BuyerBillingPage from './pages/buyer/BuyerBillingPage';
+import BuyerTeamPage from './pages/buyer/BuyerTeamPage';
 import UserTypeSelection from './pages/UserTypeSelection';
 import BuyerSignup from './pages/BuyerSignup';
 import SignInPage from './pages/SignInPage';
@@ -25,6 +27,7 @@ import PackagesPage from './pages/PackagesPage';
 import TendersPage from './pages/TendersPage';
 import JobsPage from './pages/JobsPage';
 import BuyerDashboard from './pages/buyer/BuyerDashboard';
+import BuyerCalendarPage from './pages/buyer/BuyerCalendarPage';
 import PostJobPage from './pages/buyer/PostJobPage';
 import BYOVPage from './pages/buyer/BYOVPage';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -162,9 +165,9 @@ function AppContent() {
           <Route path="/buyer/dashboard" element={<BuyerRoute><BuyerDashboard /></BuyerRoute>} />
           <Route path="/buyer/post-job" element={<BuyerRoute><PostJobPage /></BuyerRoute>} />
           <Route path="/buyer/byov" element={<BuyerRoute><BYOVPage /></BuyerRoute>} />
-          <Route path="/buyer/team" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/calendar" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
-          <Route path="/buyer/billing" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
+          <Route path="/buyer/team" element={<BuyerRoute><BuyerTeamPage /></BuyerRoute>} />
+          <Route path="/buyer/calendar" element={<BuyerRoute><BuyerCalendarPage /></BuyerRoute>} />
+          <Route path="/buyer/billing" element={<BuyerRoute><BuyerBillingPage /></BuyerRoute>} />
           <Route path="/buyer/tax" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/kyc" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
           <Route path="/buyer/risk" element={<BuyerRoute><ComingSoonPage /></BuyerRoute>} />
