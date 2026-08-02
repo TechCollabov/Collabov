@@ -12,7 +12,6 @@ import AiCalculatorPage from './pages/AiCalculatorPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import ContactPage from './pages/ContactPage';
 import ComingSoonPage from './pages/ComingSoonPage';
-import BuyerBillingPage from './pages/buyer/BuyerBillingPage';
 import BuyerTeamPage from './pages/buyer/BuyerTeamPage';
 import UserTypeSelection from './pages/UserTypeSelection';
 import BuyerSignup from './pages/BuyerSignup';
