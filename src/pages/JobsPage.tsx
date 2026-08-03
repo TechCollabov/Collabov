@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ArrowRight, Clock, MapPin, Briefcase, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, ArrowRight, Clock, MapPin, Briefcase, ChevronDown, Loader2, Bookmark } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+
+const SAVED_JOBS_KEY = 'collabov_saved_jobs';
+
+function loadSavedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SAVED_JOBS_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
 
 interface JobRow {
   id: string;
@@ -47,6 +57,16 @@ const JobsPage: React.FC = () => {
   const [location, setLocation] = useState('All');
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => loadSavedIds());
+
+  const toggleSave = (id: string) => {
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem(SAVED_JOBS_KEY, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
 
   useEffect(() => {
     (async () => {
@@ -174,6 +194,17 @@ const JobsPage: React.FC = () => {
                       >
                         Apply Now <ArrowRight className="h-4 w-4" />
                       </Link>
+                      <button
+                        onClick={() => toggleSave(job.id)}
+                        className={`flex items-center justify-center gap-1.5 py-2 px-4 border text-sm font-medium rounded-lg transition-colors ${
+                          savedIds.has(job.id)
+                            ? 'border-[#0070F3] text-[#0070F3] bg-blue-50'
+                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Bookmark className={`h-4 w-4 ${savedIds.has(job.id) ? 'fill-current' : ''}`} />
+                        {savedIds.has(job.id) ? 'Saved' : 'Save Job'}
+                      </button>
                     </div>
                   </div>
                 </div>
