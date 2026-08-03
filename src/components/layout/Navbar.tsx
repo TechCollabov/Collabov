@@ -1,14 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Menu, X, Globe, LogIn, ChevronDown, Briefcase, LayoutDashboard, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ROLE_TO_DASHBOARD } from '../../constants/roles';
 import { supabase } from '../../lib/supabase';
 
+// Hover-dropdown with a short close delay so moving the cursor from the
+// trigger into the panel (crossing the small visual gap between them)
+// doesn't fire a leave before the click lands.
+function useHoverDropdown() {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const openNow = useCallback(() => {
+    cancelClose();
+    setOpen(true);
+  }, [cancelClose]);
+
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 250);
+  }, [cancelClose]);
+
+  useEffect(() => () => cancelClose(), [cancelClose]);
+
+  return { open, setOpen, onMouseEnter: openNow, onMouseLeave: scheduleClose };
+}
+
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isOutsourceOpen, setIsOutsourceOpen] = useState(false);
-  const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+  const outsource = useHoverDropdown();
+  const projects = useHoverDropdown();
   const [marketInsightComingSoon, setMarketInsightComingSoon] = useState(true);
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -45,34 +74,34 @@ const Navbar: React.FC = () => {
 
               {/* Outsource Dropdown */}
               <div
-                className="relative"
-                onMouseEnter={() => setIsOutsourceOpen(true)}
-                onMouseLeave={() => setIsOutsourceOpen(false)}
+                className="relative pb-2"
+                onMouseEnter={outsource.onMouseEnter}
+                onMouseLeave={outsource.onMouseLeave}
               >
                 <button className="flex items-center gap-1 text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200 py-2">
                   Outsource <ChevronDown className="h-4 w-4" />
                 </button>
 
-                {isOutsourceOpen && (
+                {outsource.open && (
                   <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 py-5 z-50">
                     <div className="px-5">
                       <div className="space-y-1 mb-4">
-                        <Link to="/results?type=agency" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
+                        <Link to="/results?type=agency" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => outsource.setOpen(false)}>
                           IT Agencies
                         </Link>
-                        <Link to="/results?type=msp" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
+                        <Link to="/results?type=msp" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => outsource.setOpen(false)}>
                           MSPs
                         </Link>
-                        <Link to="/results?type=staffaug" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
+                        <Link to="/results?type=staffaug" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => outsource.setOpen(false)}>
                           Staff Augmentation
                         </Link>
-                        <Link to="/freelancers" className="flex items-center gap-2 px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
+                        <Link to="/freelancers" className="flex items-center gap-2 px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => outsource.setOpen(false)}>
                           Freelancers
                           <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">Coming Soon</span>
                         </Link>
                       </div>
                       <div className="border-t border-gray-100 pt-3 space-y-1">
-                        <Link to="/ai-calculator" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsOutsourceOpen(false)}>
+                        <Link to="/ai-calculator" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => outsource.setOpen(false)}>
                           Outsourcing Calculator
                         </Link>
                       </div>
@@ -83,21 +112,21 @@ const Navbar: React.FC = () => {
 
               {/* Projects Dropdown */}
               <div
-                className="relative"
-                onMouseEnter={() => setIsProjectsOpen(true)}
-                onMouseLeave={() => setIsProjectsOpen(false)}
+                className="relative pb-2"
+                onMouseEnter={projects.onMouseEnter}
+                onMouseLeave={projects.onMouseLeave}
               >
                 <button className="flex items-center gap-1 text-[#0B2D59] font-medium hover:text-[#0070F3] transition-colors duration-200 py-2">
                   Projects <ChevronDown className="h-4 w-4" />
                 </button>
 
-                {isProjectsOpen && (
+                {projects.open && (
                   <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 py-4 z-50">
                     <div className="px-4 space-y-1">
-                      <Link to="/tenders" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsProjectsOpen(false)}>
+                      <Link to="/tenders" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => projects.setOpen(false)}>
                         Tenders
                       </Link>
-                      <Link to="/jobs" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => setIsProjectsOpen(false)}>
+                      <Link to="/jobs" className="block px-3 py-2 text-[#0B2D59] hover:bg-blue-50 hover:text-[#0070F3] rounded-lg transition-all duration-200 font-medium text-sm" onClick={() => projects.setOpen(false)}>
                         Jobs
                       </Link>
                     </div>
