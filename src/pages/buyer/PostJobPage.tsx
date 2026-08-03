@@ -219,7 +219,7 @@ const PostJobPage: React.FC = () => {
           ? tenderData.criteria.split('\n').map(s => s.trim()).filter(Boolean)
           : null,
         tech_stack: jobData.skills.length ? jobData.skills : null,
-        admin_status: 'pending_review',
+        admin_status: 'live',
       }).select().single();
       if (error) throw error;
 
