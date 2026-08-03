@@ -36,6 +36,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminVerification from './pages/admin/AdminVerification';
+import AdminBuyerKyc from './pages/admin/AdminBuyerKyc';
 import AdminBriefs from './pages/admin/AdminBriefs';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminDisputes from './pages/admin/AdminDisputes';
@@ -185,6 +186,7 @@ function AppContent() {
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="verification" element={<AdminVerification />} />
+            <Route path="buyer-kyc" element={<AdminBuyerKyc />} />
             <Route path="briefs" element={<AdminBriefs />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="disputes" element={<AdminDisputes />} />

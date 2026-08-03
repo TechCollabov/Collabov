@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShieldCheck, FileText, Users, AlertTriangle,
-  CreditCard, BarChart2, BookOpen, Settings, Menu, X, LogOut, Globe
+  CreditCard, BarChart2, BookOpen, Settings, Menu, X, LogOut, Globe, FileCheck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -20,6 +20,7 @@ const AdminLayout: React.FC = () => {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, exact: true },
     { name: 'Vendor Verification', href: '/admin/verification', icon: ShieldCheck },
+    { name: 'Buyer KYC', href: '/admin/buyer-kyc', icon: FileCheck },
     { name: 'Brief & Tender Review', href: '/admin/briefs', icon: FileText },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Disputes', href: '/admin/disputes', icon: AlertTriangle },
