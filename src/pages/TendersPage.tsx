@@ -1,105 +1,107 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ArrowRight, Clock, Building2, DollarSign, ChevronDown } from 'lucide-react';
+import { Search, ArrowRight, Clock, Building2, DollarSign, ChevronDown, Loader2, Bookmark, ChevronUp } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
-const TENDERS = [
-  {
-    id: '1',
-    title: 'Cloud Infrastructure Modernisation',
-    company: 'FinEdge Capital',
-    companyType: 'Financial Services',
-    category: 'Cloud & Infrastructure',
-    budget: '£40,000–£70,000',
-    timeline: '4 months',
-    deadline: '22 Apr 2026',
-    description: 'We are seeking an experienced MSP or IT agency to migrate our on-premise infrastructure to AWS. The engagement covers architecture design, phased migration of 12 legacy services, disaster recovery setup, and handover documentation.',
-    skills: ['AWS', 'Terraform', 'Linux', 'Docker'],
-    proposals: 6,
-    posted: '2 days ago',
-  },
-  {
-    id: '2',
-    title: 'React Native Mobile App (iOS & Android)',
-    company: 'GreenPath Logistics',
-    companyType: 'Logistics & Supply Chain',
-    category: 'Software Development',
-    budget: '£25,000–£45,000',
-    timeline: '3 months',
-    deadline: '30 Apr 2026',
-    description: 'Build a driver-facing mobile app for real-time route optimisation, proof of delivery capture, and fleet management integration. The app must integrate with our existing REST API and support offline mode.',
-    skills: ['React Native', 'TypeScript', 'REST API', 'iOS', 'Android'],
-    proposals: 11,
-    posted: '4 days ago',
-  },
-  {
-    id: '3',
-    title: 'ISO 27001 Implementation & Certification Support',
-    company: 'MedCore Health',
-    companyType: 'Healthcare',
-    category: 'Cybersecurity',
-    budget: '£18,000–£30,000',
-    timeline: '6 months',
-    deadline: '15 May 2026',
-    description: 'We require a cybersecurity consultancy to guide us through full ISO 27001 certification. Scope includes gap analysis, ISMS documentation, staff training, internal audit, and pre-certification review.',
-    skills: ['ISO 27001', 'GDPR', 'Risk Management', 'ISMS'],
-    proposals: 4,
-    posted: '1 week ago',
-  },
-  {
-    id: '4',
-    title: 'Microsoft 365 Tenant Migration & Managed Support',
-    company: 'Brightstone Solicitors',
-    companyType: 'Legal Services',
-    category: 'Managed IT',
-    budget: '£8,000–£15,000',
-    timeline: '6 weeks',
-    deadline: '5 May 2026',
-    description: 'Migrate 80 users from Google Workspace to Microsoft 365 (Exchange Online, Teams, SharePoint). Ongoing managed IT support required post-migration at a monthly retainer.',
-    skills: ['Microsoft 365', 'Azure AD', 'Exchange Online', 'SharePoint'],
-    proposals: 9,
-    posted: '3 days ago',
-  },
-  {
-    id: '5',
-    title: 'E-commerce Replatform — Shopify to Custom',
-    company: 'LuxeHome Interiors',
-    companyType: 'Retail & E-commerce',
-    category: 'Software Development',
-    budget: '£55,000–£90,000',
-    timeline: '5 months',
-    deadline: '10 May 2026',
-    description: 'We outgrown Shopify and need a bespoke e-commerce platform built on Next.js with a headless CMS, Stripe payments, multi-warehouse inventory, and a B2B trade portal.',
-    skills: ['Next.js', 'Stripe', 'Contentful', 'PostgreSQL', 'Node.js'],
-    proposals: 7,
-    posted: '5 days ago',
-  },
-  {
-    id: '6',
-    title: 'DevOps Transformation — Dedicated Team',
-    company: 'TradePoint Exchange',
-    companyType: 'Financial Technology',
-    category: 'DevOps',
-    budget: '£12,000/month',
-    timeline: 'Ongoing',
-    deadline: '1 May 2026',
-    description: 'Looking for a dedicated DevOps team to own our CI/CD pipelines, Kubernetes cluster management, observability stack, and on-call rotation. Must have experience in high-availability fintech environments.',
-    skills: ['Kubernetes', 'Terraform', 'GitHub Actions', 'Datadog', 'AWS'],
-    proposals: 3,
-    posted: '1 day ago',
-  },
-];
+const SAVED_TENDERS_KEY = 'collabov_saved_tenders';
+
+function loadSavedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SAVED_TENDERS_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+interface TenderRow {
+  id: string;
+  title: string;
+  tender_title: string | null;
+  description: string;
+  category: string | null;
+  budget_amount: number;
+  currency: string | null;
+  timeline: string | null;
+  submission_deadline: string | null;
+  evaluation_criteria: string[] | null;
+  tech_stack: string[] | null;
+  created_at: string;
+  buyer_id: string;
+  company?: string;
+}
 
 const CATEGORIES = ['All', 'Software Development', 'Managed IT', 'Cybersecurity', 'Cloud & Infrastructure', 'DevOps', 'QA & Testing'];
 const BUDGETS = ['All', 'Under £10k', '£10k–£30k', '£30k–£60k', '£60k+'];
+
+function formatBudget(amount: number, currency: string | null): string {
+  const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£';
+  return amount ? `${symbol}${amount.toLocaleString()}` : 'Budget on request';
+}
+
+function budgetBand(amount: number): string {
+  if (amount < 10000) return 'Under £10k';
+  if (amount < 30000) return '£10k–£30k';
+  if (amount < 60000) return '£30k–£60k';
+  return '£60k+';
+}
+
+function timeAgo(dateStr: string): string {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+  if (days <= 0) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.floor(days / 7);
+  return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+}
 
 const TendersPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [budget, setBudget] = useState('All');
+  const [tenders, setTenders] = useState<TenderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => loadSavedIds());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const filtered = TENDERS.filter(t =>
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data: rows } = await supabase
+        .from('jobs')
+        .select('id, title, tender_title, description, category, budget_amount, currency, timeline, submission_deadline, evaluation_criteria, tech_stack, created_at, buyer_id')
+        .eq('job_kind', 'tender')
+        .eq('visibility', 'public')
+        .eq('status', 'open')
+        .eq('admin_status', 'live')
+        .order('created_at', { ascending: false });
+
+      const buyerIds = Array.from(new Set((rows ?? []).map(t => t.buyer_id)));
+      const { data: buyers } = buyerIds.length
+        ? await supabase.from('buyers').select('id, company_name').in('id', buyerIds)
+        : { data: [] as any[] };
+      const companyMap = new Map((buyers ?? []).map((b: any) => [b.id, b.company_name]));
+
+      setTenders((rows ?? []).map(t => ({
+        ...t,
+        company: companyMap.get(t.buyer_id) ?? 'Buyer',
+      })));
+      setLoading(false);
+    })();
+  }, []);
+
+  const toggleSave = (id: string) => {
+    setSavedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem(SAVED_TENDERS_KEY, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+
+  const filtered = tenders.filter(t =>
     (category === 'All' || t.category === category) &&
-    (search === '' || t.title.toLowerCase().includes(search.toLowerCase()) || t.company.toLowerCase().includes(search.toLowerCase()))
+    (budget === 'All' || budgetBand(t.budget_amount) === budget) &&
+    (search === '' || t.title.toLowerCase().includes(search.toLowerCase()) || (t.company ?? '').toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -149,65 +151,100 @@ const TendersPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="text-sm text-gray-500 mb-5">{filtered.length} tender{filtered.length !== 1 ? 's' : ''} found</div>
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-gray-400">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading tenders...
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-gray-500 mb-5">{filtered.length} tender{filtered.length !== 1 ? 's' : ''} found</div>
 
-        {/* List */}
-        <div className="space-y-4">
-          {filtered.map(tender => (
-            <div key={tender.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-              <div className="flex flex-col lg:flex-row lg:items-start gap-5">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="text-xs bg-blue-50 text-[#0070F3] font-semibold px-2.5 py-1 rounded-full">{tender.category}</span>
-                    <span className="text-xs text-gray-400">{tender.posted}</span>
-                  </div>
-                  <h2 className="text-lg font-bold text-[#0B2D59] mb-1">{tender.title}</h2>
-                  <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
-                    <Building2 className="h-4 w-4" />
-                    <span>{tender.company}</span>
-                    <span className="text-gray-300">·</span>
-                    <span>{tender.companyType}</span>
-                  </div>
-                  <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2">{tender.description}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tender.skills.map(s => (
-                      <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{s}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="lg:w-52 flex flex-col gap-4 lg:text-right">
-                  <div className="space-y-2">
-                    <div className="flex lg:flex-col items-center lg:items-end gap-3 lg:gap-1">
-                      <div className="flex items-center gap-1 text-[#0070F3] font-bold text-lg">
-                        <DollarSign className="h-4 w-4 flex-shrink-0" />
-                        <span className="text-sm">{tender.budget}</span>
+            {/* List */}
+            <div className="space-y-4">
+              {filtered.map(tender => {
+                const displayTitle = tender.tender_title || tender.title;
+                const expanded = expandedId === tender.id;
+                return (
+                  <div key={tender.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
+                    <div className="flex flex-col lg:flex-row lg:items-start gap-5">
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          {tender.category && <span className="text-xs bg-blue-50 text-[#0070F3] font-semibold px-2.5 py-1 rounded-full">{tender.category}</span>}
+                          <span className="text-xs text-gray-400">{timeAgo(tender.created_at)}</span>
+                        </div>
+                        <h2 className="text-lg font-bold text-[#0B2D59] mb-1">{displayTitle}</h2>
+                        <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
+                          <Building2 className="h-4 w-4" />
+                          <span>{tender.company}</span>
+                        </div>
+                        <p className={`text-sm text-gray-600 leading-relaxed mb-4 ${expanded ? '' : 'line-clamp-2'}`}>{tender.description}</p>
+                        {expanded && tender.evaluation_criteria && tender.evaluation_criteria.length > 0 && (
+                          <div className="mb-4">
+                            <div className="text-xs font-semibold text-gray-500 mb-1.5">Evaluation Criteria</div>
+                            <ul className="list-disc list-inside text-sm text-gray-600 space-y-0.5">
+                              {tender.evaluation_criteria.map((c, i) => <li key={i}>{c}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-1.5">
+                          {(tender.tech_stack ?? []).map(s => (
+                            <span key={s} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{s}</span>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 text-sm text-gray-500">
-                        <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span>{tender.timeline}</span>
+
+                      <div className="lg:w-52 flex flex-col gap-4 lg:text-right">
+                        <div className="space-y-2">
+                          <div className="flex lg:flex-col items-center lg:items-end gap-3 lg:gap-1">
+                            <div className="flex items-center gap-1 text-[#0070F3] font-bold text-lg">
+                              <DollarSign className="h-4 w-4 flex-shrink-0" />
+                              <span className="text-sm">{formatBudget(tender.budget_amount, tender.currency)}</span>
+                            </div>
+                            {tender.timeline && (
+                              <div className="flex items-center gap-1 text-sm text-gray-500">
+                                <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>{tender.timeline}</span>
+                              </div>
+                            )}
+                          </div>
+                          {tender.submission_deadline && (
+                            <div className="text-xs text-gray-400">Deadline: <span className="font-medium text-gray-600">{new Date(tender.submission_deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
+                          )}
+                        </div>
+                        <Link
+                          to={`/signin?returnUrl=/vendor/dashboard/jobs`}
+                          className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Submit Proposal <ArrowRight className="h-4 w-4" />
+                        </Link>
+                        <button
+                          onClick={() => setExpandedId(expanded ? null : tender.id)}
+                          className="flex items-center justify-center gap-1.5 py-2 px-4 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          {expanded ? <>Hide Brief <ChevronUp className="h-4 w-4" /></> : 'View Brief'}
+                        </button>
+                        <button
+                          onClick={() => toggleSave(tender.id)}
+                          className={`flex items-center justify-center gap-1.5 py-2 px-4 border text-sm font-medium rounded-lg transition-colors ${
+                            savedIds.has(tender.id)
+                              ? 'border-[#0070F3] text-[#0070F3] bg-blue-50'
+                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Bookmark className={`h-4 w-4 ${savedIds.has(tender.id) ? 'fill-current' : ''}`} />
+                          {savedIds.has(tender.id) ? 'Saved' : 'Save Tender'}
+                        </button>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-400">Deadline: <span className="font-medium text-gray-600">{tender.deadline}</span></div>
-                    <div className="text-xs text-gray-400">{tender.proposals} proposal{tender.proposals !== 1 ? 's' : ''} received</div>
                   </div>
-                  <Link
-                    to={`/signin?returnUrl=/tenders/${tender.id}`}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-[#0070F3] text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Submit Proposal <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <button className="py-2 px-4 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                    View Brief
-                  </button>
-                </div>
-              </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
 
-        {filtered.length === 0 && (
-          <div className="text-center py-16 text-gray-400">No tenders match your search.</div>
+            {filtered.length === 0 && (
+              <div className="text-center py-16 text-gray-400">No tenders match your search.</div>
+            )}
+          </>
         )}
       </div>
     </div>
