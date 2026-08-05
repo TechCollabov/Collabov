@@ -5,6 +5,7 @@ import {
   Plus, FolderOpen, Search, FileCheck, Sparkles, Send,
   X, AlertTriangle, Info, ChevronRight, ChevronUp,
   FileText, CreditCard, Star, CheckCircle, Loader2,
+  Briefcase, UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -126,18 +127,157 @@ const SIDEBAR_ITEMS: { id: string; label: string; icon: React.ElementType; to: s
   { id: 'governance', label: 'Governance', icon: FileCheck, to: '/buyer/governance' },
 ];
 
+const InviteTeamModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { user } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('member');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!user) return;
+    if (!name.trim() || !email.trim()) {
+      setError('Name and email are required.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const { error: insertError } = await supabase.from('buyer_team_invitations').insert({
+      buyer_id: user.id,
+      invited_name: name.trim(),
+      invited_email: email.trim(),
+      role,
+    });
+    setSaving(false);
+    if (insertError) {
+      setError('Could not send the invite. Please try again.');
+      return;
+    }
+    setSent(true);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-[#0B2D59]">Invite Team Member</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {sent ? (
+          <div className="text-center py-4">
+            <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
+            <p className="text-sm text-gray-600">Invite recorded for {email}. You can track and revoke it from My Team.</p>
+            <button
+              onClick={onClose}
+              className="mt-4 w-full bg-[#0070F3] text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3 mb-4">
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Colleague's name"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Colleague's email"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3]"
+              />
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0070F3] bg-white"
+              >
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+
+            {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              className="w-full bg-[#0070F3] text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Sending...' : 'Send Invite'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AddMenu: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  return (
+    <div className="relative mb-4" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Add"
+        className="group relative w-12 h-12 rounded-2xl bg-white text-brand-primary flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+      >
+        <Plus className="h-6 w-6" strokeWidth={2.5} />
+      </button>
+      {open && (
+        <div className="absolute top-0 left-full ml-3 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-50">
+          <Link
+            to="/buyer/post-job"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-brand-bg"
+          >
+            <Briefcase className="h-4 w-4 text-slate-400" />
+            <div>
+              <div className="font-semibold">Post a Project</div>
+              <div className="text-xs text-slate-400">New job or tender for vendors</div>
+            </div>
+          </Link>
+          <button
+            onClick={() => { setOpen(false); setShowInvite(true); }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-brand-bg text-left"
+          >
+            <UserPlus className="h-4 w-4 text-slate-400" />
+            <div>
+              <div className="font-semibold">Invite Team Member</div>
+              <div className="text-xs text-slate-400">Add a colleague to your account</div>
+            </div>
+          </button>
+        </div>
+      )}
+      {showInvite && <InviteTeamModal onClose={() => setShowInvite(false)} />}
+    </div>
+  );
+};
+
 const IconSidebar: React.FC = () => (
   <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-20 flex-col items-center bg-brand-primary py-6 gap-4">
-    <Link
-      to="/buyer/post-job"
-      title="Post a Job"
-      className="group relative w-12 h-12 rounded-2xl bg-white text-brand-primary flex items-center justify-center shadow-lg hover:scale-105 transition-transform mb-4"
-    >
-      <Plus className="h-6 w-6" strokeWidth={2.5} />
-      <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity">
-        Post a Job
-      </span>
-    </Link>
+    <AddMenu />
     {SIDEBAR_ITEMS.map((item) => {
       const Icon = item.icon;
       return (
