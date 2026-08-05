@@ -4,8 +4,10 @@ import {
   Globe, ChevronDown, Bell, MessageSquare, User, Settings, LogOut,
   Plus, FolderOpen, Search, FileCheck, Sparkles, Send,
   X, AlertTriangle, Info, ChevronRight, ChevronUp,
+  FileText, CreditCard, Star, CheckCircle, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 // ─── Types shared with the Command Centre ─────────────────────────────────
 
@@ -224,6 +226,163 @@ const NavDropdown: React.FC<{ group: NavGroup }> = ({ group }) => {
   );
 };
 
+// ─── Notification bell ──────────────────────────────────────────────────
+
+interface NotificationRow {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  link_url: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+const NOTIF_ICON_MAP: Record<string, React.ReactNode> = {
+  enquiry: <MessageSquare className="h-4 w-4" />,
+  new_proposal: <FileText className="h-4 w-4" />,
+  message: <MessageSquare className="h-4 w-4" />,
+  payment: <CreditCard className="h-4 w-4" />,
+  milestone: <CreditCard className="h-4 w-4" />,
+  review: <Star className="h-4 w-4" />,
+  contract: <FileText className="h-4 w-4" />,
+  system: <Bell className="h-4 w-4" />,
+};
+
+const NOTIF_COLOR_MAP: Record<string, string> = {
+  enquiry: 'bg-blue-100 text-blue-600',
+  new_proposal: 'bg-blue-100 text-blue-600',
+  message: 'bg-purple-100 text-purple-600',
+  payment: 'bg-green-100 text-green-600',
+  milestone: 'bg-green-100 text-green-600',
+  review: 'bg-amber-100 text-amber-600',
+  contract: 'bg-gray-100 text-gray-600',
+  system: 'bg-gray-100 text-gray-600',
+};
+
+function notifTimeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+const NotificationBell: React.FC = () => {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setNotifications(data || []);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`buyer-notifications-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, load]);
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const markAllRead = async () => {
+    if (!user) return;
+    setNotifications(ns => ns.map(n => ({ ...n, is_read: true })));
+    await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('user_id', user.id).eq('is_read', false);
+  };
+
+  const markRead = async (id: string) => {
+    setNotifications(ns => ns.map(n => n.id === id ? { ...n, is_read: true } : n));
+    await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('id', id);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="p-2 text-slate-400 hover:text-slate-700 relative"
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#0070F3] text-white text-[10px] font-bold flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 max-h-[28rem] flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <span className="text-sm font-semibold text-slate-900">Notifications</span>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} className="text-xs text-[#0070F3] font-medium hover:underline flex items-center gap-1">
+                <CheckCircle className="h-3.5 w-3.5" /> Mark all read
+              </button>
+            )}
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {loading ? (
+              <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 text-blue-500 animate-spin" /></div>
+            ) : notifications.length === 0 ? (
+              <div className="text-center py-10 px-4">
+                <Bell className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                <div className="text-sm text-gray-400">No notifications yet</div>
+              </div>
+            ) : (
+              notifications.map(n => {
+                const inner = (
+                  <>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${NOTIF_COLOR_MAP[n.type] || 'bg-gray-100 text-gray-600'}`}>
+                      {NOTIF_ICON_MAP[n.type] || <Bell className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-semibold truncate ${n.is_read ? 'text-gray-700' : 'text-[#0B2D59]'}`}>{n.title}</div>
+                      <div className="text-xs text-gray-500 line-clamp-2">{n.message}</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5">{notifTimeAgo(n.created_at)}</div>
+                    </div>
+                    {!n.is_read && <div className="w-2 h-2 rounded-full bg-[#0070F3] flex-shrink-0 mt-1.5" />}
+                  </>
+                );
+                const className = `flex gap-3 px-4 py-3 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/30' : ''}`;
+                return n.link_url ? (
+                  <Link key={n.id} to={n.link_url} onClick={() => { markRead(n.id); setOpen(false); }} className={className}>{inner}</Link>
+                ) : (
+                  <div key={n.id} onClick={() => markRead(n.id)} className={className}>{inner}</div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Header ──────────────────────────────────────────────────────────────
 
 const Header: React.FC = () => {
@@ -246,9 +405,7 @@ const Header: React.FC = () => {
         </nav>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Link to="/buyer/dashboard" className="p-2 text-slate-400 hover:text-slate-700 relative">
-            <Bell className="h-5 w-5" />
-          </Link>
+          <NotificationBell />
           <Link to="/messages" className="p-2 text-slate-400 hover:text-slate-700">
             <MessageSquare className="h-5 w-5" />
           </Link>
