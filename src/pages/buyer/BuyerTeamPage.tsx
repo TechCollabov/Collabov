@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Users, Star, X } from 'lucide-react';
+import { Users, Star, X, UserPlus, Trash2, Mail } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import BuyerLayout from '../../components/buyer/BuyerLayout';
@@ -24,6 +24,15 @@ interface VendorEmployeeRow {
 interface VendorRow {
   id: string;
   company_name: string;
+}
+
+interface InvitationRow {
+  id: string;
+  invited_name: string;
+  invited_email: string;
+  role: string;
+  status: string;
+  created_at: string;
 }
 
 interface ReviewRow {
@@ -233,6 +242,27 @@ const BuyerTeamPage: React.FC = () => {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [rateTarget, setRateTarget] = useState<TeamMember | null>(null);
+  const [invitations, setInvitations] = useState<InvitationRow[]>([]);
+
+  const loadInvitations = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('buyer_team_invitations')
+      .select('id, invited_name, invited_email, role, status, created_at')
+      .eq('buyer_id', user.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    setInvitations(data || []);
+  }, [user]);
+
+  useEffect(() => {
+    loadInvitations();
+  }, [loadInvitations]);
+
+  const revokeInvitation = async (id: string) => {
+    setInvitations((prev) => prev.filter((i) => i.id !== id));
+    await supabase.from('buyer_team_invitations').update({ status: 'revoked' }).eq('id', id);
+  };
 
   const loadTeam = useCallback(async () => {
     if (!user) return;
@@ -354,9 +384,45 @@ const BuyerTeamPage: React.FC = () => {
         </div>
       </div>
 
+      {invitations.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-xs font-bold tracking-[0.15em] uppercase text-gray-400 mb-4">
+            Pending Invitations ({invitations.length})
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {invitations.map((inv) => (
+              <div key={inv.id} className="bg-white rounded-2xl shadow-sm border-2 border-dashed border-slate-200 p-5 flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center flex-shrink-0">
+                    <UserPlus className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{inv.invited_name}</p>
+                    <p className="text-xs text-gray-400 truncate flex items-center gap-1">
+                      <Mail className="h-3 w-3" /> {inv.invited_email}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-1 pt-2 border-t border-gray-100">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700 capitalize">
+                    {inv.role} · Pending
+                  </span>
+                  <button
+                    onClick={() => revokeInvitation(inv.id)}
+                    className="text-xs font-semibold text-red-500 hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Revoke
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {loading ? (
         <p className="text-sm text-gray-400 py-8 text-center">Loading your team...</p>
-      ) : members.length === 0 ? (
+      ) : members.length === 0 && invitations.length === 0 ? (
         <div className="bg-white rounded-3xl shadow-sm border-2 border-slate-100 p-12 text-center">
           <Users className="h-10 w-10 text-gray-300 mx-auto mb-4" />
           <p className="text-sm text-gray-400">
